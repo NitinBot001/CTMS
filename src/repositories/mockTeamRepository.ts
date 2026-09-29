@@ -13,6 +13,7 @@ import {
   CreateCustomRoleInput,
   UpdateCustomRoleInput,
   AssignRoleInput,
+  CreateTeamMemberInput,
 } from '../types';
 import {
   MOCK_USERS,
@@ -26,12 +27,26 @@ export class MockTeamRepository implements ITeamRepository {
   private roles: Role[];
   private permissions: Permission[];
   private userRoles: UserRole[];
+  private onSaveUsers?: (users: User[]) => void;
+  private onSaveRoles?: (roles: Role[]) => void;
+  private onSaveUserRoles?: (userRoles: UserRole[]) => void;
 
-  constructor() {
-    this.users = structuredClone(MOCK_USERS);
-    this.roles = structuredClone(MOCK_ROLES);
-    this.permissions = structuredClone(MOCK_PERMISSIONS);
-    this.userRoles = structuredClone(MOCK_USER_ROLES);
+  constructor(
+    initialUsers?: User[],
+    initialRoles?: Role[],
+    initialPermissions?: Permission[],
+    initialUserRoles?: UserRole[],
+    onSaveUsers?: (users: User[]) => void,
+    onSaveRoles?: (roles: Role[]) => void,
+    onSaveUserRoles?: (userRoles: UserRole[]) => void
+  ) {
+    this.users = initialUsers ? structuredClone(initialUsers) : structuredClone(MOCK_USERS);
+    this.roles = initialRoles ? structuredClone(initialRoles) : structuredClone(MOCK_ROLES);
+    this.permissions = initialPermissions ? structuredClone(initialPermissions) : structuredClone(MOCK_PERMISSIONS);
+    this.userRoles = initialUserRoles ? structuredClone(initialUserRoles) : structuredClone(MOCK_USER_ROLES);
+    this.onSaveUsers = onSaveUsers;
+    this.onSaveRoles = onSaveRoles;
+    this.onSaveUserRoles = onSaveUserRoles;
   }
 
   async getTeamMembers(
@@ -334,6 +349,7 @@ export class MockTeamRepository implements ITeamRepository {
     };
 
     this.userRoles.push(newAssignment);
+    this.onSaveUserRoles?.(this.userRoles);
     return structuredClone(newAssignment);
   }
 
@@ -353,6 +369,7 @@ export class MockTeamRepository implements ITeamRepository {
     if (index === -1) return false;
 
     this.userRoles.splice(index, 1);
+    this.onSaveUserRoles?.(this.userRoles);
     return true;
   }
 
@@ -398,6 +415,7 @@ export class MockTeamRepository implements ITeamRepository {
     };
 
     this.roles.push(newRole);
+    this.onSaveRoles?.(this.roles);
     return structuredClone(newRole);
   }
 
@@ -451,7 +469,73 @@ export class MockTeamRepository implements ITeamRepository {
     }
 
     role.updatedAt = new Date().toISOString();
+    this.onSaveRoles?.(this.roles);
     return structuredClone(role);
+  }
+
+  async createTeamMember(
+    context: ParticipantQueryContext,
+    input: CreateTeamMemberInput
+  ): Promise<TeamMemberSummary> {
+    const existing = this.users.find((u) => u.email.toLowerCase() === input.email.trim().toLowerCase());
+    if (existing) {
+      throw new Error(`A team member with email "${input.email}" already exists.`);
+    }
+
+    const role = this.roles.find((r) => r.id === input.roleId);
+    if (!role) {
+      throw new Error(`Role "${input.roleId}" not found.`);
+    }
+
+    const newUser: User = {
+      id: `USR-${Date.now().toString(36).toUpperCase()}`,
+      displayName: input.displayName.trim(),
+      email: input.email.trim().toLowerCase(),
+      designation: input.designation || role.name,
+      status: input.status || 'ACTIVE',
+      organization: 'All India Institute of Ayurveda',
+      department: input.department || 'Clinical Research',
+      phone: input.phone || '+91 11 2999 0000',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.users.push(newUser);
+
+    const newAssignment: UserRole = {
+      id: `UR-${Date.now().toString(36).toUpperCase()}`,
+      userId: newUser.id,
+      roleId: role.id,
+      studyId: context.studyId,
+      siteId: context.siteId,
+      assignedAt: new Date().toISOString(),
+      assignedBy: 'Principal Investigator',
+    };
+
+    this.userRoles.push(newAssignment);
+    this.onSaveUsers?.(this.users);
+    this.onSaveUserRoles?.(this.userRoles);
+
+    return {
+      user: structuredClone(newUser),
+      roles: [structuredClone(role)],
+      assignments: [structuredClone(newAssignment)],
+      studyId: context.studyId,
+      siteId: context.siteId,
+    };
+  }
+
+  async toggleUserStatus(
+    _context: ParticipantQueryContext,
+    userId: string,
+    status: 'ACTIVE' | 'INACTIVE'
+  ): Promise<User> {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) throw new Error(`User "${userId}" not found.`);
+    user.status = status;
+    user.updatedAt = new Date().toISOString();
+    this.onSaveUsers?.(this.users);
+    return structuredClone(user);
   }
 }
 

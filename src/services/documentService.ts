@@ -1,5 +1,5 @@
 import { IDocumentRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockDocumentRepository } from '../repositories/mockDocumentRepository';
+import { environmentService } from './environmentService';
 import {
   Document,
   DocumentVersion,
@@ -12,10 +12,14 @@ import {
 } from '../types';
 
 export class DocumentService {
-  private repo: IDocumentRepository;
+  private _customRepo?: IDocumentRepository;
 
-  constructor(repository: IDocumentRepository = mockDocumentRepository) {
-    this.repo = repository;
+  constructor(repository?: IDocumentRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IDocumentRepository {
+    return this._customRepo || environmentService.getDocumentRepository();
   }
 
   /**

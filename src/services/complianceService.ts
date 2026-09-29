@@ -1,5 +1,5 @@
 import { IComplianceRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockComplianceRepository } from '../repositories/mockComplianceRepository';
+import { environmentService } from './environmentService';
 import {
   ProtocolDeviation,
   DeviationFilters,
@@ -12,10 +12,14 @@ import {
 } from '../types';
 
 export class ComplianceService {
-  private repo: IComplianceRepository;
+  private _customRepo?: IComplianceRepository;
 
-  constructor(repository: IComplianceRepository = mockComplianceRepository) {
-    this.repo = repository;
+  constructor(repository?: IComplianceRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IComplianceRepository {
+    return this._customRepo || environmentService.getComplianceRepository();
   }
 
   async getDeviations(

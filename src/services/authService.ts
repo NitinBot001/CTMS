@@ -1,5 +1,5 @@
 import { IAuthRepository } from '../repositories/interfaces';
-import { mockAuthRepository } from '../repositories/mockAuthRepository';
+import { environmentService } from './environmentService';
 import {
   AuthResult,
   AuthSession,
@@ -12,10 +12,14 @@ import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
 import { getRoleLandingRoute } from '../config/navigationConfig';
 
 export class AuthService {
-  private repo: IAuthRepository;
+  private _customRepo?: IAuthRepository;
 
   constructor(repo?: IAuthRepository) {
-    this.repo = repo || mockAuthRepository;
+    this._customRepo = repo;
+  }
+
+  private get repo(): IAuthRepository {
+    return this._customRepo || environmentService.getAuthRepository();
   }
 
   /**

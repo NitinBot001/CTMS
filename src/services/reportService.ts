@@ -6,7 +6,7 @@ import {
   ReportSummaryMetricItem,
 } from '../types';
 import { IReportRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockReportRepository } from '../repositories/mockReportRepository';
+import { environmentService } from './environmentService';
 import { teamService } from './teamService';
 import {
   exportReportToCsv,
@@ -17,10 +17,14 @@ import {
 } from '../utils/reportCalculations';
 
 export class ReportService {
-  private repo: IReportRepository;
+  private _customRepo?: IReportRepository;
 
   constructor(repo?: IReportRepository) {
-    this.repo = repo || mockReportRepository;
+    this._customRepo = repo;
+  }
+
+  private get repo(): IReportRepository {
+    return this._customRepo || environmentService.getReportRepository();
   }
 
   /**

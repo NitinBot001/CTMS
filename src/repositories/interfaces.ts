@@ -67,6 +67,10 @@ import {
   VerificationAction,
   VisitDataFilters,
   DataEntrySummaryMetrics,
+  CreateTeamMemberInput,
+  CreateParticipantInput,
+  CreateVisitInput,
+  AuditLogEvent,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -88,6 +92,7 @@ export interface IParticipantRepository {
   getParticipants(context: ParticipantQueryContext, filters?: ParticipantFilters): Promise<Participant[]>;
   getParticipantById(context: ParticipantQueryContext, participantId: string): Promise<Participant | null>;
   getParticipantSummary(context: ParticipantQueryContext): Promise<ParticipantSummaryMetrics>;
+  createParticipant?(context: ParticipantQueryContext, input: CreateParticipantInput): Promise<Participant>;
 }
 
 export interface IVisitRepository {
@@ -102,6 +107,7 @@ export interface IVisitRepository {
     activityId: string,
     status: ClinicalActivityStatus
   ): Promise<ParticipantVisit | null>;
+  createVisit?(context: ParticipantQueryContext, input: CreateVisitInput): Promise<ParticipantVisit>;
 }
 
 export interface ISafetyRepository {
@@ -194,6 +200,20 @@ export interface ITeamRepository {
     roleId: string,
     input: UpdateCustomRoleInput
   ): Promise<Role>;
+  createTeamMember?(
+    context: ParticipantQueryContext,
+    input: CreateTeamMemberInput
+  ): Promise<TeamMemberSummary>;
+  toggleUserStatus?(
+    context: ParticipantQueryContext,
+    userId: string,
+    status: 'ACTIVE' | 'INACTIVE'
+  ): Promise<User>;
+}
+
+export interface IAuditRepository {
+  getEvents(context: ParticipantQueryContext): Promise<AuditLogEvent[]>;
+  logEvent(event: Omit<AuditLogEvent, 'id' | 'timestamp'>): Promise<AuditLogEvent>;
 }
 
 export interface ITaskRepository {

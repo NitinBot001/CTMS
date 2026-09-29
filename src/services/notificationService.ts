@@ -2,7 +2,7 @@ import {
   INotificationRepository,
   NotificationQueryContext,
 } from '../repositories/interfaces';
-import { mockNotificationRepository } from '../repositories/mockNotificationRepository';
+import { environmentService } from './environmentService';
 import {
   Notification,
   NotificationFilters,
@@ -17,10 +17,14 @@ import { participantService } from './participantService';
 import { teamService } from './teamService';
 
 export class NotificationService {
-  private repo: INotificationRepository;
+  private _customRepo?: INotificationRepository;
 
   constructor(repo?: INotificationRepository) {
-    this.repo = repo || mockNotificationRepository;
+    this._customRepo = repo;
+  }
+
+  private get repo(): INotificationRepository {
+    return this._customRepo || environmentService.getNotificationRepository();
   }
 
   /**

@@ -30,12 +30,24 @@ export class MockTaskRepository implements ITaskRepository {
   private users: User[];
   private userRoles: UserRole[];
   private roles: Role[];
+  private onSaveTasks?: (tasks: Task[]) => void;
 
-  constructor() {
-    this.tasks = structuredClone(MOCK_TASKS);
-    this.users = structuredClone(MOCK_USERS);
-    this.userRoles = structuredClone(MOCK_USER_ROLES);
-    this.roles = structuredClone(MOCK_ROLES);
+  constructor(
+    initialTasks?: Task[],
+    initialUsers?: User[],
+    initialUserRoles?: UserRole[],
+    initialRoles?: Role[],
+    onSaveTasks?: (tasks: Task[]) => void
+  ) {
+    this.tasks = initialTasks ? structuredClone(initialTasks) : structuredClone(MOCK_TASKS);
+    this.users = initialUsers ? structuredClone(initialUsers) : structuredClone(MOCK_USERS);
+    this.userRoles = initialUserRoles ? structuredClone(initialUserRoles) : structuredClone(MOCK_USER_ROLES);
+    this.roles = initialRoles ? structuredClone(initialRoles) : structuredClone(MOCK_ROLES);
+    this.onSaveTasks = onSaveTasks;
+  }
+
+  private notifySave(): void {
+    this.onSaveTasks?.(this.tasks);
   }
 
   /**
@@ -340,6 +352,7 @@ export class MockTaskRepository implements ITaskRepository {
     };
 
     this.tasks.unshift(newTask);
+    this.notifySave();
     return structuredClone(newTask);
   }
 
@@ -413,6 +426,7 @@ export class MockTaskRepository implements ITaskRepository {
     }
 
     task.updatedAt = new Date().toISOString();
+    this.notifySave();
     return structuredClone(task);
   }
 
@@ -464,6 +478,7 @@ export class MockTaskRepository implements ITaskRepository {
       task.completedAt = new Date().toISOString();
     }
 
+    this.notifySave();
     return structuredClone(task);
   }
 
@@ -509,6 +524,7 @@ export class MockTaskRepository implements ITaskRepository {
     this.tasks[taskIndex].status = 'APPROVED';
     this.tasks[taskIndex].updatedAt = new Date().toISOString();
 
+    this.notifySave();
     return structuredClone(this.tasks[taskIndex]);
   }
 
@@ -551,6 +567,7 @@ export class MockTaskRepository implements ITaskRepository {
     this.tasks[taskIndex].status = 'REVISION_REQUIRED';
     this.tasks[taskIndex].updatedAt = new Date().toISOString();
 
+    this.notifySave();
     return structuredClone(this.tasks[taskIndex]);
   }
 
@@ -587,6 +604,7 @@ export class MockTaskRepository implements ITaskRepository {
     this.tasks[taskIndex].status = 'CANCELLED';
     this.tasks[taskIndex].updatedAt = new Date().toISOString();
 
+    this.notifySave();
     return structuredClone(this.tasks[taskIndex]);
   }
 

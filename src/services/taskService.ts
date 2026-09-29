@@ -1,5 +1,5 @@
 import { ITaskRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockTaskRepository } from '../repositories/mockTaskRepository';
+import { environmentService } from './environmentService';
 import {
   Task,
   TaskAssignment,
@@ -11,10 +11,14 @@ import {
 } from '../types';
 
 export class TaskService {
-  private repo: ITaskRepository;
+  private _customRepo?: ITaskRepository;
 
-  constructor(repository: ITaskRepository = mockTaskRepository) {
-    this.repo = repository;
+  constructor(repository?: ITaskRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): ITaskRepository {
+    return this._customRepo || environmentService.getTaskRepository();
   }
 
   async getTasks(

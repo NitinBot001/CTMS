@@ -28,11 +28,22 @@ export class MockDocumentRepository implements IDocumentRepository {
   private documents: Document[];
   private users: User[];
   private userRoles: UserRole[];
+  private onSaveDocs?: (docs: Document[]) => void;
 
-  constructor() {
-    this.documents = structuredClone(MOCK_DOCUMENTS);
-    this.users = structuredClone(MOCK_USERS);
-    this.userRoles = structuredClone(MOCK_USER_ROLES);
+  constructor(
+    initialDocs?: Document[],
+    initialUsers?: User[],
+    initialUserRoles?: UserRole[],
+    onSaveDocs?: (docs: Document[]) => void
+  ) {
+    this.documents = initialDocs ? structuredClone(initialDocs) : structuredClone(MOCK_DOCUMENTS);
+    this.users = initialUsers ? structuredClone(initialUsers) : structuredClone(MOCK_USERS);
+    this.userRoles = initialUserRoles ? structuredClone(initialUserRoles) : structuredClone(MOCK_USER_ROLES);
+    this.onSaveDocs = onSaveDocs;
+  }
+
+  private notifySave(): void {
+    this.onSaveDocs?.(this.documents);
   }
 
   /**
@@ -42,6 +53,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     this.documents = structuredClone(MOCK_DOCUMENTS);
     this.users = structuredClone(MOCK_USERS);
     this.userRoles = structuredClone(MOCK_USER_ROLES);
+    this.notifySave();
   }
 
   /**
@@ -328,6 +340,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     };
 
     this.documents.push(newDoc);
+    this.notifySave();
     return structuredClone(newDoc);
   }
 
@@ -405,6 +418,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     doc.updatedAt = nowIso;
     doc.status = deriveDocumentStatus(doc);
 
+    this.notifySave();
     return structuredClone(doc);
   }
 
@@ -457,6 +471,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     }
 
     doc.updatedAt = new Date().toISOString();
+    this.notifySave();
     return structuredClone(doc);
   }
 
@@ -484,6 +499,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     });
     doc.updatedAt = new Date().toISOString();
 
+    this.notifySave();
     return structuredClone(doc);
   }
 

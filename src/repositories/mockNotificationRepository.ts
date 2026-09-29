@@ -16,10 +16,16 @@ import {
 
 export class MockNotificationRepository implements INotificationRepository {
   private notifications: Notification[];
+  private onSave?: (notifications: Notification[]) => void;
 
-  constructor(initialData?: Notification[]) {
+  constructor(initialData?: Notification[], onSave?: (notifications: Notification[]) => void) {
     // Clone synthetic mock notifications into mutable in-memory repository store
     this.notifications = initialData ? [...initialData] : [...mockNotifications];
+    this.onSave = onSave;
+  }
+
+  private notifySave(): void {
+    this.onSave?.(this.notifications);
   }
 
   /**
@@ -96,6 +102,7 @@ export class MockNotificationRepository implements INotificationRepository {
 
     target.status = 'READ';
     target.readAt = new Date().toISOString();
+    this.notifySave();
     return { ...target };
   }
 
@@ -119,6 +126,9 @@ export class MockNotificationRepository implements INotificationRepository {
       }
     }
 
+    if (count > 0) {
+      this.notifySave();
+    }
     return count;
   }
 
@@ -144,6 +154,7 @@ export class MockNotificationRepository implements INotificationRepository {
     }
 
     target.status = 'DISMISSED';
+    this.notifySave();
     return { ...target };
   }
 
@@ -186,6 +197,7 @@ export class MockNotificationRepository implements INotificationRepository {
     };
 
     this.notifications.unshift(newNotification);
+    this.notifySave();
     return { ...newNotification };
   }
 }

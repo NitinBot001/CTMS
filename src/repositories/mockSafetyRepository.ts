@@ -11,9 +11,14 @@ import { getReferenceDate, parseDateISO } from '../utils/visitCalculations';
 
 export class MockSafetyRepository implements ISafetyRepository {
   private safetyStore: Record<string, Record<string, SafetyEvent[]>>;
+  private onSaveStore?: (store: Record<string, Record<string, SafetyEvent[]>>) => void;
 
-  constructor() {
-    this.safetyStore = structuredClone(MOCK_SAFETY_EVENTS);
+  constructor(
+    initialSafety?: Record<string, Record<string, SafetyEvent[]>>,
+    onSaveStore?: (store: Record<string, Record<string, SafetyEvent[]>>) => void
+  ) {
+    this.safetyStore = initialSafety ? structuredClone(initialSafety) : structuredClone(MOCK_SAFETY_EVENTS);
+    this.onSaveStore = onSaveStore;
   }
 
   async getSafetyEvents(
@@ -221,6 +226,7 @@ export class MockSafetyRepository implements ISafetyRepository {
     }
 
     event.lastUpdatedAt = `${refDate}T12:00:00Z`;
+    this.onSaveStore?.(this.safetyStore);
     return structuredClone(event);
   }
 
@@ -248,6 +254,7 @@ export class MockSafetyRepository implements ISafetyRepository {
 
     const refDate = getReferenceDate();
     event.lastUpdatedAt = `${refDate}T12:00:00Z`;
+    this.onSaveStore?.(this.safetyStore);
     return structuredClone(event);
   }
 }

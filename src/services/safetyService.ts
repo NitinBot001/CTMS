@@ -1,5 +1,5 @@
 import { ISafetyRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockSafetyRepository } from '../repositories/mockSafetyRepository';
+import { environmentService } from './environmentService';
 import {
   SafetyEvent,
   SafetyFilters,
@@ -10,10 +10,14 @@ import {
 } from '../types';
 
 export class SafetyService {
-  private repo: ISafetyRepository;
+  private _customRepo?: ISafetyRepository;
 
-  constructor(repository: ISafetyRepository = mockSafetyRepository) {
-    this.repo = repository;
+  constructor(repository?: ISafetyRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): ISafetyRepository {
+    return this._customRepo || environmentService.getSafetyRepository();
   }
 
   async getSafetyEvents(

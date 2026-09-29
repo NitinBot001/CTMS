@@ -4,7 +4,7 @@ import {
   WorkflowActor,
   CreateDraftRecordInput,
 } from '../repositories/interfaces';
-import { mockVisitDataRepository } from '../repositories/mockVisitDataRepository';
+import { environmentService } from './environmentService';
 import {
   VisitDataRecord,
   VisitDataFilters,
@@ -18,10 +18,14 @@ import {
 } from '../types';
 
 export class VisitDataService {
-  private repo: IVisitDataRepository;
+  private _customRepo?: IVisitDataRepository;
 
-  constructor(repository: IVisitDataRepository = mockVisitDataRepository) {
-    this.repo = repository;
+  constructor(repository?: IVisitDataRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IVisitDataRepository {
+    return this._customRepo || environmentService.getVisitDataRepository();
   }
 
   async getRecord(

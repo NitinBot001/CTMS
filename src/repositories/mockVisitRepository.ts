@@ -5,6 +5,7 @@ import {
   VisitFilters,
   VisitSummaryMetrics,
   ClinicalActivityStatus,
+  CreateVisitInput,
 } from '../types';
 import { MOCK_PROTOCOL_VISITS, MOCK_VISITS } from '../data/mockData';
 import { calculateActivityMetrics, getReferenceDate, parseDateISO } from '../utils/visitCalculations';
@@ -12,14 +13,22 @@ import { calculateActivityMetrics, getReferenceDate, parseDateISO } from '../uti
 export class MockVisitRepository implements IVisitRepository {
   // In-memory mutable copy to support interactive status updates in session
   private visitsStore: Record<string, Record<string, ParticipantVisit[]>>;
+  private protocolVisitsStore: Record<string, ProtocolVisitDefinition[]>;
+  private onSaveStore?: (store: Record<string, Record<string, ParticipantVisit[]>>) => void;
 
-  constructor() {
-    this.visitsStore = structuredClone(MOCK_VISITS);
+  constructor(
+    initialVisits?: Record<string, Record<string, ParticipantVisit[]>>,
+    initialProtocolVisits?: Record<string, ProtocolVisitDefinition[]>,
+    onSaveStore?: (store: Record<string, Record<string, ParticipantVisit[]>>) => void
+  ) {
+    this.visitsStore = initialVisits ? structuredClone(initialVisits) : structuredClone(MOCK_VISITS);
+    this.protocolVisitsStore = initialProtocolVisits ? structuredClone(initialProtocolVisits) : structuredClone(MOCK_PROTOCOL_VISITS);
+    this.onSaveStore = onSaveStore;
   }
 
   async getProtocolVisits(studyId: string): Promise<ProtocolVisitDefinition[]> {
     await new Promise((resolve) => setTimeout(resolve, 30));
-    const definitions = MOCK_PROTOCOL_VISITS[studyId] || [];
+    const definitions = this.protocolVisitsStore[studyId] || [];
     return structuredClone(definitions);
   }
 
@@ -216,7 +225,51 @@ export class MockVisitRepository implements IVisitRepository {
       visit.completedDate = undefined;
     }
 
+    this.onSaveStore?.(this.visitsStore);
     return structuredClone(visit);
+  }
+
+  async createVisit(
+    context: ParticipantQueryContext,
+    input: CreateVisitInput
+  ): Promise<ParticipantVisit> {
+    if (!this.visitsStore[context.studyId]) {
+      this.visitsStore[context.studyId] = {};
+    }
+    if (!this.visitsStore[context.studyId][context.siteId]) {
+      this.visitsStore[context.studyId][context.siteId] = [];
+    }
+
+    const siteVisits = this.visitsStore[context.studyId][context.siteId];
+    const count = siteVisits.length + 1;
+    const visitId = `VIS-${context.studyId.replace('STUDY-', '')}${context.siteId.replace('SITE-', '')}-${String(count).padStart(2, '0')}`;
+
+    const newVisit: ParticipantVisit = {
+      id: visitId,
+      studyId: context.studyId,
+      siteId: context.siteId,
+      participantId: input.participantId,
+      participantCode: input.participantId,
+      participantInitials: 'P.T.',
+      protocolVisitDefinitionId: input.visitDefinitionId || 'PV-01',
+      visitCode: input.visitCode,
+      visitName: input.visitName,
+      sequence: count,
+      targetDate: input.plannedDate,
+      windowStart: input.plannedDate,
+      windowEnd: input.plannedDate,
+      status: input.status || 'SCHEDULED',
+      assignedStaff: 'Pratibha Joshi (CRC)',
+      activities: [],
+      totalActivities: 0,
+      completedActivities: 0,
+      pendingActivities: 0,
+      requiredIncompleteActivities: 0,
+    };
+
+    siteVisits.push(newVisit);
+    this.onSaveStore?.(this.visitsStore);
+    return structuredClone(newVisit);
   }
 }
 

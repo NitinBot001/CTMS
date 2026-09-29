@@ -23,9 +23,15 @@ import {
 
 export class MockVisitDataRepository implements IVisitDataRepository {
   private records: VisitDataRecord[];
+  private onSaveRecords?: (records: VisitDataRecord[]) => void;
 
-  constructor() {
-    this.records = structuredClone(MOCK_VISIT_DATA_RECORDS);
+  constructor(initialRecords?: VisitDataRecord[], onSaveRecords?: (records: VisitDataRecord[]) => void) {
+    this.records = initialRecords ? structuredClone(initialRecords) : structuredClone(MOCK_VISIT_DATA_RECORDS);
+    this.onSaveRecords = onSaveRecords;
+  }
+
+  private notifySave(): void {
+    this.onSaveRecords?.(this.records);
   }
 
   /**
@@ -33,6 +39,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
    */
   public resetForTesting(): void {
     this.records = structuredClone(MOCK_VISIT_DATA_RECORDS);
+    this.notifySave();
   }
 
   private findScopedRecord(context: ParticipantQueryContext, recordId: string): VisitDataRecord {
@@ -262,6 +269,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
     };
 
     this.records.unshift(newRecord);
+    this.notifySave();
     return structuredClone(newRecord);
   }
 
@@ -304,6 +312,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
     }
 
     record.updatedAt = now;
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -347,6 +356,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
     }
 
     record.updatedAt = now;
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -397,6 +407,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -433,6 +444,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -464,6 +476,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -520,6 +533,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -563,6 +577,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -602,6 +617,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -633,6 +649,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -667,6 +684,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 
@@ -712,6 +730,7 @@ export class MockVisitDataRepository implements IVisitDataRepository {
       createdAt: now,
     });
 
+    this.notifySave();
     return structuredClone(record);
   }
 

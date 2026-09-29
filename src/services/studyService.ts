@@ -1,12 +1,16 @@
 import { IStudyRepository } from '../repositories/interfaces';
-import { mockStudyRepository } from '../repositories/mockStudyRepository';
+import { environmentService } from './environmentService';
 import { Study, Site, CurrentStudyContext } from '../types';
 
 export class StudyService {
-  private repo: IStudyRepository;
+  private _customRepo?: IStudyRepository;
 
-  constructor(repository: IStudyRepository = mockStudyRepository) {
-    this.repo = repository;
+  constructor(repository?: IStudyRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IStudyRepository {
+    return this._customRepo || environmentService.getStudyRepository();
   }
 
   async getStudies(): Promise<Study[]> {

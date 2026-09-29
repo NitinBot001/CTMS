@@ -1,12 +1,16 @@
 import { IParticipantRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockParticipantRepository } from '../repositories/mockParticipantRepository';
-import { Participant, ParticipantFilters, ParticipantSummaryMetrics } from '../types';
+import { environmentService } from './environmentService';
+import { Participant, ParticipantFilters, ParticipantSummaryMetrics, CreateParticipantInput } from '../types';
 
 export class ParticipantService {
-  private repo: IParticipantRepository;
+  private _customRepo?: IParticipantRepository;
 
-  constructor(repository: IParticipantRepository = mockParticipantRepository) {
-    this.repo = repository;
+  constructor(repository?: IParticipantRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IParticipantRepository {
+    return this._customRepo || environmentService.getParticipantRepository();
   }
 
   async getParticipants(
@@ -43,6 +47,19 @@ export class ParticipantService {
       };
     }
     return this.repo.getParticipantSummary(context);
+  }
+
+  async createParticipant(
+    context: ParticipantQueryContext,
+    input: CreateParticipantInput
+  ): Promise<Participant> {
+    if (!context.studyId || !context.siteId) {
+      throw new Error('Study and site context are required to onboard a participant.');
+    }
+    if (!this.repo.createParticipant) {
+      throw new Error('Participant creation not supported by current repository.');
+    }
+    return this.repo.createParticipant(context, input);
   }
 }
 

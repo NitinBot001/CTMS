@@ -1,18 +1,23 @@
 import { IVisitRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockVisitRepository } from '../repositories/mockVisitRepository';
+import { environmentService } from './environmentService';
 import {
   ProtocolVisitDefinition,
   ParticipantVisit,
   VisitFilters,
   VisitSummaryMetrics,
   ClinicalActivityStatus,
+  CreateVisitInput,
 } from '../types';
 
 export class VisitService {
-  private repo: IVisitRepository;
+  private _customRepo?: IVisitRepository;
 
-  constructor(repository: IVisitRepository = mockVisitRepository) {
-    this.repo = repository;
+  constructor(repository?: IVisitRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IVisitRepository {
+    return this._customRepo || environmentService.getVisitRepository();
   }
 
   async getProtocolVisits(studyId: string): Promise<ProtocolVisitDefinition[]> {
@@ -74,6 +79,19 @@ export class VisitService {
       return null;
     }
     return this.repo.updateVisitActivityStatus(context, visitId, activityId, status);
+  }
+
+  async createVisit(
+    context: ParticipantQueryContext,
+    input: CreateVisitInput
+  ): Promise<ParticipantVisit> {
+    if (!context.studyId || !context.siteId) {
+      throw new Error('Study and site context are required to schedule a visit.');
+    }
+    if (!this.repo.createVisit) {
+      throw new Error('Visit creation not supported by current repository.');
+    }
+    return this.repo.createVisit(context, input);
   }
 }
 

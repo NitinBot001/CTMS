@@ -1,5 +1,5 @@
 import { ITeamRepository, ParticipantQueryContext } from '../repositories/interfaces';
-import { mockTeamRepository } from '../repositories/mockTeamRepository';
+import { environmentService } from './environmentService';
 import {
   Role,
   Permission,
@@ -14,13 +14,19 @@ import {
   UpdateCustomRoleInput,
   AssignRoleInput,
   PermissionModule,
+  CreateTeamMemberInput,
+  User,
 } from '../types';
 
 export class TeamService {
-  private repo: ITeamRepository;
+  private _customRepo?: ITeamRepository;
 
-  constructor(repository: ITeamRepository = mockTeamRepository) {
-    this.repo = repository;
+  constructor(repository?: ITeamRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): ITeamRepository {
+    return this._customRepo || environmentService.getTeamRepository();
   }
 
   async getTeamMembers(
@@ -143,6 +149,33 @@ export class TeamService {
       throw new Error('Role ID is required.');
     }
     return this.repo.updateCustomRole(context, roleId, input);
+  }
+
+  async createTeamMember(
+    context: ParticipantQueryContext,
+    input: CreateTeamMemberInput
+  ): Promise<TeamMemberSummary> {
+    if (!context.studyId || !context.siteId) {
+      throw new Error('Study and site context are required to create a team member.');
+    }
+    if (!this.repo.createTeamMember) {
+      throw new Error('Team member creation not supported by current repository.');
+    }
+    return this.repo.createTeamMember(context, input);
+  }
+
+  async toggleUserStatus(
+    context: ParticipantQueryContext,
+    userId: string,
+    status: 'ACTIVE' | 'INACTIVE'
+  ): Promise<User> {
+    if (!context.studyId || !context.siteId || !userId) {
+      throw new Error('Study, site context, and user ID are required.');
+    }
+    if (!this.repo.toggleUserStatus) {
+      throw new Error('Toggle user status not supported by current repository.');
+    }
+    return this.repo.toggleUserStatus(context, userId, status);
   }
 
   /**

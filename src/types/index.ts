@@ -1347,8 +1347,66 @@ export interface DataEntrySummaryMetrics {
   totalRecords: number;
 }
 
+// -------------------------------------------------------------
+// Environment & Empty Test Workflow Types
+// -------------------------------------------------------------
 
+export type AppEnvironmentMode = 'MOCK' | 'EMPTY_TEST';
 
+export interface CreateTeamMemberInput {
+  displayName: string;
+  email: string;
+  employeeId?: string;
+  roleId: string;
+  studyId: string;
+  siteId: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  designation?: string;
+  department?: string;
+  phone?: string;
+  password?: string;
+}
 
+export interface CreateParticipantInput {
+  participantId?: string;
+  studyId: string;
+  siteId: string;
+  screeningNumber: string;
+  participantCode?: string;
+  status?: ParticipantLifecycleStatus;
+  initials?: string;
+  enrollmentDate?: string;
+  screeningDate?: string;
+  demographics?: {
+    age: number;
+    gender: 'MALE' | 'FEMALE' | 'OTHER';
+    dob?: string;
+  };
+  assignedInvestigatorId?: string;
+  assignedInvestigatorName?: string;
+  notes?: string;
+}
 
+export interface CreateVisitInput {
+  studyId: string;
+  siteId: string;
+  participantId: string;
+  visitDefinitionId?: string;
+  visitCode: string;
+  visitName: string;
+  visitType: 'SCREENING' | 'BASELINE' | 'TREATMENT' | 'FOLLOW_UP' | 'CLOSE_OUT' | 'UNSCHEDULED';
+  plannedDate: string;
+  status?: 'SCHEDULED' | 'DUE' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'MISSED' | 'CANCELLED';
+}
 
+export interface AuditLogEvent {
+  id: string;
+  actorUserId: string;
+  actorRole: string;
+  studyId: string;
+  siteId: string;
+  targetEntity: string;
+  action: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}

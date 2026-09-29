@@ -1,12 +1,16 @@
 import { IDashboardRepository } from '../repositories/interfaces';
-import { mockDashboardRepository } from '../repositories/mockDashboardRepository';
+import { environmentService } from './environmentService';
 import { DashboardOverviewData } from '../types';
 
 export class DashboardService {
-  private repo: IDashboardRepository;
+  private _customRepo?: IDashboardRepository;
 
-  constructor(repository: IDashboardRepository = mockDashboardRepository) {
-    this.repo = repository;
+  constructor(repository?: IDashboardRepository) {
+    this._customRepo = repository;
+  }
+
+  private get repo(): IDashboardRepository {
+    return this._customRepo || environmentService.getDashboardRepository();
   }
 
   async getOverview(studyId: string, siteId: string): Promise<DashboardOverviewData | null> {

@@ -13,9 +13,14 @@ import { getReferenceDate, parseDateISO } from '../utils/visitCalculations';
 
 export class MockComplianceRepository implements IComplianceRepository {
   private deviationStore: Record<string, Record<string, ProtocolDeviation[]>>;
+  private onSaveStore?: (store: Record<string, Record<string, ProtocolDeviation[]>>) => void;
 
-  constructor() {
-    this.deviationStore = structuredClone(MOCK_PROTOCOL_DEVIATIONS);
+  constructor(
+    initialDeviations?: Record<string, Record<string, ProtocolDeviation[]>>,
+    onSaveStore?: (store: Record<string, Record<string, ProtocolDeviation[]>>) => void
+  ) {
+    this.deviationStore = initialDeviations ? structuredClone(initialDeviations) : structuredClone(MOCK_PROTOCOL_DEVIATIONS);
+    this.onSaveStore = onSaveStore;
   }
 
   async getDeviations(
@@ -282,6 +287,7 @@ export class MockComplianceRepository implements IComplianceRepository {
       deviation.closedAt = deviation.updatedAt;
     }
 
+    this.onSaveStore?.(this.deviationStore);
     return structuredClone(deviation);
   }
 
@@ -310,6 +316,7 @@ export class MockComplianceRepository implements IComplianceRepository {
       deviation.reviewedAt = deviation.updatedAt;
     }
 
+    this.onSaveStore?.(this.deviationStore);
     return structuredClone(deviation);
   }
 
@@ -342,6 +349,7 @@ export class MockComplianceRepository implements IComplianceRepository {
       deviation.resolvedAt = deviation.updatedAt;
     }
 
+    this.onSaveStore?.(this.deviationStore);
     return structuredClone(deviation);
   }
 }
