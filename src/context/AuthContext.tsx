@@ -7,6 +7,7 @@ import React, {
   useMemo,
 } from 'react';
 import {
+  AppEnvironmentMode,
   AuthResult,
   AuthSession,
   AuthUser,
@@ -16,6 +17,9 @@ import {
   UserRole,
 } from '../types';
 import { authService } from '../services/authService';
+import { environmentService } from '../services/environmentService';
+import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
+import { MODE_STORAGE_KEY } from '../storage/emptyTestStore';
 
 interface AuthContextValue {
   currentUser: AuthUser | null;
@@ -28,6 +32,10 @@ interface AuthContextValue {
   effectivePermissions: Permission[];
   userAssignments: UserRole[];
   roleLandingRoute: string;
+  /** Active environment mode — 'MOCK' | 'EMPTY_TEST' */
+  currentMode: AppEnvironmentMode;
+  /** Switch environment mode before or after login */
+  setMode: (mode: AppEnvironmentMode) => void;
   login: (email: string, password: string) => Promise<AuthResult>;
   logout: () => void;
   hasPermission: (permissionId: string) => boolean;
@@ -45,11 +53,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [effectivePermissions, setEffectivePermissions] = useState<Permission[]>([]);
   const [userAssignments, setUserAssignments] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentMode, setCurrentModeState] = useState<AppEnvironmentMode>(
+    () => environmentService.getMode()
+  );
+
+  // Keep local mode state in sync when environmentService mode changes externally
+  useEffect(() => {
+    const unsub = environmentService.subscribe((mode) => {
+      setCurrentModeState(mode);
+    });
+    return unsub;
+  }, []);
+
+  const setMode = useCallback((mode: AppEnvironmentMode) => {
+    environmentService.setMode(mode);
+    // setCurrentModeState will be triggered by the subscribe callback above
+  }, []);
 
   // Restore session on application bootstrap
   const initSession = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Re-apply persisted mode BEFORE restoring session so the correct
+      // repository (Mock vs Empty) is used during session validation.
+      const persistedMode = browserStorage.get<AppEnvironmentMode>(MODE_STORAGE_KEY);
+      if (persistedMode && persistedMode !== environmentService.getMode()) {
+        environmentService.setMode(persistedMode);
+      }
+
       const result = await authService.restoreSession();
       if (result.success && result.session && result.user && result.role) {
         setSession(result.session);
@@ -114,6 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     authService.logout();
+    // Clear session storage key so mode persists but session does not
+    browserStorage.remove(SESSION_STORAGE_KEY);
     setSession(null);
     setCurrentUser(null);
     setCurrentRole(null);
@@ -150,6 +183,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       effectivePermissions,
       userAssignments,
       roleLandingRoute,
+      currentMode,
+      setMode,
       login,
       logout,
       hasPermission,
@@ -165,6 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       effectivePermissions,
       userAssignments,
       roleLandingRoute,
+      currentMode,
+      setMode,
       login,
       logout,
       hasPermission,
