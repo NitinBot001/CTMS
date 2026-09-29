@@ -28,7 +28,7 @@ _Last updated: 2026-09-29_
 - **Later (parked):** External backend integrations, real binary cloud storage, WebSockets.
 - **Stack:** React 19, Vite 6, TypeScript 5.7, Tailwind CSS 3.4, React Router DOM 7, Lucide React.
 - **Run / test / build:** `npm run dev` (port 5173) · `npm test` · `npm run typecheck` · `npm run build` · `npm run verify`
-- **Status:** Phase 1 — Task K: Clinical Visit Data Entry & Sub-Investigator Verification complete and verified. 189/189 automated tests pass.
+- **Status:** Task K + Empty Test Mode (auth enhancement): all complete and verified. 189/189 automated tests pass. Git commit `aacef15` on `main`.
 - **Workspace Boundary:** Strictly confined to project root. Never access or reference outside directories.
 - **Known issues & tech debt:** None.
 - **Open questions for the user:** None.
@@ -74,6 +74,15 @@ _Last updated: 2026-09-29_
 | 2026-09-29 | Post-Verification Immutability & Formal CRO Release | Audit trail & GCP reproducibility: Once submitted for verification or verified, direct field editing and attachment changes are locked. Advancing to `PI_REVIEW` and releasing to `SUBMITTED_TO_CRO` requires verified status and creates permanent audit trail entries. | Allowing direct editing of verified or submitted records |
 
 ## 3. Task Log  (newest first; keep ~15 entries, archive older ones to docs/memory-archive.md)
+
+### 2026-09-29 · T-018 · Auth Enhancement: Empty Test Mode + Mock/Empty Mode Selector + Repository Persistence Refactoring
+- **What:** Fixed 60+ TypeScript type errors across 10 repository files and added Empty Test Mode infrastructure: `src/storage/emptyTestStore.ts` (localStorage-backed persistent workspace with in-memory Node fallback), `src/repositories/emptyTestRepositories.ts` (14 Empty* repo classes delegating to parameterized Mock* repos), `src/services/environmentService.ts` (mode factory), Login page mode selector (MOCK / EMPTY_TEST). Extended all Mock* repos with optional constructor params + `onSave` callbacks for persistence.
+- **Why:** Auth Enhancement task added a clean-slate "Empty Test Mode" alongside the existing Mock mode so testers can exercise the full workflow from scratch without the pre-populated mock dataset. Type errors accumulated from stale field names and wrong interface shapes.
+- **How:** Rewrote `emptyTestRepositories.ts` (~2229 → ~1134 lines) to delegate to Mock* repos instead of reimplementing domain logic. Fixed `Participant` interface fields (removed stale `cohort`, `assignedInvestigatorId`, etc.), fixed `ParticipantVisit` fields (removed stale `visitType`, `requiresPISignOff`, etc.), fixed `mapTaskPriority` (TaskPriority UPPER_CASE → PriorityLevel Title-Case), fixed `getAuditHistory` / `setUserPassword` method names. Committed as `aacef15`.
+- **Result:** `npm run verify` exits 0. 189/189 tests pass. Production build 2.25s. Empty Test Mode and Mock Mode both fully wired.
+- **Verified by:** `npm run typecheck` (0 errors), `npm test` (189/189), `npm run build` (2.25s), `npm run verify` (exit 0).
+- **Dead ends:** `saveUserPasswords(map)` → correct method is `setUserPassword(email, password)`; `getAuditEvents()` → correct is `getAuditHistory()`. `assignedUsersCount` → correct is `assignedUserCount`.
+- **Follow-ups:** Await user's next directive (e.g. push to GitHub, start next segment).
 
 ### 2026-09-29 · T-017 · Task K: Clinical Visit Data Entry Operator Workflow & Sub-Investigator Verification
 - **What:** Implemented full clinical visit data entry and verification lifecycle: domain models (`VisitDataRecord`, `VisitDataField`, `VisitAttachment`, `ReviewNote`, `VerificationAction`, `VisitDataStatus`, `VisitDataFilters`, `DataEntrySummaryMetrics`), 7 permissions in `DATA_ENTRY` module, `IVisitDataRepository` & `MockVisitDataRepository`, `visitDataService` with role capability guards, lifecycle validation engine (`visitDataCalculations.ts`), 6 UI components in `src/components/dataEntry/` (`VitalsEntrySection`, `TestsObservationsSection`, `SourceDocumentViewer`, `ReviewNotesPanel`, `WorkflowHistoryTimeline`, `ReturnForCorrectionModal`), 2 detailed pages (`DataEntryRecordPage` at `/data-entry/records/:recordId`, `VerificationDetailPage` at `/sub-investigator/verification/:recordId`), 2 updated dashboards (`DataEntryDashboardPage` with 6 KPI cards & work queue, `SubInvestigatorDashboardPage` with 5 KPI cards & verification queue), route protection, and expanded test suite from 161 to 189 tests with 100% pass.
