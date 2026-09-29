@@ -28,7 +28,7 @@ _Last updated: 2026-09-29_
 - **Later (parked):** External backend integrations, real binary cloud storage, WebSockets.
 - **Stack:** React 19, Vite 6, TypeScript 5.7, Tailwind CSS 3.4, React Router DOM 7, Lucide React.
 - **Run / test / build:** `npm run dev` (port 5173) · `npm test` · `npm run typecheck` · `npm run build` · `npm run verify`
-- **Status:** Task K + Empty Test Mode (auth enhancement): all complete and verified. 189/189 automated tests pass. Git commit `aacef15` on `main`.
+- **Status:** T-019 — Empty Test Mode UI fully wired. MOCK/EMPTY TEST selector live on Login page. 189/189 tests pass. Git commit `96958fe` on `main`.
 - **Workspace Boundary:** Strictly confined to project root. Never access or reference outside directories.
 - **Known issues & tech debt:** None.
 - **Open questions for the user:** None.
@@ -74,6 +74,15 @@ _Last updated: 2026-09-29_
 | 2026-09-29 | Post-Verification Immutability & Formal CRO Release | Audit trail & GCP reproducibility: Once submitted for verification or verified, direct field editing and attachment changes are locked. Advancing to `PI_REVIEW` and releasing to `SUBMITTED_TO_CRO` requires verified status and creates permanent audit trail entries. | Allowing direct editing of verified or submitted records |
 
 ## 3. Task Log  (newest first; keep ~15 entries, archive older ones to docs/memory-archive.md)
+
+### 2026-09-29 · T-019 · Auth Enhancement: MOCK / EMPTY TEST Mode Selector — UI Integration
+- **What:** Wired the `environmentService` mode-switching fully into the Login page and `AuthContext`. Added `[MOCK] [EMPTY TEST]` tab selector to Login page; maroon theme for Mock, green for Empty Test. Mock mode shows unchanged 6-persona quick-fill panel. Empty Test mode shows live workspace user list from `emptyTestStore`, bootstrap PI quick-access banner (email + password displayed), refresh button, and "Reset workspace" link. `AuthContext` now exposes `currentMode` and `setMode()`, subscribes to `environmentService.subscribe()`, and re-applies persisted mode before session restore so the correct repo is always used after page refresh. Logout preserves mode, clears session only.
+- **Why:** The infrastructure (emptyTestStore, emptyTestRepositories, environmentService) from T-018 was complete but the UI wiring was missing — mode was never set, AuthContext had no mode awareness, and Login page had no selector.
+- **How:** Modified `src/context/AuthContext.tsx` (+37 lines): added `currentMode` state, `setMode` callback, subscribe on mount, and mode re-application in `initSession()`. Rewrote `src/pages/LoginPage.tsx`: mode tab selector at top, mode-specific right panel, credential pre-fill on mode change, `executeLogin` guards environment before auth.
+- **Result:** Login page now has a visible `[MOCK] [EMPTY TEST]` toggle. Switching to Empty Test instantly shows the bootstrap PI and any users created in that workspace. Mode persists across refreshes.
+- **Verified by:** `npm run typecheck` (0 errors), `npm test` (189/189), `npm run build` (2.47s), `npm run verify` (exit 0), secret scan (clean).
+- **Dead ends:** None.
+- **Follow-ups:** Push to GitHub. Await next user directive.
 
 ### 2026-09-29 · T-018 · Auth Enhancement: Empty Test Mode + Mock/Empty Mode Selector + Repository Persistence Refactoring
 - **What:** Fixed 60+ TypeScript type errors across 10 repository files and added Empty Test Mode infrastructure: `src/storage/emptyTestStore.ts` (localStorage-backed persistent workspace with in-memory Node fallback), `src/repositories/emptyTestRepositories.ts` (14 Empty* repo classes delegating to parameterized Mock* repos), `src/services/environmentService.ts` (mode factory), Login page mode selector (MOCK / EMPTY_TEST). Extended all Mock* repos with optional constructor params + `onSave` callbacks for persistence.
