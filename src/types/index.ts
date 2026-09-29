@@ -454,6 +454,24 @@ export type DeviationStatus =
   | 'RESOLVED'
   | 'CLOSED';
 
+export const VALID_DEVIATION_STATUS_TRANSITIONS: Record<DeviationStatus, readonly DeviationStatus[]> = {
+  REPORTED: ['UNDER_REVIEW', 'ACTION_REQUIRED', 'RESOLVED'],
+  UNDER_REVIEW: ['ACTION_REQUIRED', 'CAPA_IN_PROGRESS', 'RESOLVED'],
+  ACTION_REQUIRED: ['UNDER_REVIEW', 'CAPA_IN_PROGRESS', 'RESOLVED'],
+  CAPA_IN_PROGRESS: ['RESOLVED', 'ACTION_REQUIRED'],
+  RESOLVED: ['CLOSED', 'UNDER_REVIEW', 'ACTION_REQUIRED'],
+  CLOSED: [],
+};
+
+export function isValidDeviationStatusTransition(
+  currentStatus: DeviationStatus,
+  targetStatus: DeviationStatus
+): boolean {
+  if (currentStatus === targetStatus) return true;
+  const allowed = VALID_DEVIATION_STATUS_TRANSITIONS[currentStatus];
+  return allowed ? allowed.includes(targetStatus) : false;
+}
+
 export type CapaStatus =
   | 'NOT_REQUIRED'
   | 'PENDING'
@@ -518,12 +536,12 @@ export interface DeviationFilters {
   search?: string;
   scope?: DeviationScope | 'ALL';
   classification?: DeviationClassification | 'ALL';
-  status?: DeviationStatus | 'ALL';
-  capaStatus?: CapaStatus | 'ALL';
-  reviewStatus?: ComplianceReviewStatus | 'ALL';
+  status?: DeviationStatus | 'ALL' | 'OPEN';
+  capaStatus?: CapaStatus | 'ALL' | 'PENDING_OR_ACTIVE';
+  reviewStatus?: ComplianceReviewStatus | 'ALL' | 'REVIEW_REQUIRED';
   category?: DeviationCategory | 'ALL';
   participantId?: string;
-  dateRange?: 'ALL' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'CAPA_PENDING' | 'CAPA_OVERDUE';
+  dateRange?: 'ALL' | 'LAST_7_DAYS' | 'LAST_30_DAYS';
 }
 
 export interface ComplianceSummaryMetrics {
@@ -546,6 +564,504 @@ export interface ParticipantComplianceSummary {
   openCount: number;
   deviations: ProtocolDeviation[];
 }
+
+// ============================================================
+// Segment F: Team & Custom Roles Domain Models
+// ============================================================
+
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface User {
+  id: string;
+  displayName: string;
+  email: string;
+  designation: string;
+  status: UserStatus;
+  organization?: string;
+  department?: string;
+  phone?: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+}
+
+export type RoleType = 'SYSTEM' | 'CUSTOM';
+
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  type: RoleType;
+  permissionIds: string[];
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+}
+
+export type PermissionModule =
+  | 'STUDY'
+  | 'PARTICIPANTS'
+  | 'VISITS'
+  | 'SAFETY'
+  | 'COMPLIANCE'
+  | 'TEAM'
+  | 'DOCUMENTS'
+  | 'TASKS'
+  | 'REPORTS';
+
+export type PermissionAction =
+  | 'VIEW'
+  | 'CREATE'
+  | 'EDIT'
+  | 'REVIEW'
+  | 'APPROVE'
+  | 'MANAGE'
+  | 'EXPORT';
+
+export interface Permission {
+  id: string;
+  module: PermissionModule;
+  action: PermissionAction;
+  name: string;
+  description: string;
+}
+
+export interface UserRole {
+  id: string;
+  userId: string;
+  roleId: string;
+  studyId: string;
+  siteId: string;
+  assignedAt: string; // ISO string
+  assignedBy: string;
+}
+
+export interface TeamMemberSummary {
+  user: User;
+  roles: Role[];
+  assignments: UserRole[];
+  studyId: string;
+  siteId: string;
+}
+
+export interface TeamMemberDetail {
+  user: User;
+  roles: Role[];
+  assignments: UserRole[];
+  effectivePermissions: Permission[];
+  studyId: string;
+  siteId: string;
+}
+
+export interface TeamFilters {
+  search?: string;
+  status?: UserStatus | 'ALL';
+  roleId?: string | 'ALL';
+}
+
+export interface RoleFilters {
+  search?: string;
+  type?: RoleType | 'ALL';
+  roleType?: RoleType | 'ALL';
+}
+
+export interface TeamSummaryMetrics {
+  totalMembers: number;
+  activeMembers: number;
+  inactiveMembers: number;
+  systemRolesCount: number;
+  customRolesCount: number;
+  totalAssignments: number;
+}
+
+export interface RoleWithCounts extends Role {
+  assignedUserCount: number;
+}
+
+export interface CreateCustomRoleInput {
+  name: string;
+  description: string;
+  permissionIds: string[];
+}
+
+export interface UpdateCustomRoleInput {
+  name?: string;
+  description?: string;
+  permissionIds?: string[];
+}
+
+export interface AssignRoleInput {
+  userId: string;
+  roleId: string;
+  studyId?: string;
+  siteId?: string;
+  assignedBy?: string;
+}
+
+// ============================================================
+// SEGMENT G — TASK MANAGEMENT & APPROVALS DOMAIN MODELS
+// ============================================================
+
+export type TaskStatus =
+  | 'DRAFT'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'COMPLETED'
+  | 'REVISION_REQUIRED'
+  | 'CANCELLED';
+
+export type TaskCategory =
+  | 'SAFETY'
+  | 'COMPLIANCE'
+  | 'PARTICIPANT'
+  | 'VISIT'
+  | 'DOCUMENT'
+  | 'REPORT'
+  | 'PHARMACY'
+  | 'TRAINING'
+  | 'OTHER';
+
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'NORMAL';
+
+export type TaskApprovalDecision = 'APPROVED' | 'REVISION_REQUIRED' | 'REJECTED';
+
+export type RelatedEntityType =
+  | 'PARTICIPANT'
+  | 'VISIT'
+  | 'COMPLIANCE'
+  | 'SAFETY';
+
+export interface TaskAssignment {
+  id: string;
+  taskId: string;
+  userId: string;
+  assignedBy: string;
+  assignedAt: string; // ISO string
+  status: 'ACTIVE' | 'SUPERSEDED';
+}
+
+export interface TaskApproval {
+  id: string;
+  taskId: string;
+  reviewerId: string;
+  reviewerName?: string;
+  decision: TaskApprovalDecision;
+  comments: string;
+  reviewedAt: string; // ISO string
+}
+
+export interface TaskAssignee {
+  userId: string;
+  displayName: string;
+  email: string;
+  designation: string;
+  roleId?: string;
+  roleName?: string;
+}
+
+export interface Task {
+  id: string;
+  studyId: string;
+  siteId: string;
+  title: string;
+  description: string;
+  category: TaskCategory;
+  priority: TaskPriority;
+  status: TaskStatus;
+  dueDate: string; // YYYY-MM-DD
+  createdBy: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+  relatedEntityType?: RelatedEntityType;
+  relatedEntityId?: string;
+  requiresApproval: boolean;
+  approvalRequiredFromRoleId?: string;
+  submittedAt?: string;
+  completedAt?: string;
+  assignee?: TaskAssignee;
+  assignments: TaskAssignment[];
+  approvals: TaskApproval[];
+}
+
+export interface TaskSummaryMetrics {
+  total: number;
+  myOpen: number;
+  dueToday: number;
+  overdue: number;
+  pendingReview: number;
+  completed: number;
+}
+
+export interface TaskFilters {
+  search?: string;
+  status?: TaskStatus | 'ALL' | 'OPEN';
+  priority?: TaskPriority | 'ALL';
+  category?: TaskCategory | 'ALL';
+  assigneeId?: string | 'ALL' | 'UNASSIGNED' | 'MY_TASKS';
+  dueDateFilter?: 'ALL' | 'TODAY' | 'OVERDUE' | 'UPCOMING';
+  requiresApproval?: boolean | 'ALL';
+}
+
+export interface CreateTaskInput {
+  title: string;
+  description: string;
+  category: TaskCategory;
+  priority: TaskPriority;
+  dueDate: string;
+  requiresApproval: boolean;
+  approvalRequiredFromRoleId?: string;
+  relatedEntityType?: RelatedEntityType;
+  relatedEntityId?: string;
+  assigneeUserId?: string;
+  createdBy?: string;
+}
+
+export interface AssignTaskInput {
+  userId: string;
+  assignedBy: string;
+}
+
+export interface ApproveTaskInput {
+  reviewerId: string;
+  reviewerName?: string;
+  comments: string;
+}
+
+// ============================================================
+// SEGMENT H — DOCUMENT MANAGEMENT & EXPIRY TRACKING DOMAIN MODELS
+// ============================================================
+
+export type DocumentStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'EXPIRING_SOON'
+  | 'EXPIRED'
+  | 'ARCHIVED'
+  | 'SUPERSEDED';
+
+export type DocumentCategory =
+  | 'REGULATORY'
+  | 'ETHICS'
+  | 'PROTOCOL'
+  | 'INFORMED_CONSENT'
+  | 'SITE'
+  | 'TRAINING'
+  | 'SAFETY'
+  | 'PHARMACY'
+  | 'LABORATORY'
+  | 'STUDY_REPORT'
+  | 'OTHER';
+
+export type DocumentType =
+  | 'Protocol'
+  | 'Protocol Amendment'
+  | 'Investigator Document'
+  | 'Ethics Approval'
+  | 'Site Approval'
+  | 'Consent Form'
+  | 'Training Certificate'
+  | 'Safety Report'
+  | 'Pharmacy Record'
+  | 'Laboratory Certification'
+  | 'Monitoring Report'
+  | 'Study Report'
+  | 'Other';
+
+export type DocumentExpiryState =
+  | 'NO_EXPIRY'
+  | 'ACTIVE'
+  | 'EXPIRING_SOON'
+  | 'EXPIRED';
+
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  versionNumber: string; // e.g. "1.0", "1.1", "2.0"
+  versionLabel?: string;
+  fileName: string;
+  fileType: string; // e.g. "PDF", "DOCX", "XLSX"
+  fileSize?: string; // e.g. "2.4 MB"
+  uploadedBy: string; // User display name or user ID
+  uploadedAt: string; // ISO string
+  effectiveDate?: string; // YYYY-MM-DD
+  expiryDate?: string; // YYYY-MM-DD
+  changeSummary?: string;
+  status: 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED' | 'DRAFT';
+  fileBlobUrl?: string; // Optional client-side blob URL for preview and download
+}
+
+export interface Document {
+  id: string; // e.g. "DOC-101"
+  studyId: string;
+  siteId: string;
+  title: string;
+  description?: string;
+  category: DocumentCategory;
+  documentType: DocumentType;
+  status: DocumentStatus;
+  isRequired: boolean;
+  currentVersionId: string;
+  currentVersionNumber: string;
+  effectiveDate?: string; // YYYY-MM-DD
+  expiryDate?: string; // YYYY-MM-DD
+  ownerUserId: string;
+  ownerName?: string;
+  ownerRoleId?: string;
+  createdBy: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+  relatedEntityType?: 'PARTICIPANT' | 'VISIT' | 'COMPLIANCE' | 'SAFETY' | 'TASK';
+  relatedEntityId?: string;
+  versions: DocumentVersion[];
+}
+
+export interface DocumentSummaryMetrics {
+  total: number;
+  active: number;
+  expiringSoon: number;
+  expired: number;
+  required: number;
+  actionRequired: number; // Required documents without active/current valid version OR currently expired
+}
+
+export interface DocumentFilters {
+  search?: string;
+  category?: DocumentCategory | 'ALL';
+  documentType?: DocumentType | 'ALL';
+  status?: DocumentStatus | 'ALL' | 'ACTIVE_OR_EXPIRING';
+  expiryFilter?:
+    | 'ALL'
+    | 'ACTIVE'
+    | 'EXPIRING_SOON'
+    | 'EXPIRED'
+    | 'NO_EXPIRY'
+    | 'NEXT_7_DAYS'
+    | 'NEXT_30_DAYS';
+  isRequired?: boolean | 'ALL';
+  ownerUserId?: string | 'ALL';
+}
+
+export interface CreateDocumentInput {
+  title: string;
+  description?: string;
+  category: DocumentCategory;
+  documentType: DocumentType;
+  isRequired: boolean;
+  ownerUserId: string;
+  ownerRoleId?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  initialVersionNumber?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: string;
+  fileBlobUrl?: string;
+  changeSummary?: string;
+  relatedEntityType?: 'PARTICIPANT' | 'VISIT' | 'COMPLIANCE' | 'SAFETY' | 'TASK';
+  relatedEntityId?: string;
+  createdBy?: string;
+}
+
+export interface CreateDocumentVersionInput {
+  versionNumber: string;
+  versionLabel?: string;
+  fileName: string;
+  fileType: string;
+  fileSize?: string;
+  fileBlobUrl?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  changeSummary?: string;
+  uploadedBy: string;
+}
+
+export interface UpdateDocumentInput {
+  title?: string;
+  description?: string;
+  category?: DocumentCategory;
+  documentType?: DocumentType;
+  isRequired?: boolean;
+  ownerUserId?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  status?: DocumentStatus;
+  relatedEntityType?: 'PARTICIPANT' | 'VISIT' | 'COMPLIANCE' | 'SAFETY' | 'TASK';
+  relatedEntityId?: string;
+}
+
+// ============================================================
+// SEGMENT I: REPORTS & REGULATORY EXPORTS DOMAIN MODELS
+// ============================================================
+
+export type ReportType =
+  | 'OPERATIONAL'
+  | 'PARTICIPANT'
+  | 'VISIT'
+  | 'SAFETY'
+  | 'COMPLIANCE'
+  | 'TASK'
+  | 'DOCUMENT';
+
+export interface ReportDefinition {
+  reportType: ReportType;
+  title: string;
+  description: string;
+  domain: string;
+  availableScope: string;
+  defaultSortField?: string;
+  iconName?: string;
+}
+
+export interface ReportMetadata {
+  reportType: ReportType;
+  title: string;
+  studyId: string;
+  siteId: string;
+  generatedAt: string; // ISO date string
+  generatedBy?: string;
+  disclaimer: string;
+}
+
+export type ReportRowValue = string | number | boolean | null | undefined;
+export type ReportRow = Record<string, ReportRowValue>;
+
+export interface ReportColumnConfig {
+  key: string;
+  label: string;
+  align?: 'left' | 'center' | 'right';
+  format?: 'text' | 'date' | 'badge' | 'number';
+}
+
+export interface ReportSummaryMetricItem {
+  label: string;
+  value: number | string;
+  sublabel?: string;
+  variant?: 'default' | 'primary' | 'warning' | 'danger' | 'success';
+}
+
+export interface ReportFilters {
+  search?: string;
+  status?: string;
+  participantId?: string;
+  category?: string;
+  priority?: string;
+  classification?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  reviewStatus?: string;
+}
+
+export interface GeneratedReport {
+  metadata: ReportMetadata;
+  filters: ReportFilters;
+  columns: ReportColumnConfig[];
+  summaryMetrics: ReportSummaryMetricItem[];
+  rows: ReportRow[];
+  totalRows: number;
+}
+
+
 
 
 

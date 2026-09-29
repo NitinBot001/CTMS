@@ -99,7 +99,7 @@ export const ComplianceFiltersBar: React.FC<ComplianceFiltersBarProps> = ({
       </div>
 
       {/* Structured Multi-Criteria Selectors (AND Logic) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 pt-2 border-t border-border/60">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-2 border-t border-border/60">
         {/* Scope */}
         <div>
           <label className="block text-[10px] font-semibold uppercase text-ink-muted mb-1">
@@ -154,12 +154,13 @@ export const ComplianceFiltersBar: React.FC<ComplianceFiltersBarProps> = ({
             onChange={(e) =>
               onFilterChange({
                 ...filters,
-                status: e.target.value as DeviationStatus | 'ALL',
+                status: e.target.value as DeviationStatus | 'ALL' | 'OPEN',
               })
             }
             className="w-full text-xs p-1.5 bg-surface-soft border border-border rounded-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="ALL">All Statuses</option>
+            <option value="OPEN">Open (All Unresolved)</option>
             <option value="REPORTED">Reported</option>
             <option value="UNDER_REVIEW">Under Review</option>
             <option value="ACTION_REQUIRED">Action Required</option>
@@ -179,12 +180,13 @@ export const ComplianceFiltersBar: React.FC<ComplianceFiltersBarProps> = ({
             onChange={(e) =>
               onFilterChange({
                 ...filters,
-                capaStatus: e.target.value as CapaStatus | 'ALL',
+                capaStatus: e.target.value as CapaStatus | 'ALL' | 'PENDING_OR_ACTIVE',
               })
             }
             className="w-full text-xs p-1.5 bg-surface-soft border border-border rounded-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="ALL">All CAPA States</option>
+            <option value="PENDING_OR_ACTIVE">Pending / In Progress</option>
             <option value="PENDING">Pending</option>
             <option value="IN_PROGRESS">Active / In Progress</option>
             <option value="OVERDUE">Overdue (!)</option>
@@ -203,12 +205,13 @@ export const ComplianceFiltersBar: React.FC<ComplianceFiltersBarProps> = ({
             onChange={(e) =>
               onFilterChange({
                 ...filters,
-                reviewStatus: e.target.value as ComplianceReviewStatus | 'ALL',
+                reviewStatus: e.target.value as ComplianceReviewStatus | 'ALL' | 'REVIEW_REQUIRED',
               })
             }
             className="w-full text-xs p-1.5 bg-surface-soft border border-border rounded-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="ALL">All Review States</option>
+            <option value="REVIEW_REQUIRED">Review Required (Pending/Sign-off)</option>
             <option value="SIGN_OFF_REQUIRED">Sign-off Required</option>
             <option value="NOT_REVIEWED">Pending Review</option>
             <option value="UNDER_REVIEW">Under Review</option>
@@ -261,6 +264,27 @@ export const ComplianceFiltersBar: React.FC<ComplianceFiltersBarProps> = ({
                 {p.participantCode} ({p.initials})
               </option>
             ))}
+          </select>
+        </div>
+
+        {/* Date Range */}
+        <div>
+          <label className="block text-[10px] font-semibold uppercase text-ink-muted mb-1">
+            Date Range
+          </label>
+          <select
+            value={filters.dateRange || 'ALL'}
+            onChange={(e) =>
+              onFilterChange({
+                ...filters,
+                dateRange: e.target.value as 'ALL' | 'LAST_7_DAYS' | 'LAST_30_DAYS',
+              })
+            }
+            className="w-full text-xs p-1.5 bg-surface-soft border border-border rounded-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="ALL">All Dates</option>
+            <option value="LAST_7_DAYS">Last 7 Days</option>
+            <option value="LAST_30_DAYS">Last 30 Days</option>
           </select>
         </div>
       </div>

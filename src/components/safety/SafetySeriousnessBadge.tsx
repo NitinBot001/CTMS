@@ -59,7 +59,7 @@ export const SafetySeriousnessBadge: React.FC<SafetySeriousnessBadgeProps> = ({
   return (
     <span
       className={`inline-flex items-center border rounded-sm tracking-wide shrink-0 ${config.bg} ${sizeStyles} ${className}`}
-      title={`Regulatory Seriousness Criterion: ${config.label}`}
+      title={`Seriousness Criterion: ${config.label}`}
     >
       {config.label}
     </span>

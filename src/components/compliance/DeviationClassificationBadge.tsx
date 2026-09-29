@@ -30,7 +30,7 @@ export const DeviationClassificationBadge: React.FC<DeviationClassificationBadge
       return (
         <span
           className={`inline-flex items-center gap-1 font-bold rounded-sm border bg-red-50 text-semantic-danger border-red-200 ${sizeClasses[size]}`}
-          title="Critical Protocol Deviation: Immediate corrective action and expedited safety/sponsor reporting required"
+          title="Critical Protocol Deviation: Significant variance impacting participant safety or trial data integrity"
         >
           {showIcon && <AlertOctagon className={iconSizes[size]} />}
           <span>Critical</span>
@@ -40,7 +40,7 @@ export const DeviationClassificationBadge: React.FC<DeviationClassificationBadge
       return (
         <span
           className={`inline-flex items-center gap-1 font-semibold rounded-sm border bg-amber-50 text-amber-800 border-amber-200 ${sizeClasses[size]}`}
-          title="Major Protocol Deviation: Potential impact on participant rights, safety, or study data integrity"
+          title="Major Protocol Deviation: Variance with potential impact on study evaluations or protocol procedures"
         >
           {showIcon && <AlertTriangle className={iconSizes[size]} />}
           <span>Major</span>
@@ -51,7 +51,7 @@ export const DeviationClassificationBadge: React.FC<DeviationClassificationBadge
       return (
         <span
           className={`inline-flex items-center gap-1 font-medium rounded-sm border bg-slate-50 text-slate-700 border-slate-200 ${sizeClasses[size]}`}
-          title="Minor Protocol Deviation: Logged variance with no significant impact on study safety or integrity"
+          title="Minor Protocol Deviation: Procedural variance with minimal operational impact"
         >
           {showIcon && <Info className={iconSizes[size]} />}
           <span>Minor</span>

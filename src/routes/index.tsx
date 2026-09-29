@@ -10,6 +10,16 @@ import { SafetyManagementPage } from '../pages/SafetyManagementPage';
 import { SafetyEventDetailPage } from '../pages/SafetyEventDetailPage';
 import { ComplianceManagementPage } from '../pages/ComplianceManagementPage';
 import { ComplianceDeviationDetailPage } from '../pages/ComplianceDeviationDetailPage';
+import { TeamManagementPage } from '../pages/TeamManagementPage';
+import { TeamMemberDetailPage } from '../pages/TeamMemberDetailPage';
+import { RoleManagementPage } from '../pages/RoleManagementPage';
+import { RoleDetailPage } from '../pages/RoleDetailPage';
+import { TaskManagementPage } from '../pages/TaskManagementPage';
+import { TaskDetailPage } from '../pages/TaskDetailPage';
+import { DocumentManagementPage } from '../pages/DocumentManagementPage';
+import { DocumentDetailPage } from '../pages/DocumentDetailPage';
+import { ReportsDirectoryPage } from '../pages/ReportsDirectoryPage';
+import { ReportDetailPage } from '../pages/ReportDetailPage';
 import { ModulePlaceholderPage } from '../pages/ModulePlaceholderPage';
 
 export const AppRoutes: React.FC = () => {
@@ -108,78 +118,102 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* Site Team & Custom Roles (Segment F Core Target) */}
       <Route
         path="/pi/team"
         element={
-          <AppShell pageTitle="Site Team & Custom Roles">
-            <ModulePlaceholderPage
-              moduleName="Site Team & Role Architecture"
-              plannedSegment="Segment F"
-              description="Delegation of authority log, role assignments, custom role builder with granular permissions, and access scoping."
-              capabilities={[
-                'Pre-defined clinical role templates (PI, Sub-I, CRC, Nurse, Pharmacist, Lab)',
-                'Custom Role Builder with granular permission toggles',
-                'Permission Scope separation (Assigned Site vs Assigned Participants)',
-                'Delegation of Authority (DoA) log with digital sign-off',
-              ]}
-            />
+          <AppShell pageTitle="Site Team Directory">
+            <TeamManagementPage />
           </AppShell>
         }
       />
 
+      {/* Role Management Directory (Segment F) */}
+      <Route
+        path="/pi/team/roles"
+        element={
+          <AppShell pageTitle="Roles & Permission Catalog">
+            <RoleManagementPage />
+          </AppShell>
+        }
+      />
+
+      {/* Role Detail & Matrix Editor (Segment F) */}
+      <Route
+        path="/pi/team/roles/:roleId"
+        element={
+          <AppShell pageTitle="Role Detail & Permissions">
+            <RoleDetailPage />
+          </AppShell>
+        }
+      />
+
+      {/* Team Member Detail View (Segment F) */}
+      <Route
+        path="/pi/team/:userId"
+        element={
+          <AppShell pageTitle="Team Member Profile & Scoped Delegations">
+            <TeamMemberDetailPage />
+          </AppShell>
+        }
+      />
+
+      {/* Task Management & Approvals (Segment G Core Target) */}
       <Route
         path="/pi/tasks"
         element={
-          <AppShell pageTitle="Task Management">
-            <ModulePlaceholderPage
-              moduleName="Task Management & Approvals"
-              plannedSegment="Segment G"
-              description="Structured task lifecycle management across site staff with full multi-step review and approval workflows."
-              capabilities={[
-                'Task lifecycle: Draft → Assigned → In Progress → Submitted → Under Review → Approved → Completed',
-                'Rejection / Revision required loop',
-                'Multi-user task assignment',
-                'Dynamic approver assignment (role-based, not hardcoded)',
-              ]}
-            />
+          <AppShell pageTitle="Task Management & Approvals">
+            <TaskManagementPage />
           </AppShell>
         }
       />
 
+      {/* Task Detail View (Segment G) */}
+      <Route
+        path="/pi/tasks/:taskId"
+        element={
+          <AppShell pageTitle="Task Detail & Approvals">
+            <TaskDetailPage />
+          </AppShell>
+        }
+      />
+
+      {/* Document Management & Expiry Tracking (Segment H Core Target) */}
       <Route
         path="/pi/documents"
         element={
           <AppShell pageTitle="Study & Site Documents">
-            <ModulePlaceholderPage
-              moduleName="Document Management"
-              plannedSegment="Segment H"
-              description="Regulatory binder documents, investigator brochures, protocol versions, site certifications, and expiry monitoring."
-              capabilities={[
-                'Document versioning and change tracking',
-                'Review and sign-off workflows',
-                'Expiry alerts (e.g. CVs, GCP certificates, lab certifications)',
-                'Structured metadata and audit trail',
-              ]}
-            />
+            <DocumentManagementPage />
           </AppShell>
         }
       />
 
+      {/* Document Detail & Version History View (Segment H) */}
+      <Route
+        path="/pi/documents/:documentId"
+        element={
+          <AppShell pageTitle="Document Detail & Versions">
+            <DocumentDetailPage />
+          </AppShell>
+        }
+      />
+
+      {/* Reports Directory (Segment I) */}
       <Route
         path="/pi/reports"
         element={
           <AppShell pageTitle="Reports & Analytics">
-            <ModulePlaceholderPage
-              moduleName="Reports & Regulatory Exports"
-              plannedSegment="Segment I"
-              description="Operational reporting for recruitment velocity, safety summaries, protocol deviations, and monitor review packages."
-              capabilities={[
-                'Recruitment velocity and screen failure analysis',
-                'Site performance metrics',
-                'Safety DSMB / IRB summary exports',
-                'Data export (CSV / PDF structured summaries)',
-              ]}
-            />
+            <ReportsDirectoryPage />
+          </AppShell>
+        }
+      />
+
+      {/* Report Detail & Local Export View (Segment I) */}
+      <Route
+        path="/pi/reports/:reportType"
+        element={
+          <AppShell pageTitle="Operational Report View">
+            <ReportDetailPage />
           </AppShell>
         }
       />

@@ -21,6 +21,38 @@ import {
   DeviationStatus,
   ComplianceReviewStatus,
   CapaStatus,
+  Role,
+  Permission,
+  UserRole,
+  TeamMemberSummary,
+  TeamMemberDetail,
+  TeamFilters,
+  RoleFilters,
+  TeamSummaryMetrics,
+  RoleWithCounts,
+  CreateCustomRoleInput,
+  UpdateCustomRoleInput,
+  AssignRoleInput,
+  Task,
+  TaskAssignment,
+  TaskSummaryMetrics,
+  TaskFilters,
+  CreateTaskInput,
+  AssignTaskInput,
+  TaskStatus,
+  Document,
+  DocumentVersion,
+  DocumentSummaryMetrics,
+  DocumentFilters,
+  CreateDocumentInput,
+  CreateDocumentVersionInput,
+  UpdateDocumentInput,
+  DocumentExpiryState,
+  ReportType,
+  ReportDefinition,
+  ReportFilters,
+  GeneratedReport,
+  ReportSummaryMetricItem,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -102,4 +134,166 @@ export interface IComplianceRepository {
   ): Promise<ProtocolDeviation | null>;
 }
 
+export interface ITeamRepository {
+  getTeamMembers(
+    context: ParticipantQueryContext,
+    filters?: TeamFilters
+  ): Promise<TeamMemberSummary[]>;
+  getTeamMemberById(
+    context: ParticipantQueryContext,
+    userId: string
+  ): Promise<TeamMemberDetail | null>;
+  getRoles(
+    context: ParticipantQueryContext,
+    filters?: RoleFilters
+  ): Promise<RoleWithCounts[]>;
+  getRoleById(
+    context: ParticipantQueryContext,
+    roleId: string
+  ): Promise<Role | null>;
+  getPermissions(): Promise<Permission[]>;
+  getUserRoleAssignments(
+    context: ParticipantQueryContext,
+    userId: string
+  ): Promise<UserRole[]>;
+  getEffectivePermissions(
+    context: ParticipantQueryContext,
+    userId: string
+  ): Promise<Permission[]>;
+  getTeamSummaryMetrics(
+    context: ParticipantQueryContext
+  ): Promise<TeamSummaryMetrics>;
+  assignRole(
+    context: ParticipantQueryContext,
+    input: AssignRoleInput
+  ): Promise<UserRole>;
+  removeRoleAssignment(
+    context: ParticipantQueryContext,
+    userRoleId: string
+  ): Promise<boolean>;
+  createCustomRole(
+    context: ParticipantQueryContext,
+    input: CreateCustomRoleInput
+  ): Promise<Role>;
+  updateCustomRole(
+    context: ParticipantQueryContext,
+    roleId: string,
+    input: UpdateCustomRoleInput
+  ): Promise<Role>;
+}
 
+export interface ITaskRepository {
+  getTasks(
+    context: ParticipantQueryContext,
+    filters?: TaskFilters
+  ): Promise<Task[]>;
+  getTaskById(
+    context: ParticipantQueryContext,
+    taskId: string
+  ): Promise<Task | null>;
+  getTaskSummary(
+    context: ParticipantQueryContext,
+    currentUserId?: string
+  ): Promise<TaskSummaryMetrics>;
+  getTaskAssignments(
+    context: ParticipantQueryContext,
+    taskId: string
+  ): Promise<TaskAssignment[]>;
+  getMyTasks(
+    context: ParticipantQueryContext,
+    userId: string
+  ): Promise<Task[]>;
+  createTask(
+    context: ParticipantQueryContext,
+    input: CreateTaskInput
+  ): Promise<Task>;
+  assignTask(
+    context: ParticipantQueryContext,
+    taskId: string,
+    assignment: AssignTaskInput
+  ): Promise<Task>;
+  updateTaskStatus(
+    context: ParticipantQueryContext,
+    taskId: string,
+    status: TaskStatus
+  ): Promise<Task>;
+  submitTask(
+    context: ParticipantQueryContext,
+    taskId: string
+  ): Promise<Task>;
+  approveTask(
+    context: ParticipantQueryContext,
+    taskId: string,
+    reviewerId: string,
+    comments: string
+  ): Promise<Task>;
+  requestRevision(
+    context: ParticipantQueryContext,
+    taskId: string,
+    reviewerId: string,
+    comments: string
+  ): Promise<Task>;
+  rejectTask(
+    context: ParticipantQueryContext,
+    taskId: string,
+    reviewerId: string,
+    comments: string
+  ): Promise<Task>;
+  completeTask(
+    context: ParticipantQueryContext,
+    taskId: string
+  ): Promise<Task>;
+}
+
+export interface IDocumentRepository {
+  getDocuments(
+    context: ParticipantQueryContext,
+    filters?: DocumentFilters
+  ): Promise<Document[]>;
+  getDocumentById(
+    context: ParticipantQueryContext,
+    documentId: string
+  ): Promise<Document | null>;
+  getDocumentSummary(
+    context: ParticipantQueryContext
+  ): Promise<DocumentSummaryMetrics>;
+  getDocumentVersions(
+    context: ParticipantQueryContext,
+    documentId: string
+  ): Promise<DocumentVersion[]>;
+  createDocument(
+    context: ParticipantQueryContext,
+    input: CreateDocumentInput
+  ): Promise<Document>;
+  createDocumentVersion(
+    context: ParticipantQueryContext,
+    documentId: string,
+    input: CreateDocumentVersionInput
+  ): Promise<Document>;
+  updateDocument(
+    context: ParticipantQueryContext,
+    documentId: string,
+    update: UpdateDocumentInput
+  ): Promise<Document>;
+  archiveDocument(
+    context: ParticipantQueryContext,
+    documentId: string
+  ): Promise<Document>;
+  getExpiryState(
+    document: Document,
+    referenceDate?: string
+  ): DocumentExpiryState;
+}
+
+export interface IReportRepository {
+  getReportDefinitions(): Promise<ReportDefinition[]>;
+  generateReport(
+    context: ParticipantQueryContext,
+    reportType: ReportType,
+    filters?: ReportFilters
+  ): Promise<GeneratedReport>;
+  getReportSummary(
+    context: ParticipantQueryContext,
+    reportType: ReportType
+  ): Promise<ReportSummaryMetricItem[]>;
+}

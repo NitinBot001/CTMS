@@ -138,20 +138,44 @@ export const ComplianceManagementPage: React.FC = () => {
     if (filterKey === 'STATUS_OPEN') {
       setFilters((prev) => ({
         ...prev,
-        status: 'ALL',
-        dateRange: 'ALL',
+        status: prev.status === 'OPEN' ? 'ALL' : 'OPEN',
       }));
     } else if (filterKey === 'CLASS_CRITICAL') {
-      setFilters((prev) => ({ ...prev, classification: 'CRITICAL' }));
+      setFilters((prev) => ({
+        ...prev,
+        classification: prev.classification === 'CRITICAL' ? 'ALL' : 'CRITICAL',
+      }));
     } else if (filterKey === 'CLASS_MAJOR') {
-      setFilters((prev) => ({ ...prev, classification: 'MAJOR' }));
+      setFilters((prev) => ({
+        ...prev,
+        classification: prev.classification === 'MAJOR' ? 'ALL' : 'MAJOR',
+      }));
     } else if (filterKey === 'REVIEW_REQUIRED') {
-      setFilters((prev) => ({ ...prev, reviewStatus: 'SIGN_OFF_REQUIRED' }));
+      setFilters((prev) => ({
+        ...prev,
+        reviewStatus: prev.reviewStatus === 'REVIEW_REQUIRED' ? 'ALL' : 'REVIEW_REQUIRED',
+      }));
     } else if (filterKey === 'CAPA_PENDING') {
-      setFilters((prev) => ({ ...prev, capaStatus: 'PENDING' }));
+      setFilters((prev) => ({
+        ...prev,
+        capaStatus: prev.capaStatus === 'PENDING_OR_ACTIVE' ? 'ALL' : 'PENDING_OR_ACTIVE',
+      }));
     } else if (filterKey === 'CAPA_OVERDUE') {
-      setFilters((prev) => ({ ...prev, capaStatus: 'OVERDUE' }));
+      setFilters((prev) => ({
+        ...prev,
+        capaStatus: prev.capaStatus === 'OVERDUE' ? 'ALL' : 'OVERDUE',
+      }));
     }
+  };
+
+  const getActiveFilterKey = (): string | undefined => {
+    if (filters.status === 'OPEN') return 'STATUS_OPEN';
+    if (filters.classification === 'CRITICAL') return 'CLASS_CRITICAL';
+    if (filters.classification === 'MAJOR') return 'CLASS_MAJOR';
+    if (filters.reviewStatus === 'REVIEW_REQUIRED') return 'REVIEW_REQUIRED';
+    if (filters.capaStatus === 'PENDING_OR_ACTIVE') return 'CAPA_PENDING';
+    if (filters.capaStatus === 'OVERDUE') return 'CAPA_OVERDUE';
+    return undefined;
   };
 
   const isFiltered =
@@ -175,7 +199,7 @@ export const ComplianceManagementPage: React.FC = () => {
               Protocol Compliance & Deviations
             </h1>
             <span className="text-xs px-2 py-0.5 bg-stone-100 text-ink-secondary border border-border rounded-sm font-mono">
-              ICH-GCP E6 Adherence
+              Protocol Compliance Oversight
             </span>
           </div>
           <p className="text-xs text-ink-muted mt-1">
@@ -243,6 +267,7 @@ export const ComplianceManagementPage: React.FC = () => {
       ) : (
         <ComplianceSummaryCards
           metrics={metrics}
+          activeFilter={getActiveFilterKey()}
           onFilterClick={handleSummaryCardFilter}
         />
       )}

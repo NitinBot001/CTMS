@@ -62,3 +62,46 @@ h1, h2, h3, h4, .font-heading {
 ::-webkit-scrollbar-thumb:hover {
   background: #726B5C;
 }
+
+/* Print optimization for formal clinical reports & dossiers */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide screen-only interactive and navigation chrome */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Strictly expose printable report container */
+  #ctms-printable-report,
+  #ctms-printable-report * {
+    visibility: visible;
+  }
+
+  #ctms-printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+}

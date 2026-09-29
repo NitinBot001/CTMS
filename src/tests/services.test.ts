@@ -4,11 +4,30 @@ import { participantService } from '../services/participantService';
 import { visitService } from '../services/visitService';
 import { safetyService } from '../services/safetyService';
 import { complianceService } from '../services/complianceService';
+import { teamService } from '../services/teamService';
+import { taskService } from '../services/taskService';
+import { documentService } from '../services/documentService';
+import { reportService } from '../services/reportService';
 import {
   calculateVisitWindow,
   deriveVisitStatus,
   calculateActivityMetrics,
 } from '../utils/visitCalculations';
+import { isValidTaskTransition } from '../utils/taskCalculations';
+import {
+  calculateDocumentExpiryState,
+  getDaysUntilExpiry,
+  deriveDocumentStatus,
+  isDocumentActionRequired,
+  DOCUMENT_REFERENCE_DATE,
+} from '../utils/documentCalculations';
+import {
+  generateCsvContent,
+  formatCsvCell,
+  generateExcelContent,
+  formatFilterDisplay,
+  REGULATORY_REPORT_DISCLAIMER,
+} from '../utils/reportCalculations';
 
 function assert(condition: unknown, message: string = 'Assertion condition was false'): asserts condition {
   if (!condition) {
@@ -611,7 +630,12 @@ async function runTests() {
   assertStrictEqual(actionRequiredDevs.length, 1, 'Action required deviations should be 1 (DEV-001)');
   assertStrictEqual(capaInProgressDevs.length, 1, 'CAPA in progress deviations should be 1 (DEV-003)');
   assertStrictEqual(underReviewDevs.length, 1, 'Under review deviations should be 1 (DEV-006)');
-  console.log('✓ Test 37 passed: Status filtering verified.');
+
+  // Test OPEN filter shortcut
+  const openDevs = await complianceService.getDeviations(ctxSite1, { status: 'OPEN' });
+  assertStrictEqual(openDevs.length, 3, 'Open deviations should be 3 (DEV-001, DEV-003, DEV-006)');
+  assert(openDevs.every((d) => d.status !== 'RESOLVED' && d.status !== 'CLOSED'), 'Open filter must exclude RESOLVED and CLOSED');
+  console.log('✓ Test 37 passed: Status filtering and OPEN shortcut verified.');
 
   // Test 38: CAPA filtering
   console.log('Test 38: CAPA filtering');
@@ -625,7 +649,11 @@ async function runTests() {
   assertStrictEqual(capaPending.length, 1, 'Pending CAPA should be 1 (DEV-006)');
   assertStrictEqual(capaComplete.length, 1, 'Completed CAPA should be 1 (DEV-005)');
   assertStrictEqual(capaNotReq.length, 2, 'Not required CAPA should be 2 (DEV-002, DEV-004)');
-  console.log('✓ Test 38 passed: CAPA status filtering verified.');
+
+  // Test PENDING_OR_ACTIVE composite filter
+  const capaPendingOrActive = await complianceService.getDeviations(ctxSite1, { capaStatus: 'PENDING_OR_ACTIVE' });
+  assertStrictEqual(capaPendingOrActive.length, 2, 'Pending or active CAPA should be 2 (DEV-003, DEV-006)');
+  console.log('✓ Test 38 passed: CAPA status filtering and PENDING_OR_ACTIVE shortcut verified.');
 
   // Test 39: PI review filtering
   console.log('Test 39: PI review filtering');
@@ -637,7 +665,17 @@ async function runTests() {
   assertStrictEqual(pendingReview.length, 1, 'Pending review should be 1 (DEV-006)');
   assertStrictEqual(underReview.length, 1, 'Under review should be 1 (DEV-003)');
   assertStrictEqual(reviewed.length, 3, 'Reviewed should be 3 (DEV-002, DEV-004, DEV-005)');
-  console.log('✓ Test 39 passed: PI review filtering verified.');
+
+  // Test REVIEW_REQUIRED composite filter
+  const reviewRequiredDevs = await complianceService.getDeviations(ctxSite1, { reviewStatus: 'REVIEW_REQUIRED' });
+  assertStrictEqual(reviewRequiredDevs.length, 2, 'Review required should be 2 (DEV-001, DEV-006)');
+
+  // Test Date Range filter
+  const last30Devs = await complianceService.getDeviations(ctxSite1, { dateRange: 'LAST_30_DAYS' });
+  assert(Array.isArray(last30Devs), 'Date range query must return array');
+  const allDatesDevs = await complianceService.getDeviations(ctxSite1, { dateRange: 'ALL' });
+  assertStrictEqual(allDatesDevs.length, 6, 'ALL date range should return all 6 deviations');
+  console.log('✓ Test 39 passed: PI review and date range filtering verified.');
 
   // Test 40: Compliance summary calculation metrics
   console.log('Test 40: Compliance summary calculations');
@@ -750,13 +788,29 @@ async function runTests() {
   assertStrictEqual(postCapaSummary.open, 2, 'Open deviations should decrease to 2 (DEV-001, DEV-006)');
   console.log('✓ Test 47 passed: CAPA mutation and summary recalculation verified.');
 
-  // Test 48: Lifecycle transition behavior
-  console.log('Test 48: Lifecycle transition behavior');
+  // Test 48: Lifecycle transition behavior & validation
+  console.log('Test 48: Lifecycle transition behavior & validation');
+  assertStrictEqual(complianceService.isValidStatusTransition('REPORTED', 'UNDER_REVIEW'), true);
+  assertStrictEqual(complianceService.isValidStatusTransition('REPORTED', 'CLOSED'), false);
+  assertStrictEqual(complianceService.isValidStatusTransition('RESOLVED', 'CLOSED'), true);
+  assertStrictEqual(complianceService.isValidStatusTransition('CAPA_IN_PROGRESS', 'CLOSED'), false);
+
+  // Illegal transition attempt must be rejected
+  let transitionErrorThrown = false;
+  try {
+    await complianceService.updateDeviationStatus(ctxSite1, 'DEV-001', 'CLOSED');
+  } catch (err) {
+    transitionErrorThrown = true;
+    assert((err as Error).message.includes('Invalid deviation status transition'), 'Error message must specify invalid transition');
+  }
+  assertStrictEqual(transitionErrorThrown, true, 'Illegal transition from ACTION_REQUIRED to CLOSED must throw error');
+
+  // Valid transition from RESOLVED to CLOSED
   const closedResult = await complianceService.updateDeviationStatus(ctxSite1, 'DEV-003', 'CLOSED');
   assert(closedResult !== null, 'Closed result should not be null');
   assertStrictEqual(closedResult?.status, 'CLOSED');
   assert(Boolean(closedResult?.closedAt), 'closedAt timestamp must be recorded');
-  console.log('✓ Test 48 passed: Lifecycle transition behavior verified.');
+  console.log('✓ Test 48 passed: Lifecycle transition behavior & validation verified.');
 
   // Test 49: Attention-state calculation
   console.log('Test 49: Attention-state calculation');
@@ -779,8 +833,209 @@ async function runTests() {
   );
   console.log('✓ Test 49 passed: Attention-state calculation verified.');
 
-  // Test 50: Existing Segment A–D regression check
+  // Test 50: Existing Segments A-D regression check
   console.log('Test 50: Existing Segments A-D regression check');
+  const regStudies50 = await studyService.getStudies();
+  assert(regStudies50.length > 0, 'Studies must be present');
+  const regParticipants50 = await participantService.getParticipants(ctxSite1);
+  assertStrictEqual(regParticipants50.length, 10, 'SITE-001 must still have 10 participants');
+  const regVisits50 = await visitService.getVisits(ctxSite1);
+  assert(regVisits50.length > 0, 'Visits must still be present');
+  const regSafety50 = await safetyService.getSafetyEvents(ctxSite1);
+  assert(regSafety50.length > 0, 'Safety events must still be present');
+  const regOverview50 = await dashboardService.getOverview('STUDY-001', 'SITE-001');
+  assert(regOverview50 !== null, 'Overview must still be present');
+  console.log('✓ Test 50 passed: Segments A-D regression check verified.');
+
+  // Test 51: Team retrieval
+  console.log('Test 51: teamService.getTeamMembers() - Retrieval & Scoping');
+  const teamSite1 = await teamService.getTeamMembers(ctxSite1);
+  assert(Array.isArray(teamSite1), 'Team members should be an array');
+  assertStrictEqual(teamSite1.length, 7, 'SITE-001 must have 7 team members');
+  assert(
+    teamSite1.every((m) => m.studyId === 'STUDY-001' && m.siteId === 'SITE-001'),
+    'All team members must belong to STUDY-001 and SITE-001'
+  );
+  console.log('✓ Test 51 passed: Team retrieval verified.');
+
+  // Test 52: Site scoping (SITE-001 vs SITE-002)
+  console.log('Test 52: Site scoping (SITE-001 vs SITE-002)');
+  const teamSite2 = await teamService.getTeamMembers(ctxSite2);
+  assertStrictEqual(teamSite2.length, 3, 'SITE-002 must have 3 team members (USR-201, USR-102, USR-202)');
+  const usr102Site1 = teamSite1.find((m) => m.user.id === 'USR-102');
+  const usr102Site2 = teamSite2.find((m) => m.user.id === 'USR-102');
+  assert(Boolean(usr102Site1), 'USR-102 must be present in SITE-001');
+  assert(Boolean(usr102Site2), 'USR-102 must be present in SITE-002');
+  assertStrictEqual(usr102Site1?.siteId, 'SITE-001');
+  assertStrictEqual(usr102Site2?.siteId, 'SITE-002');
+  console.log('✓ Test 52 passed: Site scoping verified.');
+
+  // Test 53: Cross-site isolation
+  console.log('Test 53: Cross-site team isolation');
+  const crossSiteUser = await teamService.getTeamMemberById(ctxSite1, 'USR-201');
+  assertStrictEqual(crossSiteUser, null, 'USR-201 belongs to SITE-002 only, querying from SITE-001 must return null');
+  const invalidUser = await teamService.getTeamMemberById(ctxSite1, 'USR-999');
+  assertStrictEqual(invalidUser, null, 'Non-existent user must return null');
+  const site3User = await teamService.getTeamMemberById(ctxSite1, 'USR-301');
+  assertStrictEqual(site3User, null, 'USR-301 belongs to SITE-003, querying from SITE-001 must return null');
+  console.log('✓ Test 53 passed: Cross-site isolation verified.');
+
+  // Test 54: Role retrieval
+  console.log('Test 54: Role retrieval with type filters');
+  const allRoles = await teamService.getRoles(ctxSite1);
+  assert(allRoles.length >= 8, 'Must have at least 8 total roles');
+  const systemRoles = await teamService.getRoles(ctxSite1, { roleType: 'SYSTEM' });
+  assertStrictEqual(systemRoles.length, 6, 'Must have 6 system roles');
+  const customRoles = await teamService.getRoles(ctxSite1, { roleType: 'CUSTOM' });
+  assert(customRoles.length >= 2, 'Must have at least 2 custom roles');
+  const searchRoles = await teamService.getRoles(ctxSite1, { search: 'Pharmacist' });
+  assertStrictEqual(searchRoles.length, 1, 'Search for Pharmacist must return exactly 1 role');
+  assertStrictEqual(searchRoles[0].id, 'ROLE_STUDY_PHARMACIST');
+  console.log('✓ Test 54 passed: Role retrieval verified.');
+
+  // Test 55: Permission catalog retrieval and grouping
+  console.log('Test 55: Permission retrieval and grouping');
+  const permissions = await teamService.getPermissions();
+  assertStrictEqual(permissions.length, 24, 'Permission catalog must contain exactly 24 permissions');
+  const groupedPerms = teamService.groupPermissionsByModule(permissions);
+  const modules = Object.keys(groupedPerms);
+  assertStrictEqual(modules.length, 9, 'Permissions must be grouped across 9 modules');
+  assert(Boolean(groupedPerms['STUDY']), 'STUDY module must exist');
+  assert(Boolean(groupedPerms['PARTICIPANTS']), 'PARTICIPANTS module must exist');
+  assert(Boolean(groupedPerms['SAFETY']), 'SAFETY module must exist');
+  assert(Boolean(groupedPerms['COMPLIANCE']), 'COMPLIANCE module must exist');
+  console.log('✓ Test 55 passed: Permission retrieval verified.');
+
+  // Test 56: Effective permission calculation
+  console.log('Test 56: Effective permission calculation');
+  const piPerms = await teamService.getEffectivePermissions(ctxSite1, 'USR-101');
+  assertStrictEqual(piPerms.length, 24, 'PI must have all 24 effective permissions');
+  const dePerms = await teamService.getEffectivePermissions(ctxSite1, 'USR-106');
+  assertStrictEqual(dePerms.length, 5, 'Data Entry Operator must have 5 effective permissions');
+  const permIdSet = new Set(piPerms.map((p) => p.id));
+  assertStrictEqual(permIdSet.size, piPerms.length, 'Effective permissions must not contain duplicate IDs');
+  console.log('✓ Test 56 passed: Effective permission calculation verified.');
+
+  // Test 57: Multiple role assignments
+  console.log('Test 57: Multiple role assignments (USR-105)');
+  const usr105Detail = await teamService.getTeamMemberById(ctxSite1, 'USR-105');
+  assert(usr105Detail !== null, 'USR-105 must exist in SITE-001');
+  assertStrictEqual(usr105Detail?.roles.length, 2, 'USR-105 must have 2 assigned roles');
+  assertStrictEqual(usr105Detail?.assignments.length, 2, 'USR-105 must have 2 role assignments');
+  const roleIds = usr105Detail!.roles.map((r) => r.id);
+  assert(roleIds.includes('ROLE_STUDY_PHARMACIST'), 'USR-105 must have ROLE_STUDY_PHARMACIST');
+  assert(roleIds.includes('ROLE_IP_SAFETY_MONITOR'), 'USR-105 must have ROLE_IP_SAFETY_MONITOR');
+  console.log('✓ Test 57 passed: Multiple role assignments verified.');
+
+  // Test 58: Duplicate assignment rejection
+  console.log('Test 58: Duplicate role assignment rejection');
+  let dupAssignError = false;
+  try {
+    await teamService.assignRole(ctxSite1, {
+      userId: 'USR-101',
+      roleId: 'ROLE_PI',
+      studyId: 'STUDY-001',
+      siteId: 'SITE-001',
+      assignedBy: 'Dr. Ananya Sharma',
+    });
+  } catch (err) {
+    dupAssignError = true;
+    assert((err as Error).message.includes('already assigned'), 'Error must specify already assigned');
+  }
+  assertStrictEqual(dupAssignError, true, 'Duplicate assignment must throw error');
+  console.log('✓ Test 58 passed: Duplicate assignment rejection verified.');
+
+  // Test 59: Custom role creation
+  console.log('Test 59: Custom role creation');
+  const createdRole = await teamService.createCustomRole(ctxSite1, {
+    name: 'Clinical Quality Auditor',
+    description: 'Internal site auditor for GCP compliance and records',
+    permissionIds: ['STUDY_VIEW', 'COMPLIANCE_VIEW', 'REPORTS_VIEW'],
+  });
+  assertStrictEqual(createdRole.name, 'Clinical Quality Auditor');
+  assertStrictEqual(createdRole.type, 'CUSTOM');
+  assertStrictEqual(createdRole.permissionIds.length, 3);
+  assert(Boolean(createdRole.id), 'Created role must have generated ID');
+  console.log('✓ Test 59 passed: Custom role creation verified.');
+
+  // Test 60: Duplicate custom role rejection
+  console.log('Test 60: Duplicate custom role name rejection');
+  let dupRoleNameError = false;
+  try {
+    await teamService.createCustomRole(ctxSite1, {
+      name: 'clinical quality auditor',
+      description: 'Duplicate case test',
+      permissionIds: ['STUDY_VIEW'],
+    });
+  } catch (err) {
+    dupRoleNameError = true;
+    assert((err as Error).message.includes('already exists'), 'Error must specify role already exists');
+  }
+  assertStrictEqual(dupRoleNameError, true, 'Duplicate role name must be rejected');
+  console.log('✓ Test 60 passed: Duplicate custom role rejection verified.');
+
+  // Test 61: Invalid custom role with zero permissions
+  console.log('Test 61: Zero permissions custom role rejection');
+  let zeroPermError = false;
+  try {
+    await teamService.createCustomRole(ctxSite1, {
+      name: 'Empty Permissions Role',
+      description: 'Should fail',
+      permissionIds: [],
+    });
+  } catch (err) {
+    zeroPermError = true;
+    assert((err as Error).message.includes('At least one permission'), 'Error must specify permission requirement');
+  }
+  assertStrictEqual(zeroPermError, true, 'Zero permissions role must be rejected');
+
+  let emptyNameError = false;
+  try {
+    await teamService.createCustomRole(ctxSite1, {
+      name: '   ',
+      description: 'Should fail',
+      permissionIds: ['STUDY_VIEW'],
+    });
+  } catch (err) {
+    emptyNameError = true;
+    assert((err as Error).message.includes('required'), 'Error must specify name requirement');
+  }
+  assertStrictEqual(emptyNameError, true, 'Empty role name must be rejected');
+  console.log('✓ Test 61 passed: Invalid custom role rejection verified.');
+
+  // Test 62: System-role protection
+  console.log('Test 62: System role modification protection');
+  let systemRoleError = false;
+  try {
+    await teamService.updateCustomRole(ctxSite1, 'ROLE_PI', {
+      name: 'Modified PI Role',
+    });
+  } catch (err) {
+    systemRoleError = true;
+    assert((err as Error).message.includes('System roles cannot be modified'), 'Error must specify system role protection');
+  }
+  assertStrictEqual(systemRoleError, true, 'System role modification must throw error');
+  console.log('✓ Test 62 passed: System-role protection verified.');
+
+  // Test 63: Team member detail isolation & summary metrics
+  console.log('Test 63: Team member detail isolation & summary metrics');
+  const inactiveMember = await teamService.getTeamMemberById(ctxSite1, 'USR-107');
+  assert(inactiveMember !== null, 'USR-107 must exist at SITE-001');
+  assertStrictEqual(inactiveMember?.user.status, 'INACTIVE');
+  const crossSite2User = await teamService.getTeamMemberById(ctxSite1, 'USR-202');
+  assertStrictEqual(crossSite2User, null, 'USR-202 from SITE-002 must return null in SITE-001 context');
+
+  const teamMetrics = await teamService.getTeamSummaryMetrics(ctxSite1);
+  assertStrictEqual(teamMetrics.totalMembers, 7, 'Total members should be 7');
+  assertStrictEqual(teamMetrics.activeMembers, 6, 'Active members should be 6');
+  assertStrictEqual(teamMetrics.inactiveMembers, 1, 'Inactive members should be 1');
+  assertStrictEqual(teamMetrics.systemRolesCount, 6, 'System roles should be 6');
+  assert(teamMetrics.customRolesCount >= 2, 'Custom roles should be at least 2');
+  assertStrictEqual(teamMetrics.totalAssignments, 8, 'Total assignments at SITE-001 should be 8');
+  console.log('✓ Test 63 passed: Team member detail isolation & metrics verified.');
+
+  // Test 64: Segment A–E regression check
+  console.log('Test 64: Comprehensive Segments A-E regression check');
   const regStudies = await studyService.getStudies();
   assert(regStudies.length > 0, 'Studies must be present');
   const regParticipants = await participantService.getParticipants(ctxSite1);
@@ -789,14 +1044,874 @@ async function runTests() {
   assert(regVisits.length > 0, 'Visits must still be present');
   const regSafety = await safetyService.getSafetyEvents(ctxSite1);
   assert(regSafety.length > 0, 'Safety events must still be present');
+  const regDeviations = await complianceService.getDeviations(ctxSite1);
+  assertStrictEqual(regDeviations.length, 6, 'SITE-001 must still have 6 deviations');
   const regOverview = await dashboardService.getOverview('STUDY-001', 'SITE-001');
   assert(regOverview !== null, 'Overview must still be present');
-  console.log('✓ Test 50 passed: Segments A-D regression check verified.');
+  console.log('✓ Test 64 passed: Segments A-E regression check verified.');
 
-  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (50/50) ---');
+  // ============================================================
+  // SEGMENT G: TASK MANAGEMENT & APPROVALS (Tests 65–80)
+  // ============================================================
+
+  // Test 65: taskService.getTasks() retrieval
+  console.log('Test 65: taskService.getTasks() - Retrieval');
+  const tasksSite1 = await taskService.getTasks(ctxSite1);
+  assert(Array.isArray(tasksSite1), 'Tasks must be an array');
+  assertStrictEqual(tasksSite1.length, 11, 'SITE-001 should have 11 tasks');
+  assertStrictEqual(tasksSite1[0].id, 'TSK-102', 'First task at SITE-001 sorted by priority then due date should be TSK-102');
+  assert(tasksSite1.some((t) => t.id === 'TSK-101'), 'Tasks list must contain TSK-101');
+  assert(tasksSite1[0].title.length > 0, 'Task must have a title');
+  assert(tasksSite1[0].category !== undefined, 'Task must have a category');
+  assert(tasksSite1[0].priority !== undefined, 'Task must have a priority');
+  assert(tasksSite1[0].status !== undefined, 'Task must have a status');
+  console.log('✓ Test 65 passed: Task retrieval verified.');
+
+  // Test 66: Study/site scoping
+  console.log('Test 66: Task study/site scoping');
+  const tasksSite2 = await taskService.getTasks(ctxSite2);
+  assertStrictEqual(tasksSite2.length, 2, 'SITE-002 should have 2 tasks (TSK-201, TSK-202)');
+  const tasksSite3 = await taskService.getTasks({ studyId: 'STUDY-002', siteId: 'SITE-003' });
+  assertStrictEqual(tasksSite3.length, 1, 'SITE-003 should have 1 task (TSK-301)');
+  const tasksEmpty = await taskService.getTasks({ studyId: '', siteId: '' });
+  assertStrictEqual(tasksEmpty.length, 0, 'Empty context must return empty task list');
+  console.log('✓ Test 66 passed: Task study/site scoping verified.');
+
+  // Test 67: Cross-site task isolation
+  console.log('Test 67: Cross-site task isolation');
+  const crossTaskInSite1 = await taskService.getTaskById(ctxSite1, 'TSK-201');
+  assertStrictEqual(crossTaskInSite1, null, 'TSK-201 from SITE-002 must return null in SITE-001 context');
+  const crossTaskInSite2 = await taskService.getTaskById(ctxSite2, 'TSK-101');
+  assertStrictEqual(crossTaskInSite2, null, 'TSK-101 from SITE-001 must return null in SITE-002 context');
+  const validTask = await taskService.getTaskById(ctxSite1, 'TSK-101');
+  assert(validTask !== null, 'TSK-101 must exist in SITE-001');
+  assertStrictEqual(validTask?.id, 'TSK-101');
+  console.log('✓ Test 67 passed: Cross-site task isolation verified.');
+
+  // Test 68: Task filtering
+  console.log('Test 68: Task filtering (Status, Priority, Category, Assignee, Due Date)');
+  const inProgressTasks = await taskService.getTasks(ctxSite1, { status: 'IN_PROGRESS' });
+  assertStrictEqual(inProgressTasks.length, 2, 'Should have 2 IN_PROGRESS tasks (TSK-102, TSK-105)');
+  
+  const highPriorityTasks = await taskService.getTasks(ctxSite1, { priority: 'HIGH' });
+  assertStrictEqual(highPriorityTasks.length, 4, 'Should have 4 HIGH priority tasks (TSK-101, TSK-102, TSK-104, TSK-107)');
+
+  const safetyTasks = await taskService.getTasks(ctxSite1, { category: 'SAFETY' });
+  assertStrictEqual(safetyTasks.length, 1, 'Should have 1 SAFETY task (TSK-101)');
+
+  const user103Tasks = await taskService.getTasks(ctxSite1, { assigneeId: 'USR-103' });
+  assertStrictEqual(user103Tasks.length, 4, 'USR-103 should have 4 assigned tasks (TSK-102, TSK-105, TSK-106, TSK-108)');
+
+  const overdueTasks = await taskService.getTasks(ctxSite1, { dueDateFilter: 'OVERDUE' });
+  assertStrictEqual(overdueTasks.length, 2, 'Should have 2 overdue tasks (TSK-102, TSK-105)');
+
+  const dueTodayTasks = await taskService.getTasks(ctxSite1, { dueDateFilter: 'TODAY' });
+  assertStrictEqual(dueTodayTasks.length, 3, 'Should have 3 tasks due today (TSK-101, TSK-104, TSK-107)');
+  console.log('✓ Test 68 passed: Task filtering verified.');
+
+  // Test 69: Combined multi-criteria AND filtering
+  console.log('Test 69: Combined multi-criteria AND filtering');
+  const combinedSafetyHigh = await taskService.getTasks(ctxSite1, {
+    category: 'SAFETY',
+    priority: 'HIGH',
+  });
+  assertStrictEqual(combinedSafetyHigh.length, 1, 'Combined SAFETY + HIGH should return 1 task (TSK-101)');
+  assertStrictEqual(combinedSafetyHigh[0].id, 'TSK-101');
+
+  const combinedSearch = await taskService.getTasks(ctxSite1, {
+    search: 'excursion',
+  });
+  assertStrictEqual(combinedSearch.length, 1, 'Search for excursion should match TSK-104');
+  assertStrictEqual(combinedSearch[0].id, 'TSK-104');
+
+  const combinedNoMatch = await taskService.getTasks(ctxSite1, {
+    category: 'SAFETY',
+    status: 'COMPLETED',
+  });
+  assertStrictEqual(combinedNoMatch.length, 0, 'SAFETY + COMPLETED should return 0 tasks at SITE-001');
+  console.log('✓ Test 69 passed: Combined multi-criteria AND filtering verified.');
+
+  // Test 70: Task summary metric calculation
+  console.log('Test 70: Task summary metric calculation');
+  const taskSummary = await taskService.getTaskSummary(ctxSite1, 'USR-103');
+  assertStrictEqual(taskSummary.total, 11, 'Total tasks at SITE-001 should be 11');
+  assertStrictEqual(taskSummary.dueToday, 3, 'Tasks due today should be 3');
+  assertStrictEqual(taskSummary.overdue, 2, 'Overdue tasks should be 2');
+  assertStrictEqual(taskSummary.pendingReview, 2, 'Pending review tasks should be 2 (UNDER_REVIEW + SUBMITTED)');
+  assertStrictEqual(taskSummary.completed, 2, 'Completed tasks should be 2 (TSK-108, TSK-109)');
+  assertStrictEqual(taskSummary.myOpen, 3, 'USR-103 should have 3 open tasks (TSK-102, TSK-105, TSK-106)');
+  console.log('✓ Test 70 passed: Task summary metric calculation verified.');
+
+  // Test 71: Task assignment
+  console.log('Test 71: Task assignment flow');
+  const draftTask = await taskService.getTaskById(ctxSite1, 'TSK-110');
+  assert(draftTask !== null, 'TSK-110 must exist');
+  assertStrictEqual(draftTask?.status, 'DRAFT', 'TSK-110 starts in DRAFT status');
+  assertStrictEqual(draftTask?.assignee, undefined, 'TSK-110 is unassigned');
+
+  const assignedTask = await taskService.assignTask(ctxSite1, 'TSK-110', {
+    userId: 'USR-103',
+    assignedBy: 'Dr. Ananya Sharma (PI)',
+  });
+  assertStrictEqual(assignedTask.status, 'ASSIGNED', 'Status should transition from DRAFT to ASSIGNED');
+  assertStrictEqual(assignedTask.assignee?.userId, 'USR-103');
+  assertStrictEqual(assignedTask.assignments.length, 1);
+  assertStrictEqual(assignedTask.assignments[0].status, 'ACTIVE');
+  console.log('✓ Test 71 passed: Task assignment flow verified.');
+
+  // Test 72: Invalid/cross-site assignment rejection
+  console.log('Test 72: Invalid and cross-site assignment rejection');
+  let crossSiteAssignmentError = false;
+  try {
+    await taskService.assignTask(ctxSite1, 'TSK-103', {
+      userId: 'USR-201', // belongs to SITE-002
+      assignedBy: 'Dr. Ananya Sharma (PI)',
+    });
+  } catch (err) {
+    crossSiteAssignmentError = true;
+    assert((err as Error).message.includes('Cross-site task assignment is prohibited'), 'Error must specify cross-site prohibition');
+  }
+  assertStrictEqual(crossSiteAssignmentError, true, 'Assigning cross-site user must throw error');
+
+  let inactiveUserAssignmentError = false;
+  try {
+    await taskService.assignTask(ctxSite1, 'TSK-103', {
+      userId: 'USR-107', // inactive user at SITE-001
+      assignedBy: 'Dr. Ananya Sharma (PI)',
+    });
+  } catch (err) {
+    inactiveUserAssignmentError = true;
+    assert((err as Error).message.includes('inactive user'), 'Error must specify inactive user rejection');
+  }
+  assertStrictEqual(inactiveUserAssignmentError, true, 'Assigning inactive user must throw error');
+  console.log('✓ Test 72 passed: Invalid and cross-site assignment rejection verified.');
+
+  // Test 73: Lifecycle transition validation (isValidTaskTransition)
+  console.log('Test 73: Lifecycle transition validation rules');
+  assertStrictEqual(isValidTaskTransition('DRAFT', 'ASSIGNED', false), true, 'DRAFT -> ASSIGNED valid');
+  assertStrictEqual(isValidTaskTransition('ASSIGNED', 'IN_PROGRESS', false), true, 'ASSIGNED -> IN_PROGRESS valid');
+  assertStrictEqual(isValidTaskTransition('IN_PROGRESS', 'SUBMITTED', false), true, 'IN_PROGRESS -> SUBMITTED valid');
+  assertStrictEqual(isValidTaskTransition('SUBMITTED', 'UNDER_REVIEW', false), true, 'SUBMITTED -> UNDER_REVIEW valid');
+  assertStrictEqual(isValidTaskTransition('UNDER_REVIEW', 'APPROVED', false), true, 'UNDER_REVIEW -> APPROVED valid');
+  assertStrictEqual(isValidTaskTransition('UNDER_REVIEW', 'REVISION_REQUIRED', false), true, 'UNDER_REVIEW -> REVISION_REQUIRED valid');
+  assertStrictEqual(isValidTaskTransition('REVISION_REQUIRED', 'IN_PROGRESS', false), true, 'REVISION_REQUIRED -> IN_PROGRESS valid');
+  assertStrictEqual(isValidTaskTransition('APPROVED', 'COMPLETED', true), true, 'APPROVED -> COMPLETED valid');
+  assertStrictEqual(isValidTaskTransition('IN_PROGRESS', 'COMPLETED', false), true, 'IN_PROGRESS -> COMPLETED valid when requiresApproval is false');
+  assertStrictEqual(isValidTaskTransition('IN_PROGRESS', 'COMPLETED', true), false, 'IN_PROGRESS -> COMPLETED INVALID when requiresApproval is true');
+  assertStrictEqual(isValidTaskTransition('COMPLETED', 'IN_PROGRESS', false), false, 'COMPLETED is terminal');
+  assertStrictEqual(isValidTaskTransition('CANCELLED', 'IN_PROGRESS', false), false, 'CANCELLED is terminal');
+  console.log('✓ Test 73 passed: Lifecycle transition validation rules verified.');
+
+  // Test 74: Invalid status jump rejection
+  console.log('Test 74: Invalid status jump rejection');
+  let invalidJumpError = false;
+  try {
+    await taskService.updateTaskStatus(ctxSite1, 'TSK-101', 'DRAFT'); // UNDER_REVIEW -> DRAFT is invalid
+  } catch (err) {
+    invalidJumpError = true;
+    assert((err as Error).message.includes('Invalid task status transition'), 'Error must specify invalid transition');
+  }
+  assertStrictEqual(invalidJumpError, true, 'Illegal status jump must throw error');
+
+  let directCompleteError = false;
+  try {
+    // TSK-102 is IN_PROGRESS and requiresApproval: true
+    await taskService.completeTask(ctxSite1, 'TSK-102');
+  } catch (err) {
+    directCompleteError = true;
+    assert((err as Error).message.includes('must be submitted, reviewed, and approved'), 'Error must state approval required');
+  }
+  assertStrictEqual(directCompleteError, true, 'Completing unapproved task requiring approval must throw error');
+  console.log('✓ Test 74 passed: Invalid status jump rejection verified.');
+
+  // Test 75: Submit for review workflow
+  console.log('Test 75: Submit for review workflow');
+  // First move TSK-103 to IN_PROGRESS
+  await taskService.updateTaskStatus(ctxSite1, 'TSK-103', 'IN_PROGRESS');
+  const submittedTask = await taskService.submitTask(ctxSite1, 'TSK-103');
+  assertStrictEqual(submittedTask.status, 'SUBMITTED', 'Task status must be SUBMITTED');
+  assert(submittedTask.submittedAt !== undefined, 'Task must record submittedAt timestamp');
+  console.log('✓ Test 75 passed: Submit for review workflow verified.');
+
+  // Test 76: Approval workflow
+  console.log('Test 76: Approval workflow');
+  // TSK-101 is currently UNDER_REVIEW
+  const approvedTask = await taskService.approveTask(
+    ctxSite1,
+    'TSK-101',
+    'USR-101',
+    'Clinically verified and accepted by PI'
+  );
+  assertStrictEqual(approvedTask.status, 'APPROVED', 'Task status must be APPROVED');
+  assert(approvedTask.approvals.length > 0, 'Task must contain approval record');
+  const lastApproval = approvedTask.approvals[approvedTask.approvals.length - 1];
+  assertStrictEqual(lastApproval.decision, 'APPROVED');
+  assertStrictEqual(lastApproval.reviewerId, 'USR-101');
+  assertStrictEqual(lastApproval.comments, 'Clinically verified and accepted by PI');
+  console.log('✓ Test 76 passed: Approval workflow verified.');
+
+  // Test 77: Revision request workflow
+  console.log('Test 77: Revision request workflow');
+  // TSK-104 is currently SUBMITTED
+  const revisionTask = await taskService.requestRevision(
+    ctxSite1,
+    'TSK-104',
+    'USR-101',
+    'Need updated temperature excursion calibration logs'
+  );
+  assertStrictEqual(revisionTask.status, 'REVISION_REQUIRED', 'Task status must be REVISION_REQUIRED');
+  const revApproval = revisionTask.approvals[revisionTask.approvals.length - 1];
+  assertStrictEqual(revApproval.decision, 'REVISION_REQUIRED');
+  assertStrictEqual(revApproval.comments, 'Need updated temperature excursion calibration logs');
+  console.log('✓ Test 77 passed: Revision request workflow verified.');
+
+  // Test 78: Completion rules
+  console.log('Test 78: Completion rules');
+  // TSK-107 is in APPROVED status with requiresApproval: true
+  const completedTask = await taskService.completeTask(ctxSite1, 'TSK-107');
+  assertStrictEqual(completedTask.status, 'COMPLETED', 'Approved task must transition to COMPLETED');
+  assert(completedTask.completedAt !== undefined, 'completedAt timestamp must be recorded');
+
+  // Attempting complete on TSK-104 (now in REVISION_REQUIRED) must fail
+  let revCompleteError = false;
+  try {
+    await taskService.completeTask(ctxSite1, 'TSK-104');
+  } catch (err) {
+    revCompleteError = true;
+  }
+  assertStrictEqual(revCompleteError, true, 'Task in REVISION_REQUIRED cannot transition to COMPLETED');
+  console.log('✓ Test 78 passed: Completion rules verified.');
+
+  // Test 79: Related entity linkage
+  console.log('Test 79: Related entity linkage');
+  const saeTask = await taskService.getTaskById(ctxSite1, 'TSK-101');
+  assertStrictEqual(saeTask?.relatedEntityType, 'SAFETY');
+  assertStrictEqual(saeTask?.relatedEntityId, 'SAE-003');
+
+  const devTask = await taskService.getTaskById(ctxSite1, 'TSK-102');
+  assertStrictEqual(devTask?.relatedEntityType, 'COMPLIANCE');
+  assertStrictEqual(devTask?.relatedEntityId, 'DEV-001');
+
+  const visTask = await taskService.getTaskById(ctxSite1, 'TSK-103');
+  assertStrictEqual(visTask?.relatedEntityType, 'VISIT');
+  assertStrictEqual(visTask?.relatedEntityId, 'VIS-1023-04');
+
+  const ptTask = await taskService.getTaskById(ctxSite1, 'TSK-105');
+  assertStrictEqual(ptTask?.relatedEntityType, 'PARTICIPANT');
+  assertStrictEqual(ptTask?.relatedEntityId, 'PT-1011');
+  console.log('✓ Test 79 passed: Related entity linkage verified.');
+
+  // Test 80: Comprehensive Segments A–F regression check
+  console.log('Test 80: Comprehensive Segments A-F regression check');
+  const reg80Studies = await studyService.getStudies();
+  assert(reg80Studies.length > 0, 'Studies must be present');
+  const reg80Participants = await participantService.getParticipants(ctxSite1);
+  assertStrictEqual(reg80Participants.length, 10, 'SITE-001 must still have 10 participants');
+  const reg80Visits = await visitService.getVisits(ctxSite1);
+  assert(reg80Visits.length > 0, 'Visits must still be present');
+  const reg80Safety = await safetyService.getSafetyEvents(ctxSite1);
+  assert(reg80Safety.length > 0, 'Safety events must still be present');
+  const reg80Deviations = await complianceService.getDeviations(ctxSite1);
+  assertStrictEqual(reg80Deviations.length, 6, 'SITE-001 must still have 6 deviations');
+  const reg80Team = await teamService.getTeamMembers(ctxSite1);
+  assertStrictEqual(reg80Team.length, 7, 'SITE-001 must still have 7 team members');
+  const reg80Overview = await dashboardService.getOverview('STUDY-001', 'SITE-001');
+  assert(reg80Overview !== null, 'Overview must still be present');
+  console.log('✓ Test 80 passed: Segments A-F regression check verified.');
+
+  // ============================================================
+  // SEGMENT H — DOCUMENT MANAGEMENT & EXPIRY TRACKING TESTS (81-100)
+  // ============================================================
+  console.log('\n--- STARTING SEGMENT H: DOCUMENT MANAGEMENT & EXPIRY TRACKING TESTS ---');
+
+  // Test 81: documentService.getDocuments() - Retrieval & Scoping
+  console.log('Test 81: documentService.getDocuments() - Retrieval & Scoping');
+  const site1Docs = await documentService.getDocuments(ctxSite1);
+  assert(Array.isArray(site1Docs), 'Documents result must be an array');
+  assertStrictEqual(site1Docs.length, 12, 'SITE-001 must have 12 mock documents');
+  assertStrictEqual(site1Docs[0].id, 'DOC-101', 'First document should be DOC-101');
+  console.log('✓ Test 81 passed: Document retrieval and site count verified.');
+
+  // Test 82: Document study/site scoping (SITE-001 vs SITE-002 vs SITE-003)
+  console.log('Test 82: Document study/site scoping');
+  const site2Docs = await documentService.getDocuments(ctxSite2);
+  assertStrictEqual(site2Docs.length, 2, 'SITE-002 must have 2 documents (DOC-201, DOC-202)');
+  const site3Docs = await documentService.getDocuments(ctxSite3);
+  assertStrictEqual(site3Docs.length, 1, 'SITE-003 must have 1 document (DOC-301)');
+  console.log('✓ Test 82 passed: Study/site scoping verified across multiple sites.');
+
+  // Test 83: Cross-site document isolation
+  console.log('Test 83: Cross-site document isolation');
+  const crossSiteDoc = await documentService.getDocumentById(ctxSite1, 'DOC-201');
+  assertStrictEqual(crossSiteDoc, null, 'DOC-201 belongs to SITE-002 and must not be retrievable in SITE-001 context');
+  const validSite2Doc = await documentService.getDocumentById(ctxSite2, 'DOC-201');
+  assert(validSite2Doc !== null, 'DOC-201 must be accessible in SITE-002 context');
+  assertStrictEqual(validSite2Doc?.siteId, 'SITE-002');
+  console.log('✓ Test 83 passed: Cross-site document isolation verified.');
+
+  // Test 84: Cross-study document isolation
+  console.log('Test 84: Cross-study document isolation');
+  const crossStudyDoc = await documentService.getDocumentById(ctxSite1, 'DOC-301');
+  assertStrictEqual(crossStudyDoc, null, 'DOC-301 belongs to STUDY-002 and must not be retrievable in STUDY-001 context');
+  const validSite3Doc = await documentService.getDocumentById(ctxSite3, 'DOC-301');
+  assert(validSite3Doc !== null, 'DOC-301 must be accessible in STUDY-002/SITE-003 context');
+  assertStrictEqual(validSite3Doc?.studyId, 'STUDY-002');
+  console.log('✓ Test 84 passed: Cross-study document isolation verified.');
+
+  // Test 85: Document text search filtering
+  console.log('Test 85: Document text search filtering');
+  const searchDocByTitle = await documentService.getDocuments(ctxSite1, { search: 'Protocol' });
+  assert(searchDocByTitle.length >= 2, 'Search by "Protocol" should match multiple documents');
+  const searchDocById = await documentService.getDocuments(ctxSite1, { search: 'DOC-102' });
+  assertStrictEqual(searchDocById.length, 1, 'Search by ID DOC-102 should return 1 result');
+  assertStrictEqual(searchDocById[0].id, 'DOC-102');
+  const searchByFileName = await documentService.getDocuments(ctxSite1, { search: 'IB_AYUN01' });
+  assert(searchByFileName.length >= 1, 'Search by version filename should return matching document (DOC-103)');
+  assertStrictEqual(searchByFileName[0].id, 'DOC-103');
+  console.log('✓ Test 85 passed: Text search filtering verified.');
+
+  // Test 86: Category and document type filtering
+  console.log('Test 86: Category and document type filtering');
+  const ethicsDocs = await documentService.getDocuments(ctxSite1, { category: 'ETHICS' });
+  assert(ethicsDocs.length >= 1, 'Should find ETHICS category documents');
+  assert(ethicsDocs.every((d) => d.category === 'ETHICS'), 'All returned docs must have ETHICS category');
+  const protocolTypeDocs = await documentService.getDocuments(ctxSite1, { documentType: 'Protocol' });
+  assert(protocolTypeDocs.length >= 1, 'Should find Protocol document type');
+  assert(protocolTypeDocs.every((d) => d.documentType === 'Protocol'), 'All returned docs must be Protocol');
+  console.log('✓ Test 86 passed: Category and document type filtering verified.');
+
+  // Test 87: Combined multi-criteria AND filtering
+  console.log('Test 87: Combined multi-criteria AND filtering');
+  const combinedReqEthics = await documentService.getDocuments(ctxSite1, {
+    category: 'ETHICS',
+    isRequired: true,
+  });
+  assert(combinedReqEthics.length >= 1, 'Should find required ETHICS documents');
+  assert(combinedReqEthics.every((d) => d.category === 'ETHICS' && d.isRequired), 'All results must satisfy AND criteria');
+  console.log('✓ Test 87 passed: Combined multi-criteria AND filtering verified.');
+
+  // Test 88: Expiry calculations and calculateDocumentExpiryState() behavior
+  console.log('Test 88: Expiry calculations and calculateDocumentExpiryState()');
+  const noExpiryState = calculateDocumentExpiryState({ expiryDate: undefined, status: 'ACTIVE' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(noExpiryState, 'NO_EXPIRY', 'Undefined expiryDate must produce NO_EXPIRY');
+  const expiredState = calculateDocumentExpiryState({ expiryDate: '2026-08-01', status: 'ACTIVE' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(expiredState, 'EXPIRED', 'Past expiry date must produce EXPIRED');
+  const expiringSoonState = calculateDocumentExpiryState({ expiryDate: '2026-10-15', status: 'ACTIVE' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(expiringSoonState, 'EXPIRING_SOON', 'Expiry date within 30 days must produce EXPIRING_SOON');
+  const activeState = calculateDocumentExpiryState({ expiryDate: '2027-06-30', status: 'ACTIVE' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(activeState, 'ACTIVE', 'Expiry date > 30 days away must produce ACTIVE');
+  const archivedDocState = calculateDocumentExpiryState({ expiryDate: '2026-08-01', status: 'ARCHIVED' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(archivedDocState, 'NO_EXPIRY', 'Archived document must return NO_EXPIRY regardless of date');
+  const derivedExp = deriveDocumentStatus({ status: 'ACTIVE', expiryDate: '2026-08-01' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(derivedExp, 'EXPIRED', 'Past expiry must derive EXPIRED status');
+  const derivedPreserveDraft = deriveDocumentStatus({ status: 'DRAFT', expiryDate: '2026-08-01' }, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(derivedPreserveDraft, 'DRAFT', 'DRAFT status must be preserved');
+  console.log('✓ Test 88 passed: Expiry state calculation unit behavior verified.');
+
+  // Test 89: getDaysUntilExpiry() normalization
+  console.log('Test 89: getDaysUntilExpiry() normalization');
+  const daysNull = getDaysUntilExpiry(undefined, DOCUMENT_REFERENCE_DATE);
+  assertStrictEqual(daysNull, null, 'Days should be null for undefined date');
+  const days16 = getDaysUntilExpiry('2026-10-15', '2026-09-29');
+  assertStrictEqual(days16, 16, 'Days from 2026-09-29 to 2026-10-15 must be 16');
+  const daysNegative = getDaysUntilExpiry('2026-09-15', '2026-09-29');
+  assertStrictEqual(daysNegative, -14, 'Days from 2026-09-29 to 2026-09-15 must be -14');
+  console.log('✓ Test 89 passed: Days until expiry calculation verified.');
+
+  // Test 90: Expiring-soon detection
+  console.log('Test 90: Expiring-soon detection');
+  const expiringSoonDocs = await documentService.getDocuments(ctxSite1, { expiryFilter: 'EXPIRING_SOON' });
+  assertStrictEqual(expiringSoonDocs.length, 2, 'SITE-001 must have 2 expiring soon documents (DOC-102, DOC-106)');
+  const expiringIds = expiringSoonDocs.map((d) => d.id).sort();
+  assertStrictEqual(expiringIds[0], 'DOC-102');
+  assertStrictEqual(expiringIds[1], 'DOC-106');
+  console.log('✓ Test 90 passed: Expiring-soon detection verified.');
+
+  // Test 91: Expired detection
+  console.log('Test 91: Expired detection');
+  const expiredDocs = await documentService.getDocuments(ctxSite1, { expiryFilter: 'EXPIRED' });
+  assertStrictEqual(expiredDocs.length, 2, 'SITE-001 must have 2 expired documents (DOC-104, DOC-107)');
+  const expiredIds = expiredDocs.map((d) => d.id).sort();
+  assertStrictEqual(expiredIds[0], 'DOC-104');
+  assertStrictEqual(expiredIds[1], 'DOC-107');
+  console.log('✓ Test 91 passed: Expired detection verified.');
+
+  // Test 92: Required and Action-Required calculations
+  console.log('Test 92: Required and Action-Required calculations');
+  const requiredDocs = await documentService.getDocuments(ctxSite1, { isRequired: true });
+  assertStrictEqual(requiredDocs.length, 9, 'SITE-001 must have 9 required documents');
+  const actionReqDocs = site1Docs.filter((d) => isDocumentActionRequired(d, DOCUMENT_REFERENCE_DATE));
+  assertStrictEqual(actionReqDocs.length, 3, 'SITE-001 must have 3 action required documents (DOC-104, DOC-107, DOC-112)');
+  const actionReqIds = actionReqDocs.map((d) => d.id).sort();
+  assertStrictEqual(actionReqIds[0], 'DOC-104');
+  assertStrictEqual(actionReqIds[1], 'DOC-107');
+  assertStrictEqual(actionReqIds[2], 'DOC-112');
+  console.log('✓ Test 92 passed: Required and Action-Required calculations verified.');
+
+  // Test 93: documentService.getDocumentSummary() summary metric counts
+  console.log('Test 93: documentService.getDocumentSummary() metrics');
+  const docSummary = await documentService.getDocumentSummary(ctxSite1);
+  assertStrictEqual(docSummary.total, 12, 'Total must be 12');
+  assertStrictEqual(docSummary.active, 6, 'Active must be 6');
+  assertStrictEqual(docSummary.expiringSoon, 2, 'Expiring soon must be 2');
+  assertStrictEqual(docSummary.expired, 2, 'Expired must be 2');
+  assertStrictEqual(docSummary.required, 9, 'Required must be 9');
+  assertStrictEqual(docSummary.actionRequired, 3, 'Action required must be 3');
+  console.log('✓ Test 93 passed: Document summary metrics verified.');
+
+  // Test 94: Document creation validation
+  console.log('Test 94: Document creation validation');
+  let missingTitleErr = false;
+  try {
+    await documentService.createDocument(ctxSite1, {
+      title: '',
+      category: 'SITE',
+      documentType: 'Site Approval',
+      isRequired: true,
+      ownerUserId: 'USR-101',
+    });
+  } catch (err) {
+    missingTitleErr = true;
+    assert((err as Error).message.includes('title is required'), 'Error must mention title');
+  }
+  assertStrictEqual(missingTitleErr, true, 'Creating document without title must throw error');
+
+  let invalidOwnerErr = false;
+  try {
+    await documentService.createDocument(ctxSite1, {
+      title: 'Valid Title',
+      category: 'SITE',
+      documentType: 'Site Approval',
+      isRequired: true,
+      ownerUserId: 'NON_EXISTENT_USER',
+    });
+  } catch (err) {
+    invalidOwnerErr = true;
+    assert((err as Error).message.includes('does not exist'), 'Error must mention user does not exist');
+  }
+  assertStrictEqual(invalidOwnerErr, true, 'Creating document with invalid owner must throw error');
+  console.log('✓ Test 94 passed: Document creation validation verified.');
+
+  // Test 95: Document creation success with initial version
+  console.log('Test 95: Document creation success with initial version');
+  const createdDoc = await documentService.createDocument(ctxSite1, {
+    title: 'Site Emergency Evacuation Plan',
+    description: 'Emergency response and patient evacuation SOP for clinical trial facility.',
+    category: 'SITE',
+    documentType: 'Site Approval',
+    isRequired: true,
+    ownerUserId: 'USR-101',
+    initialVersionNumber: '1.0',
+    fileName: 'Emergency_Evac_SOP_v1.0.pdf',
+    fileType: 'PDF',
+    effectiveDate: '2026-09-01',
+    expiryDate: '2027-09-01',
+    fileBlobUrl: 'blob:http://localhost:5173/mock-uuid-test1',
+    changeSummary: 'Initial SOP creation and facility sign-off.',
+    createdBy: 'Dr. Ananya Sharma',
+  });
+  assert(createdDoc.id.startsWith('DOC-'), 'New document must have generated ID');
+  assertStrictEqual(createdDoc.title, 'Site Emergency Evacuation Plan');
+  assertStrictEqual(createdDoc.status, 'ACTIVE');
+  assertStrictEqual(createdDoc.versions.length, 1);
+  assertStrictEqual(createdDoc.versions[0].versionNumber, '1.0');
+  assertStrictEqual(createdDoc.versions[0].fileBlobUrl, 'blob:http://localhost:5173/mock-uuid-test1');
+  assertStrictEqual(createdDoc.currentVersionNumber, '1.0');
+  console.log('✓ Test 95 passed: Document creation success verified.');
+
+  // Test 96: Version creation flow
+  console.log('Test 96: Version creation flow');
+  const updatedDocWithVer = await documentService.createDocumentVersion(
+    ctxSite1,
+    createdDoc.id,
+    {
+      versionNumber: '2.0',
+      versionLabel: 'Updated Evacuation Map',
+      fileName: 'Emergency_Evac_SOP_v2.0.pdf',
+      fileType: 'PDF',
+      fileBlobUrl: 'blob:http://localhost:5173/mock-uuid-test2',
+      effectiveDate: '2026-09-29',
+      expiryDate: '2027-09-29',
+      changeSummary: 'Added secondary assembly point details.',
+      uploadedBy: 'Dr. Ananya Sharma',
+    }
+  );
+  assertStrictEqual(updatedDocWithVer.versions.length, 2, 'Document should now have 2 versions');
+  assertStrictEqual(updatedDocWithVer.currentVersionNumber, '2.0', 'currentVersionNumber must be updated to 2.0');
+  assertStrictEqual(updatedDocWithVer.currentVersionId, updatedDocWithVer.versions[1].id);
+  assertStrictEqual(updatedDocWithVer.versions[1].fileBlobUrl, 'blob:http://localhost:5173/mock-uuid-test2');
+  console.log('✓ Test 96 passed: Version creation flow verified.');
+
+  // Test 97: Version number uniqueness enforcement
+  console.log('Test 97: Version number uniqueness enforcement');
+  let duplicateVerErr = false;
+  try {
+    await documentService.createDocumentVersion(ctxSite1, createdDoc.id, {
+      versionNumber: '2.0',
+      fileName: 'Duplicate_Ver.pdf',
+      fileType: 'PDF',
+      uploadedBy: 'Dr. Ananya Sharma',
+    });
+  } catch (err) {
+    duplicateVerErr = true;
+    assert((err as Error).message.includes('already exists'), 'Error must mention version already exists');
+  }
+  assertStrictEqual(duplicateVerErr, true, 'Duplicate version number must throw error');
+  console.log('✓ Test 97 passed: Version uniqueness enforcement verified.');
+
+  // Test 98: Historical version preservation and metadata management
+  console.log('Test 98: Historical version preservation & metadata update');
+  const versionsList = await documentService.getDocumentVersions(ctxSite1, createdDoc.id);
+  assertStrictEqual(versionsList.length, 2, 'Must preserve all versions');
+  const v1 = versionsList.find((v) => v.versionNumber === '1.0');
+  const v2 = versionsList.find((v) => v.versionNumber === '2.0');
+  assertStrictEqual(v1?.status, 'SUPERSEDED', 'Version 1.0 must be SUPERSEDED');
+  assertStrictEqual(v2?.status, 'ACTIVE', 'Version 2.0 must be ACTIVE');
+
+  // Verify document metadata update (management capability)
+  const editedDoc = await documentService.updateDocument(ctxSite1, createdDoc.id, {
+    title: 'Site Emergency Evacuation & Safety Plan (Updated)',
+    category: 'SAFETY',
+    documentType: 'Safety Report',
+    isRequired: false,
+    expiryDate: '2028-01-01',
+  });
+  assertStrictEqual(editedDoc.title, 'Site Emergency Evacuation & Safety Plan (Updated)');
+  assertStrictEqual(editedDoc.category, 'SAFETY');
+  assertStrictEqual(editedDoc.documentType, 'Safety Report');
+  assertStrictEqual(editedDoc.isRequired, false);
+  assertStrictEqual(editedDoc.expiryDate, '2028-01-01');
+  console.log('✓ Test 98 passed: Historical version preservation and metadata management verified.');
+
+  // Test 99: Document archive workflow
+  console.log('Test 99: Document archive workflow');
+  const archivedDoc = await documentService.archiveDocument(ctxSite1, createdDoc.id);
+  assertStrictEqual(archivedDoc.status, 'ARCHIVED', 'Document status must be ARCHIVED');
+  assert(archivedDoc.versions.every((v) => v.status === 'ARCHIVED'), 'All versions must be marked ARCHIVED');
+  console.log('✓ Test 99 passed: Document archive workflow verified.');
+
+  // Test 100: Comprehensive Segments A–G regression check
+  console.log('Test 100: Comprehensive Segments A-G regression check');
+  const reg100Studies = await studyService.getStudies();
+  assert(reg100Studies.length > 0, 'Studies must be present');
+  const reg100Participants = await participantService.getParticipants(ctxSite1);
+  assertStrictEqual(reg100Participants.length, 10, 'SITE-001 must still have 10 participants');
+  const reg100Visits = await visitService.getVisits(ctxSite1);
+  assert(reg100Visits.length > 0, 'Visits must still be present');
+  const reg100Safety = await safetyService.getSafetyEvents(ctxSite1);
+  assert(reg100Safety.length > 0, 'Safety events must still be present');
+  const reg100Deviations = await complianceService.getDeviations(ctxSite1);
+  assertStrictEqual(reg100Deviations.length, 6, 'SITE-001 must still have 6 deviations');
+  const reg100Team = await teamService.getTeamMembers(ctxSite1);
+  assertStrictEqual(reg100Team.length, 7, 'SITE-001 must still have 7 team members');
+  const reg100Tasks = await taskService.getTasks(ctxSite1);
+  assertStrictEqual(reg100Tasks.length, 11, 'SITE-001 must still have 11 tasks');
+  const reg100Overview = await dashboardService.getOverview('STUDY-001', 'SITE-001');
+  assert(reg100Overview !== null, 'Overview must still be present');
+  console.log('✓ Test 100 passed: Segments A-G regression check verified.');
+
+  // ============================================================
+  // SEGMENT I: REPORTS & REGULATORY EXPORTS TESTS (101 - 120)
+  // ============================================================
+
+  console.log('\n--- STARTING SEGMENT I: REPORTS & REGULATORY EXPORTS TESTS ---');
+
+  // Test 101: Report directory retrieval
+  console.log('Test 101: reportService.getReportDefinitions()');
+  const reportDefs = await reportService.getReportDefinitions();
+  assertStrictEqual(reportDefs.length, 7, 'There must be exactly 7 report definitions');
+  const expectedTypes = ['OPERATIONAL', 'PARTICIPANT', 'VISIT', 'SAFETY', 'COMPLIANCE', 'TASK', 'DOCUMENT'];
+  expectedTypes.forEach((t) => {
+    assert(reportDefs.some((d) => d.reportType === t), `Report type ${t} must be present`);
+  });
+  console.log('✓ Test 101 passed: Report directory retrieval verified.');
+
+  // Test 102: Report type validation
+  console.log('Test 102: Report type validation & unknown handling');
+  let invalidReportErr = false;
+  try {
+    await reportService.generateReport(ctxSite1, 'INVALID_REPORT' as any);
+  } catch (err) {
+    invalidReportErr = true;
+    assert((err as Error).message.includes('Invalid report type'), 'Error must mention invalid report type');
+  }
+  assertStrictEqual(invalidReportErr, true, 'Unknown report type must throw error');
+  const safetyDef = await reportService.getReportDefinitionByType('SAFETY');
+  assert(safetyDef !== null && safetyDef.title === 'Safety & AE Summary', 'Safety report definition lookup must succeed');
+  const nullDef = await reportService.getReportDefinitionByType('UNKNOWN' as any);
+  assertStrictEqual(nullDef, null, 'Unknown report type definition lookup must return null');
+  console.log('✓ Test 102 passed: Report type validation verified.');
+
+  // Test 103: Participant report generation
+  console.log('Test 103: Participant report generation');
+  const participantReport = await reportService.generateReport(ctxSite1, 'PARTICIPANT');
+  assertStrictEqual(participantReport.metadata.reportType, 'PARTICIPANT');
+  assertStrictEqual(participantReport.metadata.studyId, 'STUDY-001');
+  assertStrictEqual(participantReport.metadata.siteId, 'SITE-001');
+  assertStrictEqual(participantReport.metadata.disclaimer, REGULATORY_REPORT_DISCLAIMER);
+  assertStrictEqual(participantReport.totalRows, 10, 'SITE-001 must generate 10 participant rows');
+  assert(String(participantReport.rows[0].participantId).startsWith('PT-'), 'Subject ID must start with PT-');
+  const partTotalMetric = participantReport.summaryMetrics.find((m) => m.label === 'Total Subjects');
+  assertStrictEqual(partTotalMetric?.value, 10, 'Summary metric must reflect total subjects');
+  console.log('✓ Test 103 passed: Participant report generation verified.');
+
+  // Test 104: Visit report generation
+  console.log('Test 104: Visit report generation');
+  const visitReport = await reportService.generateReport(ctxSite1, 'VISIT');
+  assertStrictEqual(visitReport.metadata.reportType, 'VISIT');
+  assert(visitReport.totalRows > 0, 'Visit report must contain scheduled visits');
+  assert(String(visitReport.rows[0].visitId).startsWith('VIS-'), 'Visit ID must start with VIS-');
+  assert(visitReport.columns.some((c) => c.key === 'windowRange'), 'Columns must include windowRange');
+  assert(visitReport.summaryMetrics.some((m) => m.label === 'Total Visits'), 'Metrics must include Total Visits');
+  console.log('✓ Test 104 passed: Visit report generation verified.');
+
+  // Test 105: Safety report generation
+  console.log('Test 105: Safety report generation');
+  const safetyReport = await reportService.generateReport(ctxSite1, 'SAFETY');
+  assertStrictEqual(safetyReport.metadata.reportType, 'SAFETY');
+  assert(safetyReport.totalRows > 0, 'Safety report must contain adverse events');
+  assert(safetyReport.rows.some((r) => r.isSerious === 'Yes (SAE)'), 'Report must include serious adverse events');
+  assert(safetyReport.summaryMetrics.some((m) => m.label === 'Serious (SAE)'), 'Summary metrics must track SAEs');
+  console.log('✓ Test 105 passed: Safety report generation verified.');
+
+  // Test 106: Compliance report generation
+  console.log('Test 106: Compliance report generation');
+  const compReport = await reportService.generateReport(ctxSite1, 'COMPLIANCE');
+  assertStrictEqual(compReport.metadata.reportType, 'COMPLIANCE');
+  assertStrictEqual(compReport.totalRows, 6, 'SITE-001 must contain 6 deviation records');
+  assert(String(compReport.rows[0].deviationId).startsWith('DEV-'), 'Deviation ID must start with DEV-');
+  assert(compReport.rows.some((r) => r.classification === 'CRITICAL'), 'Must include critical non-compliance row');
+  console.log('✓ Test 106 passed: Compliance report generation verified.');
+
+  // Test 107: Task report generation
+  console.log('Test 107: Task report generation');
+  const taskReport = await reportService.generateReport(ctxSite1, 'TASK');
+  assertStrictEqual(taskReport.metadata.reportType, 'TASK');
+  assertStrictEqual(taskReport.totalRows, 11, 'SITE-001 must contain 11 task records');
+  assert(String(taskReport.rows[0].taskId).startsWith('TSK-'), 'Task ID must start with TSK-');
+  assert(taskReport.columns.some((c) => c.key === 'approvalStatus'), 'Columns must include approvalStatus');
+  console.log('✓ Test 107 passed: Task report generation verified.');
+
+  // Test 108: Document report generation
+  console.log('Test 108: Document report generation');
+  const docReport = await reportService.generateReport(ctxSite1, 'DOCUMENT');
+  assertStrictEqual(docReport.metadata.reportType, 'DOCUMENT');
+  assert(docReport.totalRows >= 12, 'SITE-001 must contain documents');
+  assert(String(docReport.rows[0].documentId).startsWith('DOC-'), 'Document ID must start with DOC-');
+  assert(docReport.rows.some((r) => r.obligation === 'Mandatory'), 'Must include mandatory obligations');
+  console.log('✓ Test 108 passed: Document report generation verified.');
+
+  // Test 109: Study/site scope isolation
+  console.log('Test 109: Study/site scope isolation (SITE-001 vs SITE-002)');
+  const site1PartReport = await reportService.generateReport(ctxSite1, 'PARTICIPANT');
+  const site2PartReport = await reportService.generateReport(ctxSite2, 'PARTICIPANT');
+  assertStrictEqual(site1PartReport.totalRows, 10, 'SITE-001 must have 10 participants');
+  assertStrictEqual(site2PartReport.totalRows, 3, 'SITE-002 must have 3 participants');
+  const site1Ids = new Set(site1PartReport.rows.map((r) => r.participantId));
+  const hasLeakage = site2PartReport.rows.some((r) => site1Ids.has(r.participantId));
+  assertStrictEqual(hasLeakage, false, 'SITE-002 report must have ZERO records from SITE-001');
+  console.log('✓ Test 109 passed: Scope isolation verified.');
+
+  // Test 110: Cross-study isolation
+  console.log('Test 110: Cross-study isolation');
+  const crossStudyReport = await reportService.generateReport(
+    { studyId: 'STUDY-NONEXISTENT', siteId: 'SITE-001' },
+    'PARTICIPANT'
+  );
+  assertStrictEqual(crossStudyReport.totalRows, 0, 'Invalid study context must yield 0 records');
+  assertStrictEqual(crossStudyReport.rows.length, 0, 'Invalid study context must return empty rows array');
+  console.log('✓ Test 110 passed: Cross-study isolation verified.');
+
+  // Test 111: Report filtering
+  console.log('Test 111: Report filtering (status and classification)');
+  const filteredActiveParts = await reportService.generateReport(ctxSite1, 'PARTICIPANT', {
+    status: 'ACTIVE',
+  });
+  assert(filteredActiveParts.totalRows > 0, 'Must have active participants');
+  assert(filteredActiveParts.rows.every((r) => r.status === 'ACTIVE'), 'All rows must have status === ACTIVE');
+
+  const filteredCriticalDevs = await reportService.generateReport(ctxSite1, 'COMPLIANCE', {
+    classification: 'CRITICAL',
+  });
+  assert(filteredCriticalDevs.totalRows > 0, 'Must find critical deviations');
+  assert(filteredCriticalDevs.rows.every((r) => r.classification === 'CRITICAL'), 'All rows must have classification === CRITICAL');
+  console.log('✓ Test 111 passed: Single criteria filtering verified.');
+
+  // Test 112: Combined AND filtering
+  console.log('Test 112: Combined AND filtering');
+  const combinedTasks = await reportService.generateReport(ctxSite1, 'TASK', {
+    status: 'IN_PROGRESS',
+    category: 'SAFETY',
+  });
+  assert(
+    combinedTasks.rows.every((r) => r.status === 'IN_PROGRESS' && r.category === 'SAFETY'),
+    'All rows must satisfy both status and category simultaneously'
+  );
+  console.log('✓ Test 112 passed: Combined AND filtering verified.');
+
+  // Test 113: Summary metric consistency
+  console.log('Test 113: Summary metric consistency with row data');
+  const complianceRep = await reportService.generateReport(ctxSite1, 'COMPLIANCE');
+  const openCountMetric = complianceRep.summaryMetrics.find((m) => m.label === 'Open Deviations');
+  const derivedOpenCount = complianceRep.rows.filter(
+    (r) => r.status !== 'CLOSED' && r.status !== 'RESOLVED'
+  ).length;
+  assertStrictEqual(openCountMetric?.value, derivedOpenCount, 'Summary open count must match row calculations');
+  console.log('✓ Test 113 passed: Summary metric consistency verified.');
+
+  // Test 114: CSV escaping/export
+  console.log('Test 114: CSV escaping and formatting');
+  assertStrictEqual(formatCsvCell('Simple'), '"Simple"');
+  assertStrictEqual(formatCsvCell('With, Comma'), '"With, Comma"');
+  assertStrictEqual(formatCsvCell('With "Quotes"'), '"With ""Quotes"""');
+  assertStrictEqual(formatCsvCell('Line1\nLine2'), '"Line1\nLine2"');
+  assertStrictEqual(formatCsvCell(null), '""');
+  assertStrictEqual(formatCsvCell(true), '"YES"');
+  assertStrictEqual(formatCsvCell(false), '"NO"');
+
+  const csvTest = generateCsvContent(
+    [{ key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }],
+    [{ id: '1', name: 'Dr. "A"' }]
+  );
+  assert(csvTest.startsWith('\uFEFF'), 'CSV must prepend UTF-8 Byte Order Mark');
+  assert(csvTest.includes('"Dr. ""A"""'), 'CSV must escape inner quotes');
+  console.log('✓ Test 114 passed: CSV escaping and export formatting verified.');
+
+  // Test 115: JSON export schema
+  console.log('Test 115: JSON export schema and payload integrity');
+  const jsonTestReport = await reportService.generateReport(ctxSite1, 'SAFETY');
+  assertStrictEqual(jsonTestReport.metadata.studyId, 'STUDY-001');
+  assertStrictEqual(jsonTestReport.metadata.siteId, 'SITE-001');
+  assert(jsonTestReport.metadata.disclaimer.includes('Not a regulatory filing'), 'Disclaimer must be present');
+  assert(Array.isArray(jsonTestReport.summaryMetrics), 'Summary metrics must be an array');
+  assert(Array.isArray(jsonTestReport.rows), 'Rows must be an array');
+  assert(Array.isArray(jsonTestReport.columns), 'Columns must be an array');
+  console.log('✓ Test 115 passed: JSON export schema verified.');
+
+  // Test 116: Export field allowlisting
+  console.log('Test 116: Export field allowlisting (no private/secret data)');
+  const allReportRows = [
+    ...(await reportService.generateReport(ctxSite1, 'PARTICIPANT')).rows,
+    ...(await reportService.generateReport(ctxSite1, 'SAFETY')).rows,
+    ...(await reportService.generateReport(ctxSite1, 'TASK')).rows,
+  ];
+  for (const row of allReportRows) {
+    const keys = Object.keys(row);
+    assert(!keys.includes('password'), 'Export rows must not contain password');
+    assert(!keys.includes('token'), 'Export rows must not contain token');
+    assert(!keys.includes('secret'), 'Export rows must not contain secret');
+    assert(!keys.includes('apiKey'), 'Export rows must not contain apiKey');
+  }
+  console.log('✓ Test 116 passed: Field allowlisting verified.');
+
+  // Test 117: REPORTS permission check
+  console.log('Test 117: REPORTS permission checks');
+  const piCanView = await reportService.checkReportPermission('USR-101', ctxSite1, 'REPORTS_VIEW');
+  const piCanExport = await reportService.checkReportPermission('USR-101', ctxSite1, 'REPORTS_EXPORT');
+  assertStrictEqual(piCanView, true, 'PI (USR-101) must have REPORTS_VIEW');
+  assertStrictEqual(piCanExport, true, 'PI (USR-101) must have REPORTS_EXPORT');
+  const unknownUserPerm = await reportService.checkReportPermission('USR-NONEXISTENT', ctxSite1, 'REPORTS_EXPORT');
+  assertStrictEqual(unknownUserPerm, false, 'Unknown user must not have export permission');
+  console.log('✓ Test 117 passed: REPORTS permission checks verified.');
+
+  // Test 118: Cross-site export protection
+  console.log('Test 118: Cross-site export protection');
+  const piCrossSiteExport = await reportService.checkReportPermission('USR-101', ctxSite2, 'REPORTS_EXPORT');
+  assertStrictEqual(piCrossSiteExport, false, 'PI of SITE-001 must NOT have permissions in SITE-002');
+  console.log('✓ Test 118 passed: Cross-site export protection verified.');
+
+  // Test 119: Empty report behavior
+  console.log('Test 119: Empty report behavior');
+  const emptyReport = await reportService.generateReport(ctxSite1, 'PARTICIPANT', {
+    search: 'NONEXISTENT_PARTICIPANT_SEARCH_9999',
+  });
+  assertStrictEqual(emptyReport.totalRows, 0, 'Empty filter must yield 0 rows');
+  assertStrictEqual(emptyReport.rows.length, 0, 'Rows array must be empty');
+  const emptyTotal = emptyReport.summaryMetrics.find((m) => m.label === 'Total Subjects');
+  assertStrictEqual(emptyTotal?.value, 0, 'Total Subjects must be 0 for empty report');
+  console.log('✓ Test 119 passed: Empty report behavior verified.');
+
+  // Test 120: Comprehensive Segments A–H regression check
+  console.log('Test 120: Comprehensive Segments A-H regression check');
+  const reg120Studies = await studyService.getStudies();
+  assert(reg120Studies.length > 0, 'Studies must be present');
+  const reg120Participants = await participantService.getParticipants(ctxSite1);
+  assertStrictEqual(reg120Participants.length, 10, 'SITE-001 must still have 10 participants');
+  const reg120Visits = await visitService.getVisits(ctxSite1);
+  assert(reg120Visits.length > 0, 'Visits must still be present');
+  const reg120Safety = await safetyService.getSafetyEvents(ctxSite1);
+  assert(reg120Safety.length > 0, 'Safety events must still be present');
+  const reg120Deviations = await complianceService.getDeviations(ctxSite1);
+  assertStrictEqual(reg120Deviations.length, 6, 'SITE-001 must still have 6 deviations');
+  const reg120Team = await teamService.getTeamMembers(ctxSite1);
+  assertStrictEqual(reg120Team.length, 7, 'SITE-001 must still have 7 team members');
+  const reg120Tasks = await taskService.getTasks(ctxSite1);
+  assertStrictEqual(reg120Tasks.length, 11, 'SITE-001 must still have 11 tasks');
+  const reg120Docs = await documentService.getDocuments(ctxSite1);
+  assert(reg120Docs.length >= 12, 'SITE-001 must still have documents');
+  const reg120Overview = await dashboardService.getOverview('STUDY-001', 'SITE-001');
+  assert(reg120Overview !== null, 'Overview must still be present');
+  console.log('✓ Test 120 passed: Segments A-H regression check verified.');
+
+  // Test 121: Excel export generation & structural verification
+  console.log('Test 121: Excel export generation & content verification');
+  const excelReport = await reportService.generateReport(ctxSite1, 'PARTICIPANT');
+  const excelHtml = generateExcelContent(excelReport, {
+    studyCode: 'STUDY-001',
+    studyTitle: 'Ayurvedic Clinical Protocol Study',
+    protocolVersion: 'v2.1',
+    siteCode: 'SITE-001',
+    siteName: 'AIIA Main Hospital',
+    piName: 'Dr. Arvind Sharma',
+    piRole: 'Principal Investigator',
+  });
+  assert(excelHtml.includes('ALL INDIA INSTITUTE OF AYURVEDA'), 'Excel export must include AIIA header');
+  assert(excelHtml.includes('Participant Status Report'), 'Excel export must include report title');
+  assert(excelHtml.includes('STUDY-001'), 'Excel export must include studyCode');
+  assert(excelHtml.includes('SITE-001'), 'Excel export must include siteCode');
+  assert(excelHtml.includes('Dr. Arvind Sharma'), 'Excel export must include PI Name');
+  assert(excelHtml.includes('AUTHORISED SIGNATORY'), 'Excel export must include signatory block');
+  assert(excelHtml.includes('Signature of Principal Investigator'), 'Excel export must include signature line');
+  assert(excelHtml.includes('Operational Scope:'), 'Excel export must include regulatory disclaimer');
+  assert(excelHtml.includes('xmlns:x="urn:schemas-microsoft-com:office:excel"'), 'Excel export must include Excel XML namespaces');
+  console.log('✓ Test 121 passed: Excel export generation verified.');
+
+  // Test 122: formatFilterDisplay helper validation
+  console.log('Test 122: formatFilterDisplay helper validation');
+  const emptyFilterStr = formatFilterDisplay({});
+  assertStrictEqual(emptyFilterStr, 'All Records (No active filters)', 'Empty filters must show default text');
+  const filledFilterStr = formatFilterDisplay({
+    search: 'PT-101',
+    status: 'ENROLLED',
+    category: 'SAFETY',
+    dateFrom: '2026-01-01',
+    dateTo: '2026-06-30',
+  });
+  assert(filledFilterStr.includes('Search: "PT-101"'), 'Filter string must include search');
+  assert(filledFilterStr.includes('Status: ENROLLED'), 'Filter string must include status');
+  assert(filledFilterStr.includes('Category: SAFETY'), 'Filter string must include category');
+  assert(filledFilterStr.includes('Date: 2026-01-01 to 2026-06-30'), 'Filter string must include date range');
+  console.log('✓ Test 122 passed: formatFilterDisplay verified.');
+
+  // Test 123: reportService.exportReport supports EXCEL and PDF
+  console.log('Test 123: reportService.exportReport supports EXCEL and PDF');
+  let excelExportFailed = false;
+  try {
+    // In node environment, downloadFile uses browser DOM, so we test generateExcelContent directly
+    // and verify reportService.exportReport validates input
+    await reportService.exportReport(null as any, 'EXCEL');
+  } catch (err) {
+    excelExportFailed = true;
+    assert((err as Error).message.includes('No report provided'), 'Must reject null report');
+  }
+  assertStrictEqual(excelExportFailed, true, 'Null report export must fail');
+  console.log('✓ Test 123 passed: Export service validation verified.');
+
+  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (123/123) ---');
 }
 
 runTests().catch((err) => {
   console.error('Test run failed:', err);
   throw err;
 });
+

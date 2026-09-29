@@ -78,11 +78,11 @@ export const ComplianceDeviationDetailPage: React.FC = () => {
 
       if (updated) {
         setDeviation(updated);
-        setFeedbackMessage('Principal Investigator sign-off successfully recorded in audit log.');
+        setFeedbackMessage('Principal Investigator sign-off successfully recorded in audit metadata.');
         setTimeout(() => setFeedbackMessage(null), 5000);
       }
-    } catch {
-      setError('Failed to record PI review sign-off.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record PI review sign-off.');
     }
   };
 
@@ -158,8 +158,8 @@ export const ComplianceDeviationDetailPage: React.FC = () => {
         setFeedbackMessage('Protocol deviation formally closed.');
         setTimeout(() => setFeedbackMessage(null), 5000);
       }
-    } catch {
-      setError('Failed to close deviation.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close deviation.');
     }
   };
 
@@ -660,8 +660,8 @@ export const ComplianceDeviationDetailPage: React.FC = () => {
           {/* Audit Metadata Card */}
           <Card className="border-border">
             <CardHeader
-              title="Audit & Traceability"
-              subtitle="GCP compliance trail"
+              title="Audit Metadata"
+              subtitle="System record & tracking metadata"
             />
             <CardContent className="space-y-2.5 p-4 text-xs font-mono text-ink-secondary">
               <div className="flex justify-between items-center py-1 border-b border-border/60">

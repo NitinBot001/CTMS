@@ -8,6 +8,7 @@ import {
   ComplianceReviewStatus,
   CapaStatus,
   ParticipantComplianceSummary,
+  isValidDeviationStatusTransition,
 } from '../types';
 
 export class ComplianceService {
@@ -95,6 +96,13 @@ export class ComplianceService {
       };
     }
     return this.repo.getComplianceSummary(context);
+  }
+
+  isValidStatusTransition(
+    currentStatus: DeviationStatus,
+    targetStatus: DeviationStatus
+  ): boolean {
+    return isValidDeviationStatusTransition(currentStatus, targetStatus);
   }
 
   async updateDeviationStatus(

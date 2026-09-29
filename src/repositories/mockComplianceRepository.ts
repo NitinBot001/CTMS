@@ -6,6 +6,7 @@ import {
   DeviationStatus,
   ComplianceReviewStatus,
   CapaStatus,
+  isValidDeviationStatusTransition,
 } from '../types';
 import { MOCK_PROTOCOL_DEVIATIONS } from '../data/mockData';
 import { getReferenceDate, parseDateISO } from '../utils/visitCalculations';
@@ -60,17 +61,31 @@ export class MockComplianceRepository implements IComplianceRepository {
 
       // 4. Status filter
       if (filters.status && filters.status !== 'ALL') {
-        results = results.filter((d) => d.status === filters.status);
+        if (filters.status === 'OPEN') {
+          results = results.filter((d) => d.status !== 'RESOLVED' && d.status !== 'CLOSED');
+        } else {
+          results = results.filter((d) => d.status === filters.status);
+        }
       }
 
       // 5. CAPA status filter
       if (filters.capaStatus && filters.capaStatus !== 'ALL') {
-        results = results.filter((d) => d.capaStatus === filters.capaStatus);
+        if (filters.capaStatus === 'PENDING_OR_ACTIVE') {
+          results = results.filter((d) => d.capaStatus === 'PENDING' || d.capaStatus === 'IN_PROGRESS');
+        } else {
+          results = results.filter((d) => d.capaStatus === filters.capaStatus);
+        }
       }
 
       // 6. Review status filter
       if (filters.reviewStatus && filters.reviewStatus !== 'ALL') {
-        results = results.filter((d) => d.reviewStatus === filters.reviewStatus);
+        if (filters.reviewStatus === 'REVIEW_REQUIRED') {
+          results = results.filter(
+            (d) => d.reviewStatus === 'SIGN_OFF_REQUIRED' || d.reviewStatus === 'NOT_REVIEWED'
+          );
+        } else {
+          results = results.filter((d) => d.reviewStatus === filters.reviewStatus);
+        }
       }
 
       // 7. Category filter
@@ -89,11 +104,7 @@ export class MockComplianceRepository implements IComplianceRepository {
       if (filters.dateRange && filters.dateRange !== 'ALL') {
         const refParsed = parseDateISO(refDateStr);
 
-        if (filters.dateRange === 'CAPA_PENDING') {
-          results = results.filter((d) => d.capaStatus === 'PENDING' || d.capaStatus === 'IN_PROGRESS');
-        } else if (filters.dateRange === 'CAPA_OVERDUE') {
-          results = results.filter((d) => d.capaStatus === 'OVERDUE');
-        } else if (filters.dateRange === 'LAST_7_DAYS') {
+        if (filters.dateRange === 'LAST_7_DAYS') {
           const sevenDaysPrior = new Date(refParsed.getTime());
           sevenDaysPrior.setUTCDate(sevenDaysPrior.getUTCDate() - 7);
           const sevenDaysPriorStr = sevenDaysPrior.toISOString().slice(0, 10);
@@ -254,6 +265,12 @@ export class MockComplianceRepository implements IComplianceRepository {
 
     const deviation = siteDeviations.find((d) => d.id.toLowerCase() === deviationId.toLowerCase());
     if (!deviation) return null;
+
+    if (deviation.status !== status && !isValidDeviationStatusTransition(deviation.status, status)) {
+      throw new Error(
+        `Invalid deviation status transition: cannot transition from ${deviation.status} to ${status}.`
+      );
+    }
 
     deviation.status = status;
     deviation.updatedAt = new Date().toISOString();

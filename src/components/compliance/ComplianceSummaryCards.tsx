@@ -35,7 +35,7 @@ export const ComplianceSummaryCards: React.FC<ComplianceSummaryCardsProps> = ({
     {
       label: 'Critical Deviations',
       value: metrics.critical,
-      subtext: metrics.critical > 0 ? 'Urgent CAPA & Sponsor alert' : 'Zero critical logged',
+      subtext: metrics.critical > 0 ? 'Action & review required' : 'Zero critical logged',
       icon: AlertOctagon,
       iconBg: metrics.critical > 0 ? 'bg-red-50' : 'bg-stone-100',
       iconColor: metrics.critical > 0 ? 'text-semantic-danger' : 'text-ink-muted',
@@ -55,7 +55,7 @@ export const ComplianceSummaryCards: React.FC<ComplianceSummaryCardsProps> = ({
     {
       label: 'PI Review Required',
       value: metrics.piReviewRequired,
-      subtext: metrics.piReviewRequired > 0 ? 'Pending investigator sign-off' : 'All reviews completed',
+      subtext: metrics.piReviewRequired > 0 ? 'Pending investigator review' : 'All reviews completed',
       icon: FileCheck2,
       iconBg: metrics.piReviewRequired > 0 ? 'bg-red-50' : 'bg-stone-100',
       iconColor: metrics.piReviewRequired > 0 ? 'text-semantic-danger' : 'text-ink-muted',
