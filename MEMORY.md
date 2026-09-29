@@ -70,6 +70,15 @@ _Last updated: 2026-09-29_
 
 ## 3. Task Log  (newest first; keep ~15 entries, archive older ones to docs/memory-archive.md)
 
+### 2026-09-29 · T-016 · Bug Fix: PI Dashboard Route Infinite Redirect Resolution & 1-Click Access
+- **What:** Fixed bug where navigating to `/pi` or logging in as PI triggered an infinite redirect loop in `RootRedirect`, rendering the PI Dashboard inaccessible. Mapped `/pi` and `/pi/dashboard` directly to `DashboardOverviewPage` wrapped with `RequireAuth`, updated `RootRedirect` on `/` to route to `/pi`, enhanced `LoginPage.tsx` with default PI credentials pre-fill (`demo.pi@aiia-ctms.local`), added prominent 1-click 'Launch PI Dashboard' instant evaluation banner, and added instant 'Sign In' buttons on all demo persona cards. Updated `Sidebar.tsx` to highlight 'Overview' on both `/pi` and `/pi/dashboard`.
+- **Why:** Resolve user-reported issue ("pi dashboard nahi open ho raha hai") caused by `/pi` matching `<Route path="/pi" element={<RootRedirect />} />` which in turn attempted to navigate to `roleLandingRoute` (`/pi`), looping infinitely.
+- **How:** Cleaned up `AppRoutes` in `src/routes/index.tsx` so `/pi` directly mounts `DashboardOverviewPage`, resolved destination routing race in `LoginPage.tsx`, and verified with 161 automated tests.
+- **Result:** PI Dashboard immediately opens seamlessly at `/pi`, `/pi/dashboard`, and `/`, with 1-click instant login options and zero infinite redirect loops.
+- **Verified by:** `npm run typecheck` (0 errors), `npm test` (161/161 automated tests passing, 0 failures), `npm run build` (built cleanly in 2.36s), `npm run verify` (exit code 0), secret scan (0 secrets detected).
+- **Dead ends:** None.
+- **Follow-ups:** Push fix to GitHub repository.
+
 ### 2026-09-29 · T-015 · Phase 1 — Authentication & Role-Based Portal Foundation
 - **What:** Implemented dedicated institutional `/login` page, mock authentication service (`authService`) & repository (`MockAuthRepository`), synthetic credentials for 6 personas with 1-click quick-fill panel, browser storage abstraction (`BrowserDataStore`, `LocalStorageAdapter`), route protection (`RequireAuth`, `RequirePermission`, `AccessDeniedState`), role landing routes and dedicated dashboards (`/sub-investigator`, `/crc`, `/study-nurse`, `/pharmacist`, `/data-entry`), role-aware dynamic navigation in `Sidebar.tsx` and `Header.tsx`, `StudyContext` confinement to user-assigned sites, and expanded test suite from 143 to 161 automated tests (Tests 144–161) with 100% green pass.
 - **Why:** Establish institutional application-level authentication, session management, and role-specific dashboards across all Segment F roles without introducing external auth dependencies or breaking existing Segments A–J.
@@ -203,13 +212,6 @@ _Last updated: 2026-09-29_
 - **Dead ends:** none.
 - **Follow-ups:** Await Segment C instructions (Visits & Clinical Activities).
 
-### 2026-09-29 · T-001 · Phase 1 — Segment A: PI Dashboard Foundation + Overview
-- **What:** Built complete PI Application Shell, Global Navigation, Study/Site Context Switcher, Overview Dashboard with 9 clinical operations sections, service & repository abstraction layer, and verification suite.
-- **Why:** Establish the site-level clinical trial operations center for Principal Investigators per Phase 1 Segment A requirements.
-- **How:** Created types, mockData, repositories, services, StudyContext, AppShell, Header, Sidebar, UI primitives, 7 dashboard widget components, and DashboardOverviewPage.
-- **Result:** Fully functional, responsive PI operations overview with interactive study/site switching, loading/empty/error states, and calculated recruitment metrics. Future modules connected via non-functional placeholders.
-- **Verified by:** `npm run typecheck` (0 errors), `npm run test` (5/5 unit tests passed), `npm run build` (production assets generated), `curl` HTTP 200 checks on Dev and Preview servers, secret scan (0 secrets).
-- **Dead ends:** Initial `--experimental-strip-types` test runner hit Node ESM relative import resolution; resolved cleanly with Vite SSR test bundle runner (`npm test`).
-- **Follow-ups:** Await Segment B instructions (Participant Management).
+- *2026-09-29 · T-001 · Phase 1 — Segment A: PI Dashboard Foundation + Overview* &rarr; archived to [docs/memory-archive.md](docs/memory-archive.md)
 
 - *2026-09-28 · T-000 · Phase 0 — Project Context & Development Contract* &rarr; archived to [docs/memory-archive.md](docs/memory-archive.md)

@@ -45,7 +45,7 @@ const RootRedirect: React.FC = () => {
   const { isAuthenticated, roleLandingRoute, isLoading } = useAuth();
   if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <Navigate to={roleLandingRoute || '/pi/dashboard'} replace />;
+  return <Navigate to={roleLandingRoute || '/pi'} replace />;
 };
 
 export const AppRoutes: React.FC = () => {
@@ -56,7 +56,6 @@ export const AppRoutes: React.FC = () => {
 
       {/* Root Navigation Resolution */}
       <Route path="/" element={<RootRedirect />} />
-      <Route path="/pi" element={<RootRedirect />} />
 
       {/* Role-Specific Portal Dashboards */}
       <Route
@@ -110,7 +109,17 @@ export const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* PI Operations Overview (Segment A Core Target) */}
+      {/* PI Operations Overview (Segment A Core Target — Accessible at both /pi and /pi/dashboard) */}
+      <Route
+        path="/pi"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="PI Operations Overview">
+              <DashboardOverviewPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
       <Route
         path="/pi/dashboard"
         element={

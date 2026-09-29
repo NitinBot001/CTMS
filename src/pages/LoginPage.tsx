@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { authService } from '../services/authService';
 import {
   Shield,
   Eye,
@@ -13,6 +14,7 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
+  Sparkles,
 } from 'lucide-react';
 import { DemoCredential } from '../types';
 
@@ -21,43 +23,38 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const { login, isAuthenticated, roleLandingRoute, getDemoCredentials } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const demoCredentials: DemoCredential[] = getDemoCredentials();
+  const defaultPi = demoCredentials.find((c) => c.roleId === 'ROLE_PI') || demoCredentials[0];
+
+  const [email, setEmail] = useState(defaultPi ? defaultPi.email : 'demo.pi@aiia-ctms.local');
+  const [password, setPassword] = useState(defaultPi ? defaultPi.password : 'PI@Demo123');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoPanelExpanded, setDemoPanelExpanded] = useState(true);
 
-  const demoCredentials: DemoCredential[] = getDemoCredentials();
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const destination = (location.state as { from?: { pathname: string } })?.from?.pathname || roleLandingRoute || '/';
+      const fromPath = (location.state as { from?: { pathname: string } })?.from?.pathname;
+      const targetRoute = roleLandingRoute || '/pi';
+      const destination = fromPath && fromPath !== '/login' ? fromPath : targetRoute;
       navigate(destination, { replace: true });
     }
   }, [isAuthenticated, navigate, location.state, roleLandingRoute]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    if (!email.trim() || !password) {
-      setErrorMessage('Please provide both institutional email and password.');
-      return;
-    }
-
+  const executeLogin = async (userEmail: string, userPass: string) => {
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
-      const result = await login(email.trim(), password);
+      const result = await login(userEmail.trim(), userPass);
       if (result.success && result.session) {
-        const destination =
-          (location.state as { from?: { pathname: string } })?.from?.pathname ||
-          roleLandingRoute ||
-          '/';
+        const targetRoute = authService.getRoleLandingRoute(result.role?.id) || '/pi';
+        const fromPath = (location.state as { from?: { pathname: string } })?.from?.pathname;
+        const destination = fromPath && fromPath !== '/login' ? fromPath : targetRoute;
         navigate(destination, { replace: true });
       } else {
-        setErrorMessage(result.errorMessage || 'Invalid institutional credentials.');
+        setErrorMessage(result.error || 'Invalid institutional credentials.');
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Authentication service error occurred.');
@@ -66,10 +63,25 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) {
+      setErrorMessage('Please provide both institutional email and password.');
+      return;
+    }
+    await executeLogin(email, password);
+  };
+
   const handleSelectDemoUser = (cred: DemoCredential) => {
     setEmail(cred.email);
     setPassword(cred.password);
     setErrorMessage(null);
+  };
+
+  const handleQuickLogin = (cred: DemoCredential) => {
+    setEmail(cred.email);
+    setPassword(cred.password);
+    executeLogin(cred.email, cred.password);
   };
 
   return (
@@ -117,6 +129,30 @@ export const LoginPage: React.FC = () => {
               <p className="text-xs sm:text-sm text-stone-600 mt-1">
                 Access your designated clinical trial oversight, protocol compliance, and patient data portal.
               </p>
+            </div>
+
+            {/* Quick Demo Launch Banner */}
+            <div className="mb-5 p-3.5 bg-[#7A2A12]/5 border border-[#7A2A12]/20 rounded-sm flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#7A2A12]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#B8862E]" />
+                  <span>Instant Demo Evaluation</span>
+                </div>
+                <div className="text-[11px] text-stone-600 mt-0.5">
+                  Launch the Principal Investigator dashboard directly with 1 click
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => {
+                  const piCred = demoCredentials.find((c) => c.roleId === 'ROLE_PI') || demoCredentials[0];
+                  if (piCred) handleQuickLogin(piCred);
+                }}
+                className="px-3.5 py-1.5 bg-[#7A2A12] hover:bg-[#63220E] text-white text-xs font-semibold rounded-sm shadow-xs transition-colors shrink-0 disabled:opacity-60 cursor-pointer"
+              >
+                Launch PI Dashboard &rarr;
+              </button>
             </div>
 
             {/* Error Alert Banner */}
@@ -230,11 +266,10 @@ export const LoginPage: React.FC = () => {
                 {demoCredentials.map((cred) => {
                   const isSelected = email === cred.email;
                   return (
-                    <button
+                    <div
                       key={cred.email}
-                      type="button"
                       onClick={() => handleSelectDemoUser(cred)}
-                      className={`w-full text-left p-2.5 rounded-sm border transition-all text-xs flex items-center justify-between ${
+                      className={`w-full text-left p-2.5 rounded-sm border transition-all text-xs flex items-center justify-between cursor-pointer ${
                         isSelected
                           ? 'border-[#7A2A12] bg-[#7A2A12]/5 ring-1 ring-[#7A2A12]'
                           : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
@@ -254,10 +289,20 @@ export const LoginPage: React.FC = () => {
                           {cred.email}
                         </div>
                       </div>
-                      <span className="text-[10px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded border border-stone-200 shrink-0">
-                        Quick Fill
-                      </span>
-                    </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickLogin(cred);
+                          }}
+                          className="text-[11px] font-semibold text-white bg-[#7A2A12] hover:bg-[#63220E] px-2.5 py-1 rounded-sm shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
+                        >
+                          Sign In &rarr;
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>

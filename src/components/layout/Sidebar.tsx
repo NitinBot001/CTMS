@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   X,
   Activity,
@@ -14,6 +14,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+  const location = useLocation();
   const { activeStudy, activeSite } = useStudy();
   const { currentRole, effectivePermissions } = useAuth();
 
@@ -88,13 +89,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 onClick={() => {
                   if (window.innerWidth < 1024) onClose();
                 }}
-                className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2 text-xs font-medium rounded-sm transition-colors group ${
-                    isActive
+                className={({ isActive }) => {
+                  const isCurrentActive =
+                    isActive ||
+                    (item.name === 'Overview' &&
+                      (location.pathname === '/pi' || location.pathname === '/pi/dashboard'));
+                  return `flex items-center justify-between px-3 py-2 text-xs font-medium rounded-sm transition-colors group ${
+                    isCurrentActive
                       ? 'bg-rose-50/80 text-primary border-l-2 border-primary font-semibold'
                       : 'text-ink-secondary hover:bg-surface-soft hover:text-ink'
-                  }`
-                }
+                  }`;
+                }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Icon className="w-4 h-4 shrink-0 transition-colors group-hover:text-primary" />
