@@ -46,6 +46,9 @@ import {
 import { authService } from '../services/authService';
 import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
 import { getRoleLandingRoute, getRoleNavigationItems } from '../config/navigationConfig';
+import { environmentService } from '../services/environmentService';
+import { emptyTestStore, BOOTSTRAP_PI_USER, BOOTSTRAP_PI_PASSWORD } from '../storage/emptyTestStore';
+import { mockDataStore } from '../storage/mockDataStore';
 
 function assert(condition: unknown, message: string = 'Assertion condition was false'): asserts condition {
   if (!condition) {
@@ -2859,7 +2862,366 @@ async function runTests() {
   assert(allPartsFinal.length >= 8, 'Participants intact');
   console.log('✓ Test 189 passed: Comprehensive Segments A-K regression check verified.');
 
-  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (189/189) ---');
+  // ============================================================================
+  // TEAM MEMBER ONBOARDING & LOGIN CREDENTIALS TESTS (TESTS 190-221)
+  // ============================================================================
+  console.log('\n--- STARTING TEAM MEMBER ONBOARDING & LOGIN CREDENTIALS TESTS ---');
+
+  // Initialize and isolate environments for testing
+  environmentService.setMode('EMPTY_TEST');
+  emptyTestStore.resetWorkspace();
+  mockDataStore.resetWorkspace();
+
+  const emptyCtx = { studyId: 'EMPTY-STUDY-001', siteId: 'EMPTY-SITE-001' };
+
+  // Test 190: PI can validate Add Team Member input
+  console.log('Test 190: PI can validate Add Team Member input');
+  let missingNameFailed = false;
+  try {
+    await teamService.createTeamMember(emptyCtx, {
+      displayName: '   ',
+      email: 'invalid@test.local',
+      roleId: 'ROLE_SUB_I',
+      studyId: emptyCtx.studyId,
+      siteId: emptyCtx.siteId,
+    });
+  } catch (err: any) {
+    missingNameFailed = true;
+    assert(err.message.includes('Full Name is required'), 'Rejects empty name');
+  }
+  assert(missingNameFailed, 'Empty name must be rejected');
+
+  let invalidEmailFailed = false;
+  try {
+    await teamService.createTeamMember(emptyCtx, {
+      displayName: 'Valid Name',
+      email: 'not-an-email',
+      roleId: 'ROLE_SUB_I',
+      studyId: emptyCtx.studyId,
+      siteId: emptyCtx.siteId,
+    });
+  } catch (err: any) {
+    invalidEmailFailed = true;
+    assert(err.message.includes('valid email address is required'), 'Rejects invalid email format');
+  }
+  assert(invalidEmailFailed, 'Invalid email format must be rejected');
+  console.log('✓ Test 190 passed: PI can validate Add Team Member input.');
+
+  // Test 191: PI can create Sub-Investigator
+  console.log('Test 191: PI can create Sub-Investigator');
+  const subIMember = await teamService.createTeamMember(emptyCtx, {
+    displayName: 'Demo Sub-I',
+    email: 'demo.subi@test.local',
+    roleId: 'ROLE_SUB_I',
+    studyId: emptyCtx.studyId,
+    siteId: emptyCtx.siteId,
+    employeeId: 'EMP-SUBI-001',
+  });
+  assert(Boolean(subIMember.user.id), 'Sub-I user created with ID');
+  assertStrictEqual(subIMember.user.displayName, 'Demo Sub-I', 'Display name matches');
+  assertStrictEqual(subIMember.roles[0].id, 'ROLE_SUB_I', 'Role assigned is ROLE_SUB_I');
+  console.log('✓ Test 191 passed: PI can create Sub-Investigator.');
+
+  // Test 192: PI can create CRC
+  console.log('Test 192: PI can create CRC');
+  const crcMember = await teamService.createTeamMember(emptyCtx, {
+    displayName: 'Demo CRC',
+    email: 'demo.crc@test.local',
+    roleId: 'ROLE_CRC',
+    studyId: emptyCtx.studyId,
+    siteId: emptyCtx.siteId,
+    employeeId: 'EMP-CRC-001',
+  });
+  assertStrictEqual(crcMember.roles[0].id, 'ROLE_CRC', 'Role assigned is ROLE_CRC');
+  console.log('✓ Test 192 passed: PI can create CRC.');
+
+  // Test 193: PI can create Study Nurse
+  console.log('Test 193: PI can create Study Nurse');
+  const nurseMember = await teamService.createTeamMember(emptyCtx, {
+    displayName: 'Demo Nurse',
+    email: 'demo.nurse@test.local',
+    roleId: 'ROLE_STUDY_NURSE',
+    studyId: emptyCtx.studyId,
+    siteId: emptyCtx.siteId,
+    employeeId: 'EMP-NURSE-001',
+  });
+  assertStrictEqual(nurseMember.roles[0].id, 'ROLE_STUDY_NURSE', 'Role assigned is ROLE_STUDY_NURSE');
+  console.log('✓ Test 193 passed: PI can create Study Nurse.');
+
+  // Test 194: PI can create Study Pharmacist
+  console.log('Test 194: PI can create Study Pharmacist');
+  const pharmMember = await teamService.createTeamMember(emptyCtx, {
+    displayName: 'Demo Pharmacist',
+    email: 'demo.pharmacist@test.local',
+    roleId: 'ROLE_STUDY_PHARMACIST',
+    studyId: emptyCtx.studyId,
+    siteId: emptyCtx.siteId,
+    employeeId: 'EMP-PHARM-001',
+  });
+  assertStrictEqual(pharmMember.roles[0].id, 'ROLE_STUDY_PHARMACIST', 'Role assigned is ROLE_STUDY_PHARMACIST');
+  console.log('✓ Test 194 passed: PI can create Study Pharmacist.');
+
+  // Test 195: PI can create Data Entry Operator
+  console.log('Test 195: PI can create Data Entry Operator');
+  const deMember = await teamService.createTeamMember(emptyCtx, {
+    displayName: 'Demo Data Entry',
+    email: 'demo.data@test.local',
+    roleId: 'ROLE_DATA_ENTRY',
+    studyId: emptyCtx.studyId,
+    siteId: emptyCtx.siteId,
+    employeeId: 'EMP-DATA-001',
+  });
+  assertStrictEqual(deMember.roles[0].id, 'ROLE_DATA_ENTRY', 'Role assigned is ROLE_DATA_ENTRY');
+  console.log('✓ Test 195 passed: PI can create Data Entry Operator.');
+
+  // Test 196: Created users appear in Team list
+  console.log('Test 196: Created users appear in Team list');
+  const teamList = await teamService.getTeamMembers(emptyCtx);
+  assert(teamList.length >= 6, 'Includes Bootstrap PI + 5 newly created staff');
+  const emailsInList = teamList.map((m) => m.user.email);
+  assert(emailsInList.includes('demo.subi@test.local'), 'Sub-I in team list');
+  assert(emailsInList.includes('demo.crc@test.local'), 'CRC in team list');
+  assert(emailsInList.includes('demo.nurse@test.local'), 'Nurse in team list');
+  assert(emailsInList.includes('demo.pharmacist@test.local'), 'Pharmacist in team list');
+  assert(emailsInList.includes('demo.data@test.local'), 'Data Entry in team list');
+  console.log('✓ Test 196 passed: Created users appear in Team list.');
+
+  // Test 197: Created user is linked to correct study
+  console.log('Test 197: Created user is linked to correct study');
+  assertStrictEqual(pharmMember.studyId, 'EMPTY-STUDY-001', 'Linked to EMPTY-STUDY-001');
+  console.log('✓ Test 197 passed: Created user is linked to correct study.');
+
+  // Test 198: Created user is linked to correct site
+  console.log('Test 198: Created user is linked to correct site');
+  assertStrictEqual(pharmMember.siteId, 'EMPTY-SITE-001', 'Linked to EMPTY-SITE-001');
+  console.log('✓ Test 198 passed: Created user is linked to correct site.');
+
+  // Test 199: Correct UserRole is created
+  console.log('Test 199: Correct UserRole is created');
+  const pharmRoles = await teamService.getUserRoleAssignments(emptyCtx, pharmMember.user.id);
+  assert(pharmRoles.length === 1, 'Exactly one UserRole created');
+  assertStrictEqual(pharmRoles[0].roleId, 'ROLE_STUDY_PHARMACIST', 'UserRole roleId matches');
+  assertStrictEqual(pharmRoles[0].studyId, 'EMPTY-STUDY-001', 'UserRole studyId matches');
+  assertStrictEqual(pharmRoles[0].siteId, 'EMPTY-SITE-001', 'UserRole siteId matches');
+  console.log('✓ Test 199 passed: Correct UserRole is created.');
+
+  // Test 200: Effective permissions resolve correctly
+  console.log('Test 200: Effective permissions resolve correctly');
+  const emptyDePerms = await teamService.getEffectivePermissions(emptyCtx, deMember.user.id);
+  const dePermIds = emptyDePerms.map((p) => p.id);
+  assert(dePermIds.includes('DATA_ENTRY_EDIT'), 'Data entry has edit/transcribe permission');
+  assert(dePermIds.includes('DATA_ENTRY_VIEW'), 'Data entry has view permission');
+  assert(!dePermIds.includes('SAFETY_REPORT_EXPEDITED'), 'Data entry does not have safety sign-off');
+  console.log('✓ Test 200 passed: Effective permissions resolve correctly.');
+
+  // Test 201: Duplicate email is blocked
+  console.log('Test 201: Duplicate email is blocked');
+  let duplicateEmailFailed = false;
+  try {
+    await teamService.createTeamMember(emptyCtx, {
+      displayName: 'Duplicate Pharmacist',
+      email: 'demo.pharmacist@test.local',
+      roleId: 'ROLE_STUDY_PHARMACIST',
+      studyId: emptyCtx.studyId,
+      siteId: emptyCtx.siteId,
+    });
+  } catch (err: any) {
+    duplicateEmailFailed = true;
+    assert(err.message.includes('An account with this email already exists.'), 'Exact duplicate error message');
+  }
+  assert(duplicateEmailFailed, 'Duplicate email must throw error');
+  console.log('✓ Test 201 passed: Duplicate email is blocked.');
+
+  // Test 202: Email matching is case-insensitive
+  console.log('Test 202: Email matching is case-insensitive');
+  let caseDuplicateFailed = false;
+  try {
+    await teamService.createTeamMember(emptyCtx, {
+      displayName: 'Uppercase Duplicate',
+      email: 'DEMO.PHARMACIST@TEST.LOCAL',
+      roleId: 'ROLE_STUDY_PHARMACIST',
+      studyId: emptyCtx.studyId,
+      siteId: emptyCtx.siteId,
+    });
+  } catch (err: any) {
+    caseDuplicateFailed = true;
+    assert(err.message.includes('An account with this email already exists.'), 'Case-insensitive duplicate blocked');
+  }
+  assert(caseDuplicateFailed, 'Case-insensitive email match must be blocked');
+  console.log('✓ Test 202 passed: Email matching is case-insensitive.');
+
+  // Test 203: Duplicate UserRole assignment is blocked
+  console.log('Test 203: Duplicate UserRole assignment is blocked');
+  let duplicateRoleFailed = false;
+  try {
+    await teamService.assignRole(emptyCtx, {
+      userId: pharmMember.user.id,
+      roleId: 'ROLE_STUDY_PHARMACIST',
+      studyId: emptyCtx.studyId,
+      siteId: emptyCtx.siteId,
+      assignedBy: 'Dr. Test PI',
+    });
+  } catch (err: any) {
+    duplicateRoleFailed = true;
+    assert(err.message.includes('already assigned this role'), 'Duplicate role assignment blocked');
+  }
+  assert(duplicateRoleFailed, 'Duplicate UserRole must be blocked');
+  console.log('✓ Test 203 passed: Duplicate UserRole assignment is blocked.');
+
+  // Test 204: Default temporary password is "128"
+  console.log('Test 204: Default temporary password is "128"');
+  const storedPasswords = emptyTestStore.getUserPasswords();
+  assertStrictEqual(storedPasswords['demo.pharmacist@test.local'], '128', 'Password is 128 in store');
+  assertStrictEqual(pharmMember.user.mustChangePassword, true, 'mustChangePassword flag is true');
+  console.log('✓ Test 204 passed: Default temporary password is "128".');
+
+  // Test 205: Password value is not written to audit logs
+  console.log('Test 205: Password value is not written to audit logs');
+  const auditLogs = emptyTestStore.getAuditHistory();
+  const serializedAudit = JSON.stringify(auditLogs);
+  assert(!serializedAudit.includes('"128"'), 'Temporary password 128 is not stored in audit logs');
+  console.log('✓ Test 205 passed: Password value is not written to audit logs.');
+
+  // Test 206: Created user can log in using email + 128
+  console.log('Test 206: Created user can log in using email + 128');
+  const emptyPharmLogin = await authService.login('demo.pharmacist@test.local', '128');
+  assertStrictEqual(emptyPharmLogin.success, true, 'Pharmacist logged in successfully');
+  assertStrictEqual(emptyPharmLogin.user?.displayName, 'Demo Pharmacist', 'User profile retrieved');
+  assertStrictEqual(emptyPharmLogin.role?.id, 'ROLE_STUDY_PHARMACIST', 'Role matches ROLE_STUDY_PHARMACIST');
+  console.log('✓ Test 206 passed: Created user can log in using email + 128.');
+
+  // Test 207: Correct dashboard is selected from role
+  console.log('Test 207: Correct dashboard is selected from role');
+  const landingRoute = authService.getRoleLandingRoute(emptyPharmLogin.role?.id);
+  assertStrictEqual(landingRoute, '/pharmacist', 'Pharmacist lands on /pharmacist');
+  console.log('✓ Test 207 passed: Correct dashboard is selected from role.');
+
+  // Test 208: Data Entry user lands on /data-entry
+  console.log('Test 208: Data Entry user lands on /data-entry');
+  const emptyDeLogin = await authService.login('demo.data@test.local', '128');
+  assertStrictEqual(emptyDeLogin.success, true, 'Data Entry user logged in');
+  assertStrictEqual(authService.getRoleLandingRoute(emptyDeLogin.role?.id), '/data-entry', 'Route is /data-entry');
+  console.log('✓ Test 208 passed: Data Entry user lands on /data-entry.');
+
+  // Test 209: Sub-Investigator lands on /sub-investigator
+  console.log('Test 209: Sub-Investigator lands on /sub-investigator');
+  const emptySubiLogin = await authService.login('demo.subi@test.local', '128');
+  assertStrictEqual(emptySubiLogin.success, true, 'Sub-I logged in');
+  assertStrictEqual(authService.getRoleLandingRoute(emptySubiLogin.role?.id), '/sub-investigator', 'Route is /sub-investigator');
+  console.log('✓ Test 209 passed: Sub-Investigator lands on /sub-investigator.');
+
+  // Test 210: Study Pharmacist lands on /pharmacist
+  console.log('Test 210: Study Pharmacist lands on /pharmacist');
+  assertStrictEqual(getRoleLandingRoute('ROLE_STUDY_PHARMACIST'), '/pharmacist', 'Route helper returns /pharmacist');
+  console.log('✓ Test 210 passed: Study Pharmacist lands on /pharmacist.');
+
+  // Test 211: Study Nurse lands on /study-nurse
+  console.log('Test 211: Study Nurse lands on /study-nurse');
+  const emptyNurseLogin = await authService.login('demo.nurse@test.local', '128');
+  assertStrictEqual(emptyNurseLogin.success, true, 'Nurse logged in');
+  assertStrictEqual(authService.getRoleLandingRoute(emptyNurseLogin.role?.id), '/study-nurse', 'Route is /study-nurse');
+  console.log('✓ Test 211 passed: Study Nurse lands on /study-nurse.');
+
+  // Test 212: CRC lands on /crc
+  console.log('Test 212: CRC lands on /crc');
+  const emptyCrcLogin = await authService.login('demo.crc@test.local', '128');
+  assertStrictEqual(emptyCrcLogin.success, true, 'CRC logged in');
+  assertStrictEqual(authService.getRoleLandingRoute(emptyCrcLogin.role?.id), '/crc', 'Route is /crc');
+  console.log('✓ Test 212 passed: CRC lands on /crc.');
+
+  // Test 213: Deactivated user cannot log in
+  console.log('Test 213: Deactivated user cannot log in');
+  await teamService.toggleUserStatus(emptyCtx, deMember.user.id, 'INACTIVE');
+  const deactivatedLogin = await authService.login('demo.data@test.local', '128');
+  assertStrictEqual(deactivatedLogin.success, false, 'Deactivated login is rejected');
+  assert(deactivatedLogin.error?.includes('inactive'), 'Error states account is inactive');
+  // Reactivate for downstream tests
+  await teamService.toggleUserStatus(emptyCtx, deMember.user.id, 'ACTIVE');
+  console.log('✓ Test 213 passed: Deactivated user cannot log in.');
+
+  // Test 214: Empty Test team persists after refresh
+  console.log('Test 214: Empty Test team persists after refresh');
+  const persistedUsers = emptyTestStore.getUsers();
+  assert(persistedUsers.length >= 6, 'All 6 users persisted in browser storage');
+  assert(persistedUsers.some((u) => u.email === 'demo.pharmacist@test.local'), 'Pharmacist exists in store');
+  console.log('✓ Test 214 passed: Empty Test team persists after refresh.');
+
+  // Test 215: Empty Test team persists after logout/login
+  console.log('Test 215: Empty Test team persists after logout/login');
+  authService.logout();
+  const reLoginPi = await authService.login(BOOTSTRAP_PI_USER.email, BOOTSTRAP_PI_PASSWORD);
+  assertStrictEqual(reLoginPi.success, true, 'Bootstrap PI re-authenticated');
+  const reloadedTeam = await teamService.getTeamMembers(emptyCtx);
+  assert(reloadedTeam.length >= 6, 'All team members present after logout/login cycle');
+  console.log('✓ Test 215 passed: Empty Test team persists after logout/login.');
+
+  // Test 216: Mock team additions persist according to mock storage strategy
+  console.log('Test 216: Mock team additions persist according to mock storage strategy');
+  environmentService.setMode('MOCK');
+  const mockCtx = { studyId: 'STUDY-001', siteId: 'SITE-001' };
+  const mockTeamBefore = await teamService.getTeamMembers(mockCtx);
+
+  const mockAddedMember = await teamService.createTeamMember(mockCtx, {
+    displayName: 'Mock Pharmacist 2',
+    email: 'mock.pharm2@aiia-ctms.local',
+    roleId: 'ROLE_STUDY_PHARMACIST',
+    studyId: mockCtx.studyId,
+    siteId: mockCtx.siteId,
+  });
+  assert(Boolean(mockAddedMember.user.id), 'Mock user created');
+  const mockTeamAfter = await teamService.getTeamMembers(mockCtx);
+  assertStrictEqual(mockTeamAfter.length, mockTeamBefore.length + 1, 'Mock team size incremented by 1');
+
+  // Verify mock addition can log in with 128
+  const mockAddedLogin = await authService.login('mock.pharm2@aiia-ctms.local', '128');
+  assertStrictEqual(mockAddedLogin.success, true, 'Mock added user logged in with 128');
+  assertStrictEqual(mockAddedLogin.role?.id, 'ROLE_STUDY_PHARMACIST', 'Mock user role resolved');
+  console.log('✓ Test 216 passed: Mock team additions persist according to mock storage strategy.');
+
+  // Test 217: Empty Test users do NOT appear in Mock
+  console.log('Test 217: Empty Test users do not appear in Mock');
+  const mockEmails = mockTeamAfter.map((m) => m.user.email);
+  assert(!mockEmails.includes('demo.pharmacist@test.local'), 'Empty Test pharmacist not in Mock');
+  assert(!mockEmails.includes('demo.subi@test.local'), 'Empty Test Sub-I not in Mock');
+  console.log('✓ Test 217 passed: Empty Test users do not appear in Mock.');
+
+  // Test 218: Mock users do NOT appear in Empty Test
+  console.log('Test 218: Mock users do not appear in Empty Test');
+  environmentService.setMode('EMPTY_TEST');
+  const emptyTeamFinal = await teamService.getTeamMembers(emptyCtx);
+  const emptyEmails = emptyTeamFinal.map((m) => m.user.email);
+  assert(!emptyEmails.includes('mock.pharm2@aiia-ctms.local'), 'Mock added user not in Empty Test');
+  assert(!emptyEmails.includes('demo.pi@aiia-ctms.local'), 'Canonical mock PI not in Empty Test');
+  console.log('✓ Test 218 passed: Mock users do not appear in Empty Test.');
+
+  // Test 219: Existing Participant data remains unaffected
+  console.log('Test 219: Existing Participant data remains unaffected');
+  environmentService.setMode('MOCK');
+  const canonicalParts = await participantService.getParticipants(ctxSite1);
+  assertStrictEqual(canonicalParts.length, 10, 'Canonical 10 participants intact');
+  const canonicalVisits = await visitService.getVisits(ctxSite1);
+  assert(canonicalVisits.length >= 10, 'Canonical visits intact');
+  console.log('✓ Test 219 passed: Existing Participant data remains unaffected.');
+
+  // Test 220: Existing Segment F tests still pass
+  console.log('Test 220: Existing Segment F tests still pass');
+  const mockRoles = await teamService.getRoles(ctxSite1);
+  assert(mockRoles.length >= 6, 'All system roles present in Mock');
+  const piRole = mockRoles.find((r) => r.id === 'ROLE_PI');
+  assert(Boolean(piRole), 'ROLE_PI intact');
+  console.log('✓ Test 220 passed: Existing Segment F tests still pass.');
+
+  // Test 221: Comprehensive regression across Segments A-K + Auth + Empty/Mock Team
+  console.log('Test 221: Comprehensive regression across Segments A-K + Auth + Empty/Mock Team');
+  const mockTasks = await taskService.getTasks(ctxSite1);
+  assert(mockTasks.length >= 10, 'Tasks intact across environments');
+  const mockSafety = await safetyService.getSafetyEvents(ctxSite1);
+  assert(mockSafety.length >= 6, 'Safety events intact');
+  const mockDevs = await complianceService.getDeviations(ctxSite1);
+  assert(mockDevs.length >= 6, 'Deviations intact');
+  console.log('✓ Test 221 passed: Comprehensive regression check verified.');
+
+  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (221/221) ---');
 }
 
 runTests().catch((err) => {

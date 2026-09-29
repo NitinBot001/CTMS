@@ -28,7 +28,7 @@ _Last updated: 2026-09-29_
 - **Later (parked):** External backend integrations, real binary cloud storage, WebSockets.
 - **Stack:** React 19, Vite 6, TypeScript 5.7, Tailwind CSS 3.4, React Router DOM 7, Lucide React.
 - **Run / test / build:** `npm run dev` (port 5173) · `npm test` · `npm run typecheck` · `npm run build` · `npm run verify`
-- **Status:** T-019 — Empty Test Mode UI fully wired. MOCK/EMPTY TEST selector live on Login page. 189/189 tests pass. Git commit `96958fe` on `main`.
+- **Status:** T-021 — Team Member Onboarding & Login Credentials implemented for Empty Test Mode and Mock Mode. Add Team Member modal, credential confirmation with copy button, temporary password '128' defaulting with mustChangePassword flag, password reset badge, deactivation toggle, strict environment isolation, and comprehensive 221/221 tests passing.
 - **Workspace Boundary:** Strictly confined to project root. Never access or reference outside directories.
 - **Known issues & tech debt:** None.
 - **Open questions for the user:** None.
@@ -72,8 +72,29 @@ _Last updated: 2026-09-29_
 | 2026-09-29 | Field-Level Correction Flagging & Mandatory Return Reason | Clinical data integrity: Returning a visit record requires non-empty clinical justification and explicit tagging of affected fields (`flaggedForCorrection`). Flagged fields display institutional warning banners in the eCRF editor until amended and resubmitted (`RESUBMITTED_FOR_VERIFICATION`). | Global rejection without field identification, allowing empty return notes |
 | 2026-09-29 | Self-Verification Defense Check | Compliance & segregation of duties: An actor cannot verify a record they entered (`actor.userId === record.enteredByUserId`). Prevents conflict of interest even if user holds multi-role permissions. | Relying solely on client UI button disabling |
 | 2026-09-29 | Post-Verification Immutability & Formal CRO Release | Audit trail & GCP reproducibility: Once submitted for verification or verified, direct field editing and attachment changes are locked. Advancing to `PI_REVIEW` and releasing to `SUBMITTED_TO_CRO` requires verified status and creates permanent audit trail entries. | Allowing direct editing of verified or submitted records |
+| 2026-09-29 | Default Temporary Password ("128") with Security Flags | CTMS staff onboarding requirement: all newly created team members default to temporary password "128" with mustChangePassword: true and isTemporaryPassword: true. Passwords never appear in team tables or audit logs. Modal displays credentials once upon creation with one-click copy. | Plaintext passwords in database/audit logs, complex generation without copy view |
 
 ## 3. Task Log  (newest first; keep ~15 entries, archive older ones to docs/memory-archive.md)
+
+### 2026-09-29 · T-021 · Team Member Onboarding & Login Credentials (Empty Test + Mock Mode)
+- **What:** Implemented institutional staff onboarding from the PI Team management console: `AddTeamMemberModal` with dual creation and credential confirmation views, temporary password generation defaulting to `"128"`, `mustChangePassword` and `isTemporaryPassword` security metadata flags, `TeamMemberTable` password reset badge (never displaying password string), `TeamMemberDetailPage` delegation metadata and `[Deactivate Account]` / `[Reactivate Account]` toggle with audit feedback, `MockTeamRepository` & `MockAuthRepository` mutable overlay (`mockDataStore`), `EmptyTeamRepository` & `EmptyAuthRepository` synchronization, duplicate case-insensitive email prevention, inactive staff login block, and expanded test suite from 189 to 221 tests (all passing).
+- **Why:** Allow the Principal Investigator in both Empty Test Mode and Mock Mode to create and onboard operational clinical staff (Sub-Investigator, CRC, Nurse, Pharmacist, Data Entry Operator) with predictable initial credentials (`email` + `"128"`) and verify that created accounts can immediately authenticate and land on their respective role dashboards without confusing staff with clinical trial participants.
+- **How:** Extended `User` and `CreateTeamMemberInput` with security/delegation fields (`employeeId`, `mustChangePassword`, `isTemporaryPassword`, `notes`). Built `mockDataStore` to persist mock-mode additions without mutating canonical `mockData.ts` constants. Added collision-proof ID generation using random suffixes (`USR-${base36}-${rand}`). Wired `EmptyTeamRepository` and `EmptyAuthRepository` to persist passwords in `emptyTestStore.setUserPassword()`. Enhanced `TeamManagementPage` with `[ + Add Team Member ]` modal launcher and `TeamMemberDetailPage` with account status toggles. Added tests 190–221 to `src/tests/services.test.ts`.
+- **Result:** Fully functional staff onboarding loop in both Empty Test and Mock modes. A PI can onboard staff who can immediately log in with temporary password `128` and land on their role dashboard (`/sub-investigator`, `/crc`, `/study-nurse`, `/pharmacist`, `/data-entry`). Inactive accounts cannot log in.
+- **Verified by:** `npm run typecheck` (0 errors), `npm test` (221/221 tests passed), `npm run build` (production build succeeded in 2.34s), `npm run verify` (exit code 0), secret scan (clean, 0 real credentials detected).
+- **Not verified:** Browser runtime visual checks (simulated via service/repository integration tests and build smoke tests).
+- **Dead ends:** In Test 196, initial ID generation using `Date.now().toString(36)` produced identical IDs when called synchronously within <1ms, collapsing team hydration; fixed by appending a 4-digit random suffix. In Test 200, corrected permission check from `DATA_ENTRY_TRANSCRIBE` to actual permission ID `DATA_ENTRY_EDIT`. In Test 219, fixed canonical participant count assertion from 8 to 10.
+- **Follow-ups:** Ready to commit and push changes to repository.
+
+### 2026-09-29 · T-020 · TypeScript `baseUrl` Deprecation Fix
+- **What:** Removed deprecated `compilerOptions.baseUrl` and changed the `@/*` path target to `./src/*`.
+- **Why:** Resolve the TypeScript 6 deprecation diagnostic without suppressing it or breaking the alias.
+- **How:** Kept the existing alias and made its target explicitly relative to `tsconfig.json`.
+- **Result:** Editor diagnostics are clear and project aliases remain usable.
+- **Verified by:** `get_errors` for `tsconfig.json` (no errors); `npm run verify` (typecheck, tests, production build passed).
+- **Not verified:** Browser runtime smoke test; not needed for this compiler-config-only change.
+- **Dead ends:** Removing `baseUrl` alone caused TS5090 because `src/*` was not explicitly relative; corrected to `./src/*`.
+- **Follow-ups:** None. Existing unrelated working-tree changes were left untouched.
 
 ### 2026-09-29 · T-019 · Auth Enhancement: MOCK / EMPTY TEST Mode Selector — UI Integration
 - **What:** Wired the `environmentService` mode-switching fully into the Login page and `AuthContext`. Added `[MOCK] [EMPTY TEST]` tab selector to Login page; maroon theme for Mock, green for Empty Test. Mock mode shows unchanged 6-persona quick-fill panel. Empty Test mode shows live workspace user list from `emptyTestStore`, bootstrap PI quick-access banner (email + password displayed), refresh button, and "Reset workspace" link. `AuthContext` now exposes `currentMode` and `setMode()`, subscribes to `environmentService.subscribe()`, and re-applies persisted mode before session restore so the correct repo is always used after page refresh. Logout preserves mode, clears session only.

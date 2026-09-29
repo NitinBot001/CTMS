@@ -10,11 +10,10 @@ import {
   UserRole,
 } from '../types';
 import {
-  MOCK_USERS,
   MOCK_ROLES,
-  MOCK_USER_ROLES,
   MOCK_PERMISSIONS,
 } from '../data/mockData';
+import { mockDataStore } from '../storage/mockDataStore';
 
 export const DEMO_CREDENTIALS: DemoCredential[] = [
   {
@@ -92,26 +91,43 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
 ];
 
 export class MockAuthRepository implements IAuthRepository {
-  private users: User[];
   private roles: Role[];
-  private userRoles: UserRole[];
   private permissions: Permission[];
   private demoCredentials: DemoCredential[];
 
   constructor() {
-    this.users = [...MOCK_USERS];
     this.roles = [...MOCK_ROLES];
-    this.userRoles = [...MOCK_USER_ROLES];
     this.permissions = [...MOCK_PERMISSIONS];
     this.demoCredentials = [...DEMO_CREDENTIALS];
   }
 
   getDemoCredentials(): DemoCredential[] {
-    return [...this.demoCredentials];
+    const addedUsers = mockDataStore.getAddedUsers();
+    const addedUserRoles = mockDataStore.getAddedUserRoles();
+    const extraDemos: DemoCredential[] = addedUsers.map((u) => {
+      const assignment = addedUserRoles.find((ur) => ur.userId === u.id);
+      const role = this.roles.find((r) => r.id === assignment?.roleId);
+      const roleId = role?.id || 'ROLE_DATA_ENTRY';
+      const roleName = role?.name || 'Staff User';
+      return {
+        email: u.email,
+        password: mockDataStore.getUserPassword(u.email),
+        label: `${roleName} (${u.displayName})`,
+        roleName,
+        userName: u.displayName,
+        roleId,
+        userId: u.id,
+        studyId: assignment?.studyId || 'STUDY-001',
+        siteId: assignment?.siteId || 'SITE-001',
+        description: `${u.displayName} — ${roleName} (Added Staff)`,
+      };
+    });
+    return [...this.demoCredentials, ...extraDemos];
   }
 
   async getUserById(userId: string): Promise<User | null> {
-    const user = this.users.find((u) => u.id === userId);
+    const allUsers = mockDataStore.getAllUsers();
+    const user = allUsers.find((u) => u.id === userId);
     return user ? { ...user } : null;
   }
 
@@ -123,12 +139,14 @@ export class MockAuthRepository implements IAuthRepository {
       return this.getUserById(demo.userId);
     }
     // Check official users
-    const user = this.users.find((u) => u.email.toLowerCase() === normalized);
+    const allUsers = mockDataStore.getAllUsers();
+    const user = allUsers.find((u) => u.email.toLowerCase() === normalized);
     return user ? { ...user } : null;
   }
 
   async getUserAssignments(userId: string): Promise<UserRole[]> {
-    return this.userRoles
+    const allUserRoles = mockDataStore.getAllUserRoles();
+    return allUserRoles
       .filter((ur) => ur.userId === userId)
       .map((ur) => ({ ...ur }));
   }
@@ -143,7 +161,8 @@ export class MockAuthRepository implements IAuthRepository {
     studyId: string,
     siteId: string
   ): Promise<Permission[]> {
-    const userAssignments = this.userRoles.filter(
+    const allUserRoles = mockDataStore.getAllUserRoles();
+    const userAssignments = allUserRoles.filter(
       (ur) => ur.userId === userId && ur.studyId === studyId && ur.siteId === siteId
     );
 
@@ -191,16 +210,23 @@ export class MockAuthRepository implements IAuthRepository {
       preferredStudyId = demo.studyId;
       preferredSiteId = demo.siteId;
     } else {
-      // 2. Fallback: match by official user email with demo standard password pattern
-      const user = this.users.find((u) => u.email.toLowerCase() === normalizedEmail);
+      // 2. Check all mock users (including added mock staff)
+      const allUsers = mockDataStore.getAllUsers();
+      const user = allUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
       if (user) {
-        // Find if user corresponds to one of the demo users
         const correspondingDemo = this.demoCredentials.find((d) => d.userId === user.id);
-        if (correspondingDemo && correspondingDemo.password === trimmedPassword) {
+        const expectedPassword = correspondingDemo
+          ? correspondingDemo.password
+          : mockDataStore.getUserPassword(user.email);
+
+        if (trimmedPassword === expectedPassword) {
           targetUserId = user.id;
-          preferredRoleId = correspondingDemo.roleId;
-          preferredStudyId = correspondingDemo.studyId;
-          preferredSiteId = correspondingDemo.siteId;
+          const userAssignments = mockDataStore.getAllUserRoles().filter((ur) => ur.userId === user.id);
+          if (userAssignments.length > 0) {
+            preferredRoleId = userAssignments[0].roleId;
+            preferredStudyId = userAssignments[0].studyId;
+            preferredSiteId = userAssignments[0].siteId;
+          }
         }
       }
     }

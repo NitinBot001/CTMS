@@ -22,6 +22,8 @@ import {
   AlertCircle,
   CheckCircle2,
   UserX,
+  UserCheck,
+  KeyRound,
 } from 'lucide-react';
 
 export const TeamMemberDetailPage: React.FC = () => {
@@ -107,6 +109,37 @@ export const TeamMemberDetailPage: React.FC = () => {
       });
     } finally {
       setIsRemovingId(null);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!activeStudyId || !activeSiteId || !memberDetail) return;
+    const currentStatus = memberDetail.user.status;
+    const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const actionLabel = newStatus === 'INACTIVE' ? 'deactivate' : 'reactivate';
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${actionLabel} ${memberDetail.user.displayName}'s account? ${
+        newStatus === 'INACTIVE'
+          ? 'Deactivated staff will no longer be able to log in to the system.'
+          : 'Staff will be able to authenticate again.'
+      }`
+    );
+    if (!confirmed) return;
+
+    try {
+      const context = { studyId: activeStudyId, siteId: activeSiteId };
+      await teamService.toggleUserStatus(context, memberDetail.user.id, newStatus);
+      setActionFeedback({
+        type: 'success',
+        message: `Account successfully ${newStatus === 'INACTIVE' ? 'deactivated' : 'reactivated'}.`,
+      });
+      await loadMemberData();
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: (err as Error).message || 'Failed to update account status.',
+      });
     }
   };
 
@@ -271,16 +304,114 @@ export const TeamMemberDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Action Button */}
-          <button
-            type="button"
-            onClick={() => setIsAssignModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-serif font-bold text-white bg-primary hover:bg-primary-dark rounded-sm transition-colors shadow-xs self-start"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Assign Role</span>
-          </button>
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            <button
+              type="button"
+              onClick={handleToggleStatus}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-serif font-semibold border rounded-sm transition-colors ${
+                user.status === 'ACTIVE'
+                  ? 'text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100'
+                  : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              {user.status === 'ACTIVE' ? (
+                <>
+                  <UserX className="w-3.5 h-3.5" />
+                  <span>Deactivate Account</span>
+                </>
+              ) : (
+                <>
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Reactivate Account</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsAssignModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-serif font-bold text-white bg-primary hover:bg-primary-dark rounded-sm transition-colors shadow-xs"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Assign Role</span>
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Account Security & Delegation Metadata */}
+      <div className="bg-surface border border-border rounded-sm p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between border-b border-border/70 pb-3">
+          <div className="flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-primary" />
+            <h2 className="font-serif font-bold text-ink text-sm">
+              Account Security & Delegation Metadata
+            </h2>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-soft border border-border text-ink-muted">
+            ICH-GCP Delegation Record
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block">
+              Staff / Employee ID
+            </span>
+            <span className="font-semibold text-ink block mt-0.5 font-mono">
+              {user.employeeId || 'Not specified'}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block">
+              Authentication Status
+            </span>
+            <span className="font-semibold text-ink block mt-0.5">
+              {user.status === 'ACTIVE' ? (
+                <span className="text-emerald-700 font-bold">Authorized · Active</span>
+              ) : (
+                <span className="text-rose-700 font-bold">Access Denied · Inactive</span>
+              )}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block">
+              Password Status
+            </span>
+            <span className="text-ink block mt-0.5">
+              {user.mustChangePassword ? (
+                <span className="font-mono text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[11px]">
+                  Temporary Password Active (Reset Required)
+                </span>
+              ) : (
+                <span className="text-stone-700 text-[11px]">Standard Password</span>
+              )}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block">
+              Scope Authority
+            </span>
+            <span className="font-mono text-ink block mt-0.5 text-[11px]">
+              {siteId} ({studyId})
+            </span>
+          </div>
+        </div>
+
+        {user.notes && (
+          <div className="pt-2 border-t border-border/60 text-xs">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-ink-muted block mb-0.5">
+              Delegation Notes
+            </span>
+            <p className="text-ink-secondary bg-surface-soft p-2.5 rounded-sm border border-border/80 text-[11px] leading-relaxed">
+              {user.notes}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Active Role Assignments Section */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { teamService } from '../services/teamService';
 import {
   TeamMemberSummary,
@@ -12,14 +13,16 @@ import { TeamFiltersBar } from '../components/team/TeamFiltersBar';
 import { TeamMemberTable } from '../components/team/TeamMemberTable';
 import { TeamMemberMobileCard } from '../components/team/TeamMemberMobileCard';
 import { AssignRoleModal } from '../components/team/AssignRoleModal';
+import { AddTeamMemberModal } from '../components/team/AddTeamMemberModal';
 import { Skeleton } from '../components/ui/SkeletonLoader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { RefreshCw, Users, ShieldAlert, UserPlus } from 'lucide-react';
+import { RefreshCw, Users, ShieldAlert, UserPlus, UserCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const TeamManagementPage: React.FC = () => {
-  const { activeStudyId, activeSiteId, isLoading: isStudyLoading } = useStudy();
+  const { activeStudy, activeSite, activeStudyId, activeSiteId, isLoading: isStudyLoading } = useStudy();
+  const { currentMode } = useAuth();
 
   const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
   const [totalSiteCount, setTotalSiteCount] = useState<number>(0);
@@ -42,6 +45,7 @@ export const TeamManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState<boolean>(false);
   const [activeCardFilter, setActiveCardFilter] = useState<string>('ALL');
 
   // Simulated QA state for Definition of Done testing
@@ -165,10 +169,19 @@ export const TeamManagementPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsAssignModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-serif font-semibold text-ink-secondary bg-surface border border-border hover:bg-surface-soft rounded-sm transition-colors shadow-2xs"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-primary" />
+            <span>Assign Role</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsAddMemberModalOpen(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-serif font-bold text-white bg-primary hover:bg-primary-dark rounded-sm transition-colors shadow-xs"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Assign Role</span>
+            <span>+ Add Team Member</span>
           </button>
         </div>
       </div>
@@ -294,6 +307,23 @@ export const TeamManagementPage: React.FC = () => {
           siteId={activeSiteId}
           teamMembers={teamMembers}
           roles={roles}
+        />
+      )}
+
+      {/* Add Team Member Modal */}
+      {isAddMemberModalOpen && (
+        <AddTeamMemberModal
+          isOpen={isAddMemberModalOpen}
+          onClose={() => setIsAddMemberModalOpen(false)}
+          onSuccess={() => {
+            loadTeamData();
+          }}
+          studyId={activeStudyId}
+          studyName={activeStudy?.title || activeStudyId}
+          siteId={activeSiteId}
+          siteName={activeSite?.name || activeSiteId}
+          roles={roles}
+          environmentMode={currentMode}
         />
       )}
     </div>

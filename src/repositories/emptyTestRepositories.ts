@@ -135,7 +135,7 @@ export class EmptyAuthRepository implements IAuthRepository {
       const role = roles.find((r) => r.id === roleId) || roles[0];
       const password =
         passwords[u.email.toLowerCase()] ||
-        (u.id === BOOTSTRAP_PI_USER.id ? BOOTSTRAP_PI_PASSWORD : 'User@123');
+        (u.id === BOOTSTRAP_PI_USER.id ? BOOTSTRAP_PI_PASSWORD : '128');
 
       return {
         email: u.email,
@@ -216,7 +216,7 @@ export class EmptyAuthRepository implements IAuthRepository {
 
     const passwords = emptyTestStore.getUserPasswords();
     const expectedPassword =
-      passwords[trimmedEmail] || (user.id === BOOTSTRAP_PI_USER.id ? BOOTSTRAP_PI_PASSWORD : 'User@123');
+      passwords[trimmedEmail] || (user.id === BOOTSTRAP_PI_USER.id ? BOOTSTRAP_PI_PASSWORD : '128');
 
     if (trimmedPassword !== expectedPassword) {
       return { success: false, error: 'Invalid credentials. Please verify your email and password.' };
@@ -356,10 +356,9 @@ export class EmptyTeamRepository implements ITeamRepository {
     input: CreateTeamMemberInput
   ): Promise<TeamMemberSummary> {
     const member = await this.repo.createTeamMember(context, input);
-    // If password provided in input, persist it to passwords store
-    if (input.password?.trim()) {
-      emptyTestStore.setUserPassword(input.email, input.password.trim());
-    }
+    // Always persist password to passwords store (default "128")
+    const tempPassword = input.password?.trim() || '128';
+    emptyTestStore.setUserPassword(input.email, tempPassword);
     return member;
   }
 

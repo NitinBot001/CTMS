@@ -580,6 +580,10 @@ export interface User {
   organization?: string;
   department?: string;
   phone?: string;
+  employeeId?: string;
+  mustChangePassword?: boolean;
+  isTemporaryPassword?: boolean;
+  notes?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
 }
@@ -1364,7 +1368,15 @@ export interface CreateTeamMemberInput {
   designation?: string;
   department?: string;
   phone?: string;
+  notes?: string;
   password?: string;
+}
+
+export interface CreateTeamMemberResult {
+  user: User;
+  role: Role;
+  assignment: UserRole;
+  temporaryPassword: string;
 }
 
 export interface CreateParticipantInput {

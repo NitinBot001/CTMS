@@ -16,11 +16,10 @@ import {
   CreateTeamMemberInput,
 } from '../types';
 import {
-  MOCK_USERS,
   MOCK_ROLES,
   MOCK_PERMISSIONS,
-  MOCK_USER_ROLES,
 } from '../data/mockData';
+import { mockDataStore } from '../storage/mockDataStore';
 
 export class MockTeamRepository implements ITeamRepository {
   private users: User[];
@@ -40,10 +39,10 @@ export class MockTeamRepository implements ITeamRepository {
     onSaveRoles?: (roles: Role[]) => void,
     onSaveUserRoles?: (userRoles: UserRole[]) => void
   ) {
-    this.users = initialUsers ? structuredClone(initialUsers) : structuredClone(MOCK_USERS);
+    this.users = initialUsers ? structuredClone(initialUsers) : mockDataStore.getAllUsers();
     this.roles = initialRoles ? structuredClone(initialRoles) : structuredClone(MOCK_ROLES);
     this.permissions = initialPermissions ? structuredClone(initialPermissions) : structuredClone(MOCK_PERMISSIONS);
-    this.userRoles = initialUserRoles ? structuredClone(initialUserRoles) : structuredClone(MOCK_USER_ROLES);
+    this.userRoles = initialUserRoles ? structuredClone(initialUserRoles) : mockDataStore.getAllUserRoles();
     this.onSaveUsers = onSaveUsers;
     this.onSaveRoles = onSaveRoles;
     this.onSaveUserRoles = onSaveUserRoles;
@@ -477,9 +476,11 @@ export class MockTeamRepository implements ITeamRepository {
     context: ParticipantQueryContext,
     input: CreateTeamMemberInput
   ): Promise<TeamMemberSummary> {
-    const existing = this.users.find((u) => u.email.toLowerCase() === input.email.trim().toLowerCase());
+    const existing = this.users.find(
+      (u) => u.email.toLowerCase() === input.email.trim().toLowerCase()
+    );
     if (existing) {
-      throw new Error(`A team member with email "${input.email}" already exists.`);
+      throw new Error('An account with this email already exists.');
     }
 
     const role = this.roles.find((r) => r.id === input.roleId);
@@ -487,15 +488,20 @@ export class MockTeamRepository implements ITeamRepository {
       throw new Error(`Role "${input.roleId}" not found.`);
     }
 
+    const randSuffix = Math.floor(1000 + Math.random() * 9000);
     const newUser: User = {
-      id: `USR-${Date.now().toString(36).toUpperCase()}`,
+      id: `USR-${Date.now().toString(36).toUpperCase()}-${randSuffix}`,
       displayName: input.displayName.trim(),
       email: input.email.trim().toLowerCase(),
-      designation: input.designation || role.name,
+      designation: input.designation?.trim() || role.name,
       status: input.status || 'ACTIVE',
       organization: 'All India Institute of Ayurveda',
-      department: input.department || 'Clinical Research',
-      phone: input.phone || '+91 11 2999 0000',
+      department: input.department?.trim() || 'Clinical Research',
+      phone: input.phone?.trim() || '+91 11 2999 0000',
+      employeeId: input.employeeId?.trim(),
+      mustChangePassword: true,
+      isTemporaryPassword: true,
+      notes: input.notes?.trim(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -503,7 +509,7 @@ export class MockTeamRepository implements ITeamRepository {
     this.users.push(newUser);
 
     const newAssignment: UserRole = {
-      id: `UR-${Date.now().toString(36).toUpperCase()}`,
+      id: `UR-${Date.now().toString(36).toUpperCase()}-${randSuffix}`,
       userId: newUser.id,
       roleId: role.id,
       studyId: context.studyId,
@@ -513,8 +519,22 @@ export class MockTeamRepository implements ITeamRepository {
     };
 
     this.userRoles.push(newAssignment);
-    this.onSaveUsers?.(this.users);
-    this.onSaveUserRoles?.(this.userRoles);
+
+    // Save temporary password (default "128")
+    const tempPassword = input.password?.trim() || '128';
+    mockDataStore.setUserPassword(newUser.email, tempPassword);
+
+    if (this.onSaveUsers) {
+      this.onSaveUsers(this.users);
+    } else {
+      mockDataStore.addMockUser(newUser);
+    }
+
+    if (this.onSaveUserRoles) {
+      this.onSaveUserRoles(this.userRoles);
+    } else {
+      mockDataStore.addMockUserRole(newAssignment);
+    }
 
     return {
       user: structuredClone(newUser),
@@ -534,7 +554,13 @@ export class MockTeamRepository implements ITeamRepository {
     if (!user) throw new Error(`User "${userId}" not found.`);
     user.status = status;
     user.updatedAt = new Date().toISOString();
-    this.onSaveUsers?.(this.users);
+
+    if (this.onSaveUsers) {
+      this.onSaveUsers(this.users);
+    } else {
+      mockDataStore.setUserStatus(userId, status);
+    }
+
     return structuredClone(user);
   }
 }

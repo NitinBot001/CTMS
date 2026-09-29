@@ -78,6 +78,7 @@ export const BOOTSTRAP_PI_USER: User = {
 };
 
 export const BOOTSTRAP_PI_PASSWORD = 'PI@Empty123';
+export const DEFAULT_TEMPORARY_PASSWORD = '128';
 
 export const BOOTSTRAP_PI_USER_ROLE: UserRole = {
   id: 'UR-EMPTY-001',

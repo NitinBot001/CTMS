@@ -158,10 +158,34 @@ export class TeamService {
     if (!context.studyId || !context.siteId) {
       throw new Error('Study and site context are required to create a team member.');
     }
+    if (!input.displayName || !input.displayName.trim()) {
+      throw new Error('Full Name is required.');
+    }
+    if (!input.email || !input.email.trim()) {
+      throw new Error('Email is required.');
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(input.email.trim())) {
+      throw new Error('A valid email address is required.');
+    }
+    if (!input.roleId || !input.roleId.trim()) {
+      throw new Error('Role is required.');
+    }
+
     if (!this.repo.createTeamMember) {
       throw new Error('Team member creation not supported by current repository.');
     }
-    return this.repo.createTeamMember(context, input);
+
+    const payload: CreateTeamMemberInput = {
+      ...input,
+      displayName: input.displayName.trim(),
+      email: input.email.trim().toLowerCase(),
+      studyId: context.studyId,
+      siteId: context.siteId,
+      password: input.password?.trim() || '128',
+    };
+
+    return this.repo.createTeamMember(context, payload);
   }
 
   async toggleUserStatus(

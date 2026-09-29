@@ -124,6 +124,11 @@ export const TeamMemberTable: React.FC<TeamMemberTableProps> = ({ members }) => 
                   {/* Status */}
                   <td className="py-3 px-3">
                     <UserStatusBadge status={m.user.status} size="xs" />
+                    {m.user.mustChangePassword && (
+                      <span className="block mt-1 text-[10px] font-mono text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded w-max">
+                        Password Reset Required
+                      </span>
+                    )}
                   </td>
 
                   {/* Actions */}
