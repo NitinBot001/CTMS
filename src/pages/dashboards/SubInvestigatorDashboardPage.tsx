@@ -6,7 +6,8 @@ import { taskService } from '../../services/taskService';
 import { visitService } from '../../services/visitService';
 import { safetyService } from '../../services/safetyService';
 import { complianceService } from '../../services/complianceService';
-import { Task, ParticipantVisit, SafetyEvent, ProtocolDeviation } from '../../types';
+import { visitDataService } from '../../services/visitDataService';
+import { Task, ParticipantVisit, SafetyEvent, ProtocolDeviation, VisitDataRecord } from '../../types';
 import {
   Stethoscope,
   ShieldAlert,
@@ -17,6 +18,8 @@ import {
   Clock,
   ArrowRight,
   UserCheck,
+  ShieldCheck,
+  Paperclip,
 } from 'lucide-react';
 
 export const SubInvestigatorDashboardPage: React.FC = () => {
@@ -27,6 +30,7 @@ export const SubInvestigatorDashboardPage: React.FC = () => {
   const [upcomingVisits, setUpcomingVisits] = useState<ParticipantVisit[]>([]);
   const [safetyEvents, setSafetyEvents] = useState<SafetyEvent[]>([]);
   const [deviations, setDeviations] = useState<ProtocolDeviation[]>([]);
+  const [verificationRecords, setVerificationRecords] = useState<VisitDataRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -34,12 +38,14 @@ export const SubInvestigatorDashboardPage: React.FC = () => {
     setIsLoading(true);
     try {
       const context = { studyId: activeStudyId, siteId: activeSiteId };
-      const [fetchedTasks, fetchedVisits, fetchedSafety, fetchedDeviations] = await Promise.all([
-        taskService.getTasks(context),
-        visitService.getVisits(context),
-        safetyService.getSafetyEvents(context),
-        complianceService.getDeviations(context),
-      ]);
+      const [fetchedTasks, fetchedVisits, fetchedSafety, fetchedDeviations, fetchedVerifications] =
+        await Promise.all([
+          taskService.getTasks(context),
+          visitService.getVisits(context),
+          safetyService.getSafetyEvents(context),
+          complianceService.getDeviations(context),
+          visitDataService.getVerificationQueue(context),
+        ]);
 
       setTasks(
         fetchedTasks.filter(
@@ -62,6 +68,7 @@ export const SubInvestigatorDashboardPage: React.FC = () => {
       setDeviations(
         fetchedDeviations.filter((d) => d.status === 'REPORTED' || d.status === 'UNDER_REVIEW')
       );
+      setVerificationRecords(fetchedVerifications);
     } catch (err) {
       console.error('Failed to load Sub-Investigator dashboard data', err);
     } finally {
@@ -107,7 +114,16 @@ export const SubInvestigatorDashboardPage: React.FC = () => {
       </div>
 
       {/* Summary KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-sm border border-amber-200 shadow-xs bg-amber-50/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-amber-800 uppercase tracking-wider">Data Verifications</span>
+            <ShieldCheck className="w-4 h-4 text-amber-700" />
+          </div>
+          <p className="text-2xl font-bold font-serif text-stone-900 mt-2">{verificationRecords.length}</p>
+          <span className="text-[11px] text-amber-800">Pending source audit</span>
+        </div>
+
         <div className="bg-white p-4 rounded-sm border border-stone-200 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">My Delegated Tasks</span>
@@ -147,8 +163,77 @@ export const SubInvestigatorDashboardPage: React.FC = () => {
 
       {/* Main Grid: Clinical Oversight Focus */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (8 cols): Tasks & Safety Oversight */}
+        {/* Left Column (8 cols): Verification Queue & Tasks */}
         <div className="lg:col-span-8 space-y-6">
+          {/* Clinical Data Verification Queue */}
+          <div className="bg-white border border-stone-200 rounded-sm shadow-xs p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-serif text-base font-bold text-stone-900 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#7A2A12]" />
+                  Clinical Data Verification Queue
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Primary Sub-Investigator audit gate: Verify raw visit entries against source CRF documents
+                </p>
+              </div>
+              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-xs bg-amber-50 text-amber-800 border border-amber-200">
+                {verificationRecords.length} Awaiting Audit
+              </span>
+            </div>
+
+            {isLoading ? (
+              <p className="text-xs text-stone-500 py-4 text-center">Loading verification queue...</p>
+            ) : verificationRecords.length === 0 ? (
+              <div className="py-6 text-center text-xs text-stone-500 bg-stone-50 rounded-sm border border-stone-100">
+                No visit records currently awaiting Sub-Investigator verification.
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {verificationRecords.map((rec) => (
+                  <div key={rec.id} className="py-3 flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-xs font-semibold text-[#7A2A12]">
+                          {rec.id}
+                        </span>
+                        <span className="text-xs font-semibold text-stone-900">
+                          {rec.participantCode} ({rec.participantInitials})
+                        </span>
+                        <span className="text-stone-300">•</span>
+                        <span className="text-xs font-medium text-stone-800 truncate">
+                          {rec.visitName}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-0.5">
+                        Visit Date: {rec.visitDate} · Entered By: <strong className="text-stone-700">{rec.enteredByName}</strong>
+                      </p>
+                      <div className="flex items-center space-x-3 mt-1 text-[11px] text-stone-500">
+                        <span className="inline-flex items-center gap-1 font-mono">
+                          <Paperclip className="w-3 h-3 text-stone-400" />
+                          {rec.attachments.length} Source Document{rec.attachments.length !== 1 ? 's' : ''}
+                        </span>
+                        <span>
+                          Status:{' '}
+                          <strong className="text-amber-800">
+                            {rec.status === 'RESUBMITTED_FOR_VERIFICATION' ? 'Resubmitted' : 'Awaiting Audit'}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <Link
+                      to={`/sub-investigator/verification/${rec.id}`}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#7A2A12] hover:bg-[#5A1E0D] rounded-sm transition-colors shrink-0 shadow-xs"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Audit & Verify</span>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Delegated Tasks Card */}
           <div className="bg-white border border-stone-200 rounded-sm shadow-xs p-5">
             <div className="flex items-center justify-between mb-4">

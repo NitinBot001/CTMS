@@ -161,6 +161,7 @@ export class TeamService {
       'DOCUMENTS',
       'TASKS',
       'REPORTS',
+      'DATA_ENTRY',
     ];
 
     const grouped = {} as Record<PermissionModule, Permission[]>;

@@ -59,6 +59,14 @@ import {
   AuthResult,
   DemoCredential,
   User,
+  VisitDataRecord,
+  VisitDataField,
+  VisitAttachment,
+  ReviewNote,
+  ReviewNoteType,
+  VerificationAction,
+  VisitDataFilters,
+  DataEntrySummaryMetrics,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -350,6 +358,139 @@ export interface IAuthRepository {
   getRoleById(roleId: string): Promise<Role | null>;
   getEffectivePermissions(userId: string, studyId: string, siteId: string): Promise<Permission[]>;
   getDemoCredentials(): DemoCredential[];
+}
+
+export interface WorkflowActor {
+  userId: string;
+  name: string;
+  roleId: string;
+  roleName: string;
+}
+
+export interface CreateDraftRecordInput {
+  participantId: string;
+  participantCode: string;
+  participantInitials: string;
+  visitId: string;
+  visitCode: string;
+  visitName: string;
+  visitDate: string;
+  fields?: Partial<VisitDataField>[];
+}
+
+export interface IVisitDataRepository {
+  getRecord(
+    context: ParticipantQueryContext,
+    recordId: string
+  ): Promise<VisitDataRecord | null>;
+
+  listRecords(
+    context: ParticipantQueryContext,
+    filters?: VisitDataFilters
+  ): Promise<VisitDataRecord[]>;
+
+  getDataEntryQueue(
+    context: ParticipantQueryContext
+  ): Promise<VisitDataRecord[]>;
+
+  getVerificationQueue(
+    context: ParticipantQueryContext
+  ): Promise<VisitDataRecord[]>;
+
+  createDraft(
+    context: ParticipantQueryContext,
+    record: CreateDraftRecordInput,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  updateField(
+    context: ParticipantQueryContext,
+    recordId: string,
+    field: Partial<VisitDataField> & { fieldKey: string; label: string; value: string },
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  updateRecordFields(
+    context: ParticipantQueryContext,
+    recordId: string,
+    fields: Partial<VisitDataField>[],
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  uploadAttachment(
+    context: ParticipantQueryContext,
+    recordId: string,
+    attachment: Omit<VisitAttachment, 'id' | 'recordId' | 'uploadedAt'>,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  removeAttachment(
+    context: ParticipantQueryContext,
+    recordId: string,
+    attachmentId: string,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  submitForVerification(
+    context: ParticipantQueryContext,
+    recordId: string,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  returnForCorrection(
+    context: ParticipantQueryContext,
+    recordId: string,
+    reason: string,
+    affectedFields: string[] | undefined,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  resubmitForVerification(
+    context: ParticipantQueryContext,
+    recordId: string,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  verifyRecord(
+    context: ParticipantQueryContext,
+    recordId: string,
+    comment: string | undefined,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  moveToPiReview(
+    context: ParticipantQueryContext,
+    recordId: string,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  submitToCro(
+    context: ParticipantQueryContext,
+    recordId: string,
+    comment: string | undefined,
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  addReviewNote(
+    context: ParticipantQueryContext,
+    recordId: string,
+    note: { type: ReviewNoteType; message: string },
+    actor: WorkflowActor
+  ): Promise<VisitDataRecord>;
+
+  getReviewHistory(
+    context: ParticipantQueryContext,
+    recordId: string
+  ): Promise<ReviewNote[]>;
+
+  getVerificationHistory(
+    context: ParticipantQueryContext,
+    recordId: string
+  ): Promise<VerificationAction[]>;
+
+  getSummaryMetrics(
+    context: ParticipantQueryContext
+  ): Promise<DataEntrySummaryMetrics>;
 }
 
 

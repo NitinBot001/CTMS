@@ -60,6 +60,11 @@ const MODULE_DISPLAY_CONFIG: Record<
     description: 'Recruitment velocity, visit compliance reports, and audit data export',
     badgeColor: 'bg-cyan-50 text-cyan-900 border-cyan-200',
   },
+  DATA_ENTRY: {
+    label: 'Visit Data Entry & Verification',
+    description: 'Clinical transcription, source doc verification, correction loops, and CRO release',
+    badgeColor: 'bg-orange-50 text-orange-900 border-orange-200',
+  },
 };
 
 export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({

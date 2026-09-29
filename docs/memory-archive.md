@@ -23,3 +23,14 @@ This archive contains older task log entries rotated from `memory.md` / `MEMORY.
 - **Verified by:** `npm run typecheck` (0 errors), `npm test` (5/5 unit tests passed), `npm run build` (production assets generated), `curl` HTTP 200 checks on Dev and Preview servers, secret scan (0 secrets).
 - **Dead ends:** Initial `--experimental-strip-types` test runner hit Node ESM relative import resolution; resolved cleanly with Vite SSR test bundle runner (`npm test`).
 - **Follow-ups:** Await Segment B instructions (Participant Management).
+
+---
+
+### 2026-09-29 · T-002 · Phase 1 — Segment B: Participant Management
+- **What:** Implemented the Participant Management module: domain models, `IParticipantRepository` & `MockParticipantRepository`, `participantService`, `ParticipantManagementPage` (`/pi/patients`) with search/filters/summary strip/desktop table/mobile cards/edge states, and `ParticipantDetailPage` (`/pi/patients/:participantId`) with identity, milestones, activities, safety logs, and invalid ID handling.
+- **Why:** Provide the operational participant directory and subject-level oversight for Principal Investigators per Phase 1 Segment B requirements.
+- **How:** Created ParticipantStatusBadge, ParticipantSummaryCards, ParticipantFiltersBar, ParticipantTable, ParticipantMobileCard, ParticipantManagementPage, ParticipantDetailPage, mockParticipantRepository, participantService; updated routes, mockData, and expanded services.test.ts to 10 test suites.
+- **Result:** Fully functional participant directory and detail views with strict study/site scoping, composite search & filters, derived summary metrics, and responsive desktop/mobile layouts.
+- **Verified by:** `npm run typecheck` (0 errors), `npm test` (10/10 automated tests passed), `npm run build` (production assets generated), `npm run verify` (exit code 0), `curl` HTTP 200 checks on `/pi/patients` and `/pi/patients/PT-1023` on Dev and Preview servers, raw mock import scan (0 raw imports in UI), secret scan (0 secrets).
+- **Dead ends:** none.
+- **Follow-ups:** Await Segment C instructions (Visits & Clinical Activities).

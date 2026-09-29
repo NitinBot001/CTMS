@@ -38,6 +38,11 @@ import {
   getDefaultActionRoute,
   formatRelativeTime,
 } from '../utils/notificationCalculations';
+import { visitDataService } from '../services/visitDataService';
+import { mockVisitDataRepository } from '../repositories/mockVisitDataRepository';
+import {
+  isValidTransition as isValidVisitDataTransition,
+} from '../utils/visitDataCalculations';
 import { authService } from '../services/authService';
 import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
 import { getRoleLandingRoute, getRoleNavigationItems } from '../config/navigationConfig';
@@ -909,22 +914,23 @@ async function runTests() {
   // Test 55: Permission catalog retrieval and grouping
   console.log('Test 55: Permission retrieval and grouping');
   const permissions = await teamService.getPermissions();
-  assertStrictEqual(permissions.length, 24, 'Permission catalog must contain exactly 24 permissions');
+  assertStrictEqual(permissions.length, 31, 'Permission catalog must contain exactly 31 permissions');
   const groupedPerms = teamService.groupPermissionsByModule(permissions);
   const modules = Object.keys(groupedPerms);
-  assertStrictEqual(modules.length, 9, 'Permissions must be grouped across 9 modules');
+  assertStrictEqual(modules.length, 10, 'Permissions must be grouped across 10 modules');
   assert(Boolean(groupedPerms['STUDY']), 'STUDY module must exist');
   assert(Boolean(groupedPerms['PARTICIPANTS']), 'PARTICIPANTS module must exist');
   assert(Boolean(groupedPerms['SAFETY']), 'SAFETY module must exist');
   assert(Boolean(groupedPerms['COMPLIANCE']), 'COMPLIANCE module must exist');
+  assert(Boolean(groupedPerms['DATA_ENTRY']), 'DATA_ENTRY module must exist');
   console.log('✓ Test 55 passed: Permission retrieval verified.');
 
   // Test 56: Effective permission calculation
   console.log('Test 56: Effective permission calculation');
   const piPerms = await teamService.getEffectivePermissions(ctxSite1, 'USR-101');
-  assertStrictEqual(piPerms.length, 24, 'PI must have all 24 effective permissions');
+  assertStrictEqual(piPerms.length, 31, 'PI must have all 31 effective permissions');
   const dePerms = await teamService.getEffectivePermissions(ctxSite1, 'USR-106');
-  assertStrictEqual(dePerms.length, 5, 'Data Entry Operator must have 5 effective permissions');
+  assertStrictEqual(dePerms.length, 8, 'Data Entry Operator must have 8 effective permissions');
   const permIdSet = new Set(piPerms.map((p) => p.id));
   assertStrictEqual(permIdSet.size, piPerms.length, 'Effective permissions must not contain duplicate IDs');
   console.log('✓ Test 56 passed: Effective permission calculation verified.');
@@ -2439,7 +2445,421 @@ async function runTests() {
   assertStrictEqual(allReports.length, 7, '7 report definitions intact');
   console.log('✓ Test 161 passed: Comprehensive Segments A-J regression check verified.');
 
-  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (161/161) ---');
+  console.log('\n--- STARTING TASK K: CLINICAL VISIT DATA ENTRY & SUB-I VERIFICATION TESTS ---');
+  mockVisitDataRepository.resetForTesting();
+
+  // Test 162: visitDataService.listRecords() - Scoped Retrieval
+  console.log('Test 162: visitDataService.listRecords() - Scoped Retrieval');
+  const site1Records = await visitDataService.listRecords(ctxSite1);
+  assertStrictEqual(site1Records.length, 7, 'SITE-001 must have exactly 7 seeded visit data records');
+  assert(site1Records.every((r) => r.studyId === 'STUDY-001' && r.siteId === 'SITE-001'), 'All records must match study and site');
+  console.log('✓ Test 162 passed: Visit data records retrieval and scoping verified.');
+
+  // Test 163: visitDataService.getRecord() - Detailed Retrieval
+  console.log('Test 163: visitDataService.getRecord() - Detailed Retrieval');
+  const vdr101 = await visitDataService.getRecord(ctxSite1, 'VDR-101');
+  assert(vdr101 !== null, 'VDR-101 must exist');
+  assertStrictEqual(vdr101.participantCode, 'PT-101', 'Participant code matches');
+  assertStrictEqual(vdr101.status, 'VERIFIED', 'VDR-101 is VERIFIED');
+  assert(vdr101.fields.length >= 6, 'VDR-101 has structured clinical fields');
+  assert(vdr101.attachments.length >= 2, 'VDR-101 has source attachments');
+  console.log('✓ Test 163 passed: Detailed visit data record retrieval verified.');
+
+  // Test 164: Cross-site visit data record isolation
+  console.log('Test 164: Cross-site visit data record isolation');
+  const vdr101AtSite2 = await visitDataService.getRecord(ctxSite2, 'VDR-101');
+  assertStrictEqual(vdr101AtSite2, null, 'VDR-101 from SITE-001 must not be accessible via SITE-002');
+  const site2Records = await visitDataService.listRecords(ctxSite2);
+  assertStrictEqual(site2Records.length, 1, 'SITE-002 must have exactly 1 record (VDR-201)');
+  assertStrictEqual(site2Records[0].id, 'VDR-201', 'SITE-002 record is VDR-201');
+  console.log('✓ Test 164 passed: Cross-site visit data record isolation verified.');
+
+  // Test 165: Status filtering
+  console.log('Test 165: Status filtering');
+  const draftRecords = await visitDataService.listRecords(ctxSite1, { status: 'DRAFT' });
+  assertStrictEqual(draftRecords.length, 1, 'SITE-001 should have 1 DRAFT record (VDR-105)');
+  const submittedRecords = await visitDataService.listRecords(ctxSite1, { status: 'SUBMITTED_FOR_VERIFICATION' });
+  assertStrictEqual(submittedRecords.length, 1, 'SITE-001 should have 1 SUBMITTED_FOR_VERIFICATION record (VDR-102)');
+  const returnedRecords = await visitDataService.listRecords(ctxSite1, { status: 'RETURNED_FOR_CORRECTION' });
+  assertStrictEqual(returnedRecords.length, 1, 'SITE-001 should have 1 RETURNED_FOR_CORRECTION record (VDR-103)');
+  console.log('✓ Test 165 passed: Status filtering verified.');
+
+  // Test 166: Free-text search filtering
+  console.log('Test 166: Free-text search filtering');
+  const searchRecordsByInitials = await visitDataService.listRecords(ctxSite1, { search: 'AS' });
+  assert(searchRecordsByInitials.length >= 1, 'Search for initials AS should match VDR-101');
+  const searchByVisit = await visitDataService.listRecords(ctxSite1, { search: 'SCR-01' });
+  assert(searchByVisit.length >= 1, 'Search for SCR-01 should match');
+  const searchByOperator = await visitDataService.listRecords(ctxSite1, { search: 'Deshmukh' });
+  assert(searchByOperator.length >= 1, 'Search by operator name should match');
+  console.log('✓ Test 166 passed: Free-text search filtering verified.');
+
+  // Test 167: Attachment presence filtering
+  console.log('Test 167: Attachment presence filtering');
+  const withAttachments = await visitDataService.listRecords(ctxSite1, { hasAttachments: true });
+  const withoutAttachments = await visitDataService.listRecords(ctxSite1, { hasAttachments: false });
+  assert(withAttachments.length > 0, 'Should find records with attachments');
+  assert(withoutAttachments.some((r) => r.id === 'VDR-105'), 'VDR-105 has zero attachments');
+  assertStrictEqual(withAttachments.length + withoutAttachments.length, 7, 'Sum equals total records');
+  console.log('✓ Test 167 passed: Attachment presence filtering verified.');
+
+  // Test 168: getDataEntryQueue()
+  console.log('Test 168: visitDataService.getDataEntryQueue()');
+  const entryQueue = await visitDataService.getDataEntryQueue(ctxSite1);
+  assertStrictEqual(entryQueue.length, 2, 'Data entry queue must have 2 records (1 DRAFT + 1 RETURNED)');
+  assert(entryQueue.every((r) => r.status === 'DRAFT' || r.status === 'RETURNED_FOR_CORRECTION'), 'Queue only contains DRAFT or RETURNED');
+  console.log('✓ Test 168 passed: Data entry work queue verified.');
+
+  // Test 169: getVerificationQueue()
+  console.log('Test 169: visitDataService.getVerificationQueue()');
+  const verifQueue = await visitDataService.getVerificationQueue(ctxSite1);
+  assertStrictEqual(verifQueue.length, 2, 'Verification queue must have 2 records (1 SUBMITTED + 1 RESUBMITTED)');
+  assert(verifQueue.every((r) => r.status === 'SUBMITTED_FOR_VERIFICATION' || r.status === 'RESUBMITTED_FOR_VERIFICATION'), 'Queue only contains submitted or resubmitted');
+  console.log('✓ Test 169 passed: Sub-Investigator verification queue verified.');
+
+  // Test 170: getSummaryMetrics()
+  console.log('Test 170: visitDataService.getSummaryMetrics()');
+  const metrics = await visitDataService.getSummaryMetrics(ctxSite1);
+  assertStrictEqual(metrics.totalRecords, 7, 'Total records 7');
+  assertStrictEqual(metrics.pendingDataEntry, 2, 'Pending data entry 2');
+  assertStrictEqual(metrics.pendingVerification, 2, 'Pending verification 2');
+  assertStrictEqual(metrics.returnedForCorrection, 1, 'Returned for correction 1');
+  assertStrictEqual(metrics.documentsPending, 1, 'Documents pending 1 (VDR-105)');
+  assertStrictEqual(metrics.verified, 3, 'Verified or CRO 3 (VDR-101, VDR-106, VDR-107)');
+  console.log('✓ Test 170 passed: Data entry summary metrics verified.');
+
+  // Test 171: createDraft()
+  console.log('Test 171: visitDataService.createDraft()');
+  const deActor = {
+    userId: 'USR-106',
+    name: 'Manoj Deshmukh',
+    roleId: 'ROLE_DATA_ENTRY',
+    roleName: 'Data Entry Operator',
+  };
+  const newDraft = await visitDataService.createDraft(
+    ctxSite1,
+    {
+      participantId: 'PT-103',
+      participantCode: 'PT-103',
+      participantInitials: 'R.V.',
+      visitId: 'VIS-103-01',
+      visitCode: 'SCR-01',
+      visitName: 'Screening Evaluation',
+      visitDate: '2026-09-29',
+    },
+    deActor
+  );
+  assert(newDraft.id.startsWith('VDR-'), 'Draft ID generated');
+  assertStrictEqual(newDraft.status, 'DRAFT', 'Initial status is DRAFT');
+  assertStrictEqual(newDraft.enteredByUserId, 'USR-106', 'Entered by USR-106');
+  assert(newDraft.fields.length >= 6, 'Initial default fields created');
+  assertStrictEqual(newDraft.history.length, 1, 'History has CREATED action');
+  assertStrictEqual(newDraft.history[0].action, 'CREATED', 'First action is CREATED');
+  console.log('✓ Test 171 passed: Draft creation and field scaffolding verified.');
+
+  // Test 172: updateField()
+  console.log('Test 172: visitDataService.updateField()');
+  const updatedWithBP = await visitDataService.updateField(
+    ctxSite1,
+    newDraft.id,
+    {
+      fieldKey: 'bloodPressure',
+      label: 'Blood Pressure',
+      value: '118/76',
+      unit: 'mmHg',
+    },
+    deActor
+  );
+  const bpField = updatedWithBP.fields.find((f) => f.fieldKey === 'bloodPressure');
+  assertStrictEqual(bpField?.value, '118/76', 'BP field updated to 118/76');
+  console.log('✓ Test 172 passed: Single field update verified.');
+
+  // Test 173: updateRecordFields()
+  console.log('Test 173: visitDataService.updateRecordFields() batch update');
+  const batchUpdated = await visitDataService.updateRecordFields(
+    ctxSite1,
+    newDraft.id,
+    [
+      { fieldKey: 'pulse', value: '72' },
+      { fieldKey: 'temperature', value: '98.6' },
+      { fieldKey: 'respiratoryRate', value: '16' },
+    ],
+    deActor
+  );
+  assertStrictEqual(batchUpdated.fields.find((f) => f.fieldKey === 'pulse')?.value, '72', 'Pulse updated');
+  assertStrictEqual(batchUpdated.fields.find((f) => f.fieldKey === 'temperature')?.value, '98.6', 'Temp updated');
+  console.log('✓ Test 173 passed: Batch field update verified.');
+
+  // Test 174: Editing locked record rejection
+  console.log('Test 174: Editing locked record rejection');
+  let editLockedFailed = false;
+  try {
+    await visitDataService.updateField(
+      ctxSite1,
+      'VDR-101', // VERIFIED record
+      { fieldKey: 'pulse', label: 'Pulse', value: '80' },
+      deActor
+    );
+  } catch (err: any) {
+    editLockedFailed = true;
+    assert(err.message.includes('locked for editing'), 'Error indicates locked record');
+  }
+  assert(editLockedFailed, 'Editing a VERIFIED record must throw an error');
+  console.log('✓ Test 174 passed: Immutability of verified records verified.');
+
+  // Test 175: uploadAttachment()
+  console.log('Test 175: visitDataService.uploadAttachment()');
+  const withAttachment = await visitDataService.uploadAttachment(
+    ctxSite1,
+    newDraft.id,
+    {
+      fileName: 'PT-103_Vitals_CRF.pdf',
+      mimeType: 'application/pdf',
+      size: 450000,
+      storageReference: '/mock-source-docs/PT-103-Vitals.pdf',
+      uploadedByUserId: deActor.userId,
+      uploadedByName: deActor.name,
+      documentType: 'Source CRF Worksheet',
+    },
+    deActor
+  );
+  assertStrictEqual(withAttachment.attachments.length, 1, 'Attachment added');
+  assertStrictEqual(withAttachment.attachments[0].fileName, 'PT-103_Vitals_CRF.pdf', 'File name matches');
+  const lastAction = withAttachment.history[withAttachment.history.length - 1];
+  assertStrictEqual(lastAction.action, 'ATTACHMENT_ADDED', 'History logs ATTACHMENT_ADDED');
+  console.log('✓ Test 175 passed: Source document attachment verified.');
+
+  // Test 176: removeAttachment()
+  console.log('Test 176: visitDataService.removeAttachment()');
+  const attachmentId = withAttachment.attachments[0].id;
+  const removedDoc = await visitDataService.removeAttachment(
+    ctxSite1,
+    newDraft.id,
+    attachmentId,
+    deActor
+  );
+  assertStrictEqual(removedDoc.attachments.length, 0, 'Attachment removed');
+  console.log('✓ Test 176 passed: Attachment removal verified.');
+
+  // Re-attach for submission workflow test
+  await visitDataService.uploadAttachment(
+    ctxSite1,
+    newDraft.id,
+    {
+      fileName: 'PT-103_CRF_Valid.pdf',
+      mimeType: 'application/pdf',
+      size: 320000,
+      storageReference: '/mock-source-docs/PT-103_CRF_Valid.pdf',
+      uploadedByUserId: deActor.userId,
+      uploadedByName: deActor.name,
+      documentType: 'Source CRF Worksheet',
+    },
+    deActor
+  );
+
+  // Test 177: Attaching to locked record rejection
+  console.log('Test 177: Attaching to locked record rejection');
+  let attachLockedFailed = false;
+  try {
+    await visitDataService.uploadAttachment(
+      ctxSite1,
+      'VDR-101', // VERIFIED record
+      {
+        fileName: 'Illegal.pdf',
+        mimeType: 'application/pdf',
+        size: 1000,
+        storageReference: '/mock/illegal.pdf',
+        uploadedByUserId: deActor.userId,
+        uploadedByName: deActor.name,
+      },
+      deActor
+    );
+  } catch (err: any) {
+    attachLockedFailed = true;
+    assert(err.message.includes('status: VERIFIED'), 'Error indicates invalid status for upload');
+  }
+  assert(attachLockedFailed, 'Uploading attachment to VERIFIED record must fail');
+  console.log('✓ Test 177 passed: Document upload lock on non-editable records verified.');
+
+  // Test 178: submitForVerification()
+  console.log('Test 178: visitDataService.submitForVerification()');
+  const submitted = await visitDataService.submitForVerification(ctxSite1, newDraft.id, deActor);
+  assertStrictEqual(submitted.status, 'SUBMITTED_FOR_VERIFICATION', 'Status is SUBMITTED_FOR_VERIFICATION');
+  assert(Boolean(submitted.submittedAt), 'submittedAt timestamp populated');
+  const submitAction = submitted.history[submitted.history.length - 1];
+  assertStrictEqual(submitAction.action, 'SUBMITTED_FOR_VERIFICATION', 'History records submission');
+  console.log('✓ Test 178 passed: Submission for Sub-I verification verified.');
+
+  // Test 179: Illegal direct state jump rejection
+  console.log('Test 179: Illegal direct state jump rejection');
+  assertStrictEqual(isValidVisitDataTransition('DRAFT', 'VERIFIED'), false, 'DRAFT -> VERIFIED is strictly illegal');
+  assertStrictEqual(isValidVisitDataTransition('SUBMITTED_TO_CRO', 'DRAFT'), false, 'SUBMITTED_TO_CRO is terminal');
+  console.log('✓ Test 179 passed: Illegal transition rules verified.');
+
+  // Test 180: returnForCorrection() mandatory reason enforcement
+  console.log('Test 180: returnForCorrection() mandatory reason enforcement');
+  const subIActor = {
+    userId: 'USR-102',
+    name: 'Dr. Rajesh Kulkarni',
+    roleId: 'ROLE_SUB_I',
+    roleName: 'Sub-Investigator',
+  };
+  let emptyReasonFailed = false;
+  try {
+    await visitDataService.returnForCorrection(ctxSite1, submitted.id, '   ', ['bloodPressure'], subIActor);
+  } catch (err: any) {
+    emptyReasonFailed = true;
+    assert(err.message.includes('mandatory'), 'Error mentions mandatory reason');
+  }
+  assert(emptyReasonFailed, 'Empty reason must be rejected when returning for correction');
+  console.log('✓ Test 180 passed: Mandatory return reason enforcement verified.');
+
+  // Test 181: returnForCorrection() flags affected fields
+  console.log('Test 181: returnForCorrection() status and field flagging');
+  const returnReason = 'Blood pressure 118/76 contradicts attached source CRF worksheet which records 132/84.';
+  const returned = await visitDataService.returnForCorrection(
+    ctxSite1,
+    submitted.id,
+    returnReason,
+    ['bloodPressure'],
+    subIActor
+  );
+  assertStrictEqual(returned.status, 'RETURNED_FOR_CORRECTION', 'Status is RETURNED_FOR_CORRECTION');
+  assertStrictEqual(returned.returnReason, returnReason, 'Return reason saved');
+  assertStrictEqual(returned.returnedBy, subIActor.name, 'Returned by recorded');
+  const flaggedBp = returned.fields.find((f) => f.fieldKey === 'bloodPressure');
+  assertStrictEqual(flaggedBp?.flaggedForCorrection, true, 'BP field flagged for correction');
+  assertStrictEqual(flaggedBp?.flagReason, returnReason, 'BP flagReason populated');
+  console.log('✓ Test 181 passed: Record return and field-level flagging verified.');
+
+  // Test 182: resubmitForVerification() clears field flags
+  console.log('Test 182: resubmitForVerification() correction loop');
+  await visitDataService.updateField(
+    ctxSite1,
+    returned.id,
+    { fieldKey: 'bloodPressure', label: 'Blood Pressure', value: '132/84' },
+    deActor
+  );
+  const resubmitted = await visitDataService.resubmitForVerification(ctxSite1, returned.id, deActor);
+  assertStrictEqual(resubmitted.status, 'RESUBMITTED_FOR_VERIFICATION', 'Status is RESUBMITTED_FOR_VERIFICATION');
+  assert(Boolean(resubmitted.resubmittedAt), 'resubmittedAt populated');
+  const resubmittedBp = resubmitted.fields.find((f) => f.fieldKey === 'bloodPressure');
+  assertStrictEqual(resubmittedBp?.flaggedForCorrection, false, 'BP flag cleared on resubmission');
+  console.log('✓ Test 182 passed: Correction loop and flag clearing verified.');
+
+  // Test 183: Self-verification defense check
+  console.log('Test 183: Self-verification defense check');
+  let selfVerifyFailed = false;
+  try {
+    await visitDataService.verifyRecord(
+      ctxSite1,
+      resubmitted.id,
+      'Attempting illegal self-verification',
+      deActor
+    );
+  } catch (err: any) {
+    selfVerifyFailed = true;
+    assert(err.message.includes('Self-verification is strictly prohibited'), 'Error mentions self-verification prohibition');
+  }
+  assert(selfVerifyFailed, 'Self-verification by the data entry operator must be blocked');
+  console.log('✓ Test 183 passed: Self-verification defense check verified.');
+
+  // Test 184: Authorized Sub-Investigator verification
+  console.log('Test 184: Authorized Sub-Investigator verification');
+  const verified = await visitDataService.verifyRecord(
+    ctxSite1,
+    resubmitted.id,
+    'Verified against source CRF Page 1. BP corrected to 132/84.',
+    subIActor
+  );
+  assertStrictEqual(verified.status, 'VERIFIED', 'Status is VERIFIED');
+  assertStrictEqual(verified.verifiedByUserId, 'USR-102', 'Verified by Sub-I USR-102');
+  assert(Boolean(verified.verifiedAt), 'verifiedAt populated');
+  const verifyAction = verified.history[verified.history.length - 1];
+  assertStrictEqual(verifyAction.action, 'VERIFIED', 'History records VERIFIED');
+  console.log('✓ Test 184 passed: Sub-Investigator clinical verification verified.');
+
+  // Test 185: moveToPiReview()
+  console.log('Test 185: visitDataService.moveToPiReview()');
+  const piActor = {
+    userId: 'USR-101',
+    name: 'Dr. Anand Verma',
+    roleId: 'ROLE_PI',
+    roleName: 'Principal Investigator',
+  };
+  const piReviewed = await visitDataService.moveToPiReview(ctxSite1, verified.id, piActor);
+  assertStrictEqual(piReviewed.status, 'PI_REVIEW', 'Status advanced to PI_REVIEW');
+  assert(Boolean(piReviewed.piReviewedAt), 'piReviewedAt timestamp populated');
+  console.log('✓ Test 185 passed: Advance to PI review verified.');
+
+  // Test 186: submitToCro()
+  console.log('Test 186: visitDataService.submitToCro() release');
+  const croSubmitted = await visitDataService.submitToCro(
+    ctxSite1,
+    piReviewed.id,
+    'Site verification complete. Released to sponsor DM.',
+    piActor
+  );
+  assertStrictEqual(croSubmitted.status, 'SUBMITTED_TO_CRO', 'Status is SUBMITTED_TO_CRO');
+  assert(Boolean(croSubmitted.croBatchReference), 'croBatchReference generated');
+  assert(Boolean(croSubmitted.submittedToCroAt), 'submittedToCroAt populated');
+  console.log('✓ Test 186 passed: Release to CRO with batch reference verified.');
+
+  // Test 187: Multi-role review notes (Pharmacist/Nurse advisory)
+  console.log('Test 187: Multi-role review notes (Pharmacist advisory)');
+  const pharmActor = {
+    userId: 'USR-105',
+    name: 'Pooja Iyer',
+    roleId: 'ROLE_STUDY_PHARMACIST',
+    roleName: 'Study Pharmacist',
+  };
+  await visitDataService.addReviewNote(
+    ctxSite1,
+    'VDR-102',
+    {
+      type: 'SUGGESTION',
+      message: 'Concomitant medication log shows subject started Metformin 500mg daily. Ensure dosage matches CRF.',
+    },
+    pharmActor
+  );
+  const reviewHistory = await visitDataService.getReviewHistory(ctxSite1, 'VDR-102');
+  assert(reviewHistory.length >= 1, 'Review note appended');
+  const latestNote = reviewHistory[reviewHistory.length - 1];
+  assertStrictEqual(latestNote.authorRoleName, 'Study Pharmacist', 'Author role is Pharmacist');
+  assertStrictEqual(latestNote.type, 'SUGGESTION', 'Type is SUGGESTION');
+  console.log('✓ Test 187 passed: Multi-role advisory review notes verified.');
+
+  // Test 188: Verification audit history retrieval
+  console.log('Test 188: visitDataService.getVerificationHistory() audit trail');
+  const fullHistory = await visitDataService.getVerificationHistory(ctxSite1, croSubmitted.id);
+  assert(fullHistory.length >= 6, 'Full lifecycle audit trail preserved');
+  const actionTypes = fullHistory.map((h) => h.action);
+  assert(actionTypes.includes('CREATED'), 'History includes CREATED');
+  assert(actionTypes.includes('SUBMITTED_FOR_VERIFICATION'), 'History includes SUBMITTED');
+  assert(actionTypes.includes('RETURNED_FOR_CORRECTION'), 'History includes RETURNED');
+  assert(actionTypes.includes('RESUBMITTED_FOR_VERIFICATION'), 'History includes RESUBMITTED');
+  assert(actionTypes.includes('VERIFIED'), 'History includes VERIFIED');
+  assert(actionTypes.includes('PI_REVIEWED'), 'History includes PI_REVIEWED');
+  assert(actionTypes.includes('SUBMITTED_TO_CRO'), 'History includes SUBMITTED_TO_CRO');
+  console.log('✓ Test 188 passed: Verification audit history and GCP trail verified.');
+
+  // Test 189: Comprehensive Segments A-K regression check
+  console.log('Test 189: Comprehensive Segments A-K regression check');
+  const allNotifsFinal = await notificationService.getNotifications(ctxNtfSite1User101);
+  assert(allNotifsFinal.length >= 5, 'Notifications intact');
+  const allTasksFinal = await taskService.getTasks(ctxSite1);
+  assert(allTasksFinal.length >= 10, 'Tasks intact');
+  const allDevsFinal = await complianceService.getDeviations(ctxSite1);
+  assert(allDevsFinal.length >= 6, 'Deviations intact');
+  const allSafetyFinal = await safetyService.getSafetyEvents(ctxSite1);
+  assert(allSafetyFinal.length >= 6, 'Safety events intact');
+  const allVisitsFinal = await visitService.getVisits(ctxSite1);
+  assert(allVisitsFinal.length >= 10, 'Visits intact');
+  const allPartsFinal = await participantService.getParticipants(ctxSite1);
+  assert(allPartsFinal.length >= 8, 'Participants intact');
+  console.log('✓ Test 189 passed: Comprehensive Segments A-K regression check verified.');
+
+  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (189/189) ---');
 }
 
 runTests().catch((err) => {

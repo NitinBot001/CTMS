@@ -203,6 +203,8 @@ export function getDefaultActionRoute(
       return `/pi/patients/${sourceEntityId}`;
     case 'TEAM_MEMBER':
       return `/pi/team/${sourceEntityId}`;
+    case 'VISIT_DATA_RECORD':
+      return `/data-entry/records/${sourceEntityId}`;
     default:
       return undefined;
   }

@@ -605,7 +605,8 @@ export type PermissionModule =
   | 'TEAM'
   | 'DOCUMENTS'
   | 'TASKS'
-  | 'REPORTS';
+  | 'REPORTS'
+  | 'DATA_ENTRY';
 
 export type PermissionAction =
   | 'VIEW'
@@ -1078,7 +1079,11 @@ export type NotificationType =
   | 'DOCUMENT_EXPIRED'
   | 'VISIT_DUE'
   | 'VISIT_OVERDUE'
-  | 'TEAM_ASSIGNMENT';
+  | 'TEAM_ASSIGNMENT'
+  | 'DATA_ENTRY_SUBMITTED'
+  | 'DATA_ENTRY_RETURNED'
+  | 'DATA_ENTRY_VERIFIED'
+  | 'DATA_ENTRY_CRO_SUBMITTED';
 
 export type NotificationPriority = 'HIGH' | 'MEDIUM' | 'NORMAL';
 
@@ -1091,7 +1096,8 @@ export type NotificationSourceEntityType =
   | 'DOCUMENT'
   | 'VISIT'
   | 'PARTICIPANT'
-  | 'TEAM_MEMBER';
+  | 'TEAM_MEMBER'
+  | 'VISIT_DATA_RECORD';
 
 export interface Notification {
   id: string;
@@ -1187,6 +1193,158 @@ export interface NavigationItem {
   permission?: string; // Segment F permission identifier required to see this nav item
   badge?: string;
   badgeVariant?: 'danger' | 'warning' | 'neutral';
+}
+
+// ============================================================
+// TASK K: DATA ENTRY OPERATOR WORKFLOW & SUB-I VERIFICATION
+// ============================================================
+
+export type VisitDataStatus =
+  | 'DRAFT'
+  | 'SUBMITTED_FOR_VERIFICATION'
+  | 'RETURNED_FOR_CORRECTION'
+  | 'RESUBMITTED_FOR_VERIFICATION'
+  | 'VERIFIED'
+  | 'PI_REVIEW'
+  | 'SUBMITTED_TO_CRO';
+
+export type ReviewNoteType = 'COMMENT' | 'SUGGESTION' | 'CLINICAL_REVIEW';
+
+export interface ReviewNote {
+  id: string;
+  studyId: string;
+  siteId: string;
+  recordId: string;
+  authorUserId: string;
+  authorName: string;
+  authorRoleId: string;
+  authorRoleName: string;
+  type: ReviewNoteType;
+  message: string;
+  createdAt: string; // ISO
+  updatedAt?: string; // ISO
+}
+
+export type VerificationActionType =
+  | 'CREATED'
+  | 'UPDATED'
+  | 'SUBMITTED_FOR_VERIFICATION'
+  | 'RETURNED_FOR_CORRECTION'
+  | 'RESUBMITTED_FOR_VERIFICATION'
+  | 'VERIFIED'
+  | 'PI_REVIEWED'
+  | 'SUBMITTED_TO_CRO'
+  | 'REVIEW_NOTE_ADDED'
+  | 'ATTACHMENT_ADDED'
+  | 'ATTACHMENT_REPLACED';
+
+export interface VerificationAction {
+  id: string;
+  recordId: string;
+  actorUserId: string;
+  actorName: string;
+  actorRoleId: string;
+  actorRoleName: string;
+  action: VerificationActionType;
+  reason?: string;
+  comment?: string;
+  affectedFields?: string[];
+  createdAt: string; // ISO
+}
+
+export interface VisitAttachment {
+  id: string;
+  recordId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  storageReference: string; // object URL or simulated preview data
+  uploadedByUserId: string;
+  uploadedByName: string;
+  uploadedAt: string; // ISO
+  description?: string;
+  documentType?: string;
+  fileType?: string;
+  fileSize?: number;
+  fileUrl?: string;
+  uploadedBy?: string;
+  notes?: string;
+}
+
+export type VisitDataFieldCategory =
+  | 'VISIT_INFO'
+  | 'VITALS'
+  | 'TESTS_OBSERVATIONS'
+  | 'OBSERVATIONS'
+  | 'LAB_RESULTS'
+  | 'OTHER';
+
+export interface VisitDataField {
+  id: string;
+  recordId: string;
+  category: VisitDataFieldCategory;
+  fieldKey: string;
+  label: string;
+  value: string;
+  unit?: string;
+  sourceReference?: string;
+  sourceAttachmentId?: string;
+  flaggedForCorrection?: boolean;
+  flagReason?: string;
+  updatedAt: string; // ISO
+}
+
+export interface VisitDataRecord {
+  id: string; // e.g. 'VDR-101'
+  studyId: string;
+  siteId: string;
+  participantId: string;
+  participantCode: string;
+  participantInitials: string;
+  visitId: string;
+  visitCode: string;
+  visitName: string;
+  visitDate: string; // ISO YYYY-MM-DD
+  enteredByUserId: string;
+  enteredByName: string;
+  verifiedByUserId?: string;
+  verifiedByName?: string;
+  status: VisitDataStatus;
+  submittedAt?: string;
+  verifiedAt?: string;
+  returnedAt?: string;
+  returnedBy?: string;
+  returnReason?: string;
+  returnAffectedFields?: string[];
+  resubmittedAt?: string;
+  piReviewedAt?: string;
+  submittedToCroAt?: string;
+  croSubmittedAt?: string;
+  croBatchReference?: string;
+  fields: VisitDataField[];
+  attachments: VisitAttachment[];
+  reviewNotes: ReviewNote[];
+  history: VerificationAction[];
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+}
+
+export interface VisitDataFilters {
+  search?: string;
+  status?: VisitDataStatus | 'ALL';
+  participantId?: string;
+  visitId?: string;
+  hasAttachments?: boolean;
+}
+
+export interface DataEntrySummaryMetrics {
+  pendingDataEntry: number;
+  enteredToday: number;
+  pendingVerification: number;
+  returnedForCorrection: number;
+  documentsPending: number;
+  verified: number;
+  totalRecords: number;
 }
 
 

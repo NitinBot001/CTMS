@@ -35,6 +35,8 @@ import { CrcDashboardPage } from '../pages/dashboards/CrcDashboardPage';
 import { StudyNurseDashboardPage } from '../pages/dashboards/StudyNurseDashboardPage';
 import { StudyPharmacistDashboardPage } from '../pages/dashboards/StudyPharmacistDashboardPage';
 import { DataEntryDashboardPage } from '../pages/dashboards/DataEntryDashboardPage';
+import { DataEntryRecordPage } from '../pages/dataEntry/DataEntryRecordPage';
+import { VerificationDetailPage } from '../pages/dataEntry/VerificationDetailPage';
 
 /**
  * Root redirect handler:
@@ -105,6 +107,30 @@ export const AppRoutes: React.FC = () => {
             <AppShell pageTitle="eCRF Data Entry Station">
               <DataEntryDashboardPage />
             </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/data-entry/records/:recordId"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="DATA_ENTRY_VIEW">
+              <AppShell pageTitle="Clinical Visit Data Entry & Verification">
+                <DataEntryRecordPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/sub-investigator/verification/:recordId"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="DATA_ENTRY_VIEW">
+              <AppShell pageTitle="Clinical Data Verification & Source Audit">
+                <VerificationDetailPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
