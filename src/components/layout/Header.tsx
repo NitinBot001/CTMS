@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Bell, 
   ChevronDown, 
   Menu, 
   Building2, 
@@ -8,10 +7,11 @@ import {
   User, 
   Settings, 
   LogOut, 
-  CheckCircle2, 
-  AlertTriangle 
 } from 'lucide-react';
 import { useStudy } from '../../context/StudyContext';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { NotificationPopover } from '../notifications/NotificationPopover';
 
 interface HeaderProps {
   onToggleMobileMenu: () => void;
@@ -22,19 +22,16 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileMenu, 
   pageTitle = 'PI Operations Overview' 
 }) => {
+  const navigate = useNavigate();
   const { studies, activeStudy, activeSite, selectStudy, selectSite } = useStudy();
-  const [showNotifications, setShowNotifications] = useState(false);
+  const { currentUser, currentRole, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
@@ -43,36 +40,22 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const mockNotifications = [
-    {
-      id: 'N-1',
-      title: 'Serious Adverse Event #SAE-023 requires PI signature',
-      time: '10 min ago',
-      unread: true,
-      type: 'urgent',
-    },
-    {
-      id: 'N-2',
-      title: 'Participant P-1023 Day 30 visit completed by Nurse Pratibha',
-      time: '1 hour ago',
-      unread: true,
-      type: 'info',
-    },
-    {
-      id: 'N-3',
-      title: 'Protocol Deviation #PD-017 submitted for evaluation',
-      time: '3 hours ago',
-      unread: true,
-      type: 'warning',
-    },
-    {
-      id: 'N-4',
-      title: 'New protocol amendment v2.1 acknowledged by Ethics Committee',
-      time: 'Yesterday',
-      unread: false,
-      type: 'info',
-    },
-  ];
+  const handleLogout = async () => {
+    setShowUserMenu(false);
+    await logout();
+    navigate('/login');
+  };
+
+  const userInitials = currentUser?.name
+    ? currentUser.name
+        .replace(/^(Dr\.|Prof\.|Sister)\s+/i, '')
+        .trim()
+        .split(/\s+/)
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : 'U';
 
   return (
     <header className="sticky top-0 z-30 bg-surface border-b border-border shadow-subtle">
@@ -141,59 +124,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right: Notifications & User Profile */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Notifications Popover */}
-          <div className="relative" ref={notifRef}>
-            <button
-              type="button"
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-ink-secondary hover:text-ink hover:bg-surface-soft rounded-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              aria-label="View notifications"
-            >
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-semantic-danger rounded-full ring-2 ring-surface" />
-            </button>
-
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface border border-border rounded-sm shadow-card z-50 animate-in fade-in duration-100">
-                <div className="p-3 border-b border-border flex items-center justify-between">
-                  <span className="text-sm font-semibold text-ink font-heading">Trial Notifications</span>
-                  <span className="text-xs bg-rose-50 text-primary font-medium px-2 py-0.5 rounded-sm border border-rose-200">
-                    3 Unread
-                  </span>
-                </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-border">
-                  {mockNotifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      className={`p-3 text-xs transition-colors hover:bg-surface-soft cursor-pointer flex items-start gap-2.5 ${
-                        notif.unread ? 'bg-amber-50/30' : ''
-                      }`}
-                    >
-                      {notif.type === 'urgent' ? (
-                        <AlertTriangle className="w-4 h-4 text-semantic-danger shrink-0 mt-0.5" />
-                      ) : notif.type === 'warning' ? (
-                        <AlertTriangle className="w-4 h-4 text-semantic-warning shrink-0 mt-0.5" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium text-ink leading-tight">{notif.title}</p>
-                        <p className="text-ink-muted text-[11px] mt-1">{notif.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-2 border-t border-border bg-surface-soft text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowNotifications(false)}
-                    className="text-xs text-primary font-medium hover:underline"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <NotificationPopover
+            studyId={activeStudy?.id}
+            siteId={activeSite?.id}
+            recipientUserId={currentUser?.id || 'USR-101'}
+          />
 
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>
@@ -204,21 +139,27 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="User profile options"
             >
               <div className="w-8 h-8 rounded-sm bg-primary text-white flex items-center justify-center font-bold text-xs">
-                AS
+                {userInitials}
               </div>
               <div className="hidden xl:block leading-tight">
-                <span className="block text-xs font-semibold text-ink">Dr. Ananya Sharma</span>
-                <span className="block text-[11px] text-ink-muted">Principal Investigator</span>
+                <span className="block text-xs font-semibold text-ink truncate max-w-[140px]">
+                  {currentUser?.name || 'Dr. Ananya Sharma'}
+                </span>
+                <span className="block text-[11px] text-ink-muted truncate max-w-[140px]">
+                  {currentRole?.name || 'Principal Investigator'}
+                </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-ink-muted hidden xl:block" />
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-surface border border-border rounded-sm shadow-card z-50 py-1">
+              <div className="absolute right-0 mt-2 w-60 bg-surface border border-border rounded-sm shadow-card z-50 py-1">
                 <div className="px-4 py-2 border-b border-border">
-                  <p className="text-xs font-bold text-ink">Dr. Ananya Sharma</p>
-                  <p className="text-[11px] text-ink-muted">ananya.sharma@aiims.edu</p>
-                  <p className="text-[11px] text-secondary font-medium mt-0.5">Role: Principal Investigator</p>
+                  <p className="text-xs font-bold text-ink">{currentUser?.name || 'Dr. Ananya Sharma'}</p>
+                  <p className="text-[11px] text-ink-muted truncate">{currentUser?.email || 'ananya.sharma@aiims.edu'}</p>
+                  <p className="text-[11px] text-secondary font-medium mt-0.5">
+                    Role: {currentRole?.name || 'Principal Investigator'}
+                  </p>
                 </div>
                 <div className="py-1 text-xs">
                   <a
@@ -239,14 +180,14 @@ export const Header: React.FC<HeaderProps> = ({
                   </a>
                 </div>
                 <div className="border-t border-border pt-1">
-                  <a
-                    href="#logout"
-                    onClick={(e) => { e.preventDefault(); setShowUserMenu(false); }}
-                    className="flex items-center gap-2 px-4 py-2 text-semantic-danger hover:bg-red-50 text-xs"
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-semantic-danger hover:bg-red-50 text-xs text-left"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Sign Out (Session Lock)</span>
-                  </a>
+                  </button>
                 </div>
               </div>
             )}

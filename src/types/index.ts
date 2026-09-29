@@ -1061,6 +1061,135 @@ export interface GeneratedReport {
   totalRows: number;
 }
 
+// ============================================================
+// SEGMENT J: NOTIFICATIONS, ALERTS & ACTION CENTER
+// ============================================================
+
+export type NotificationType =
+  | 'SAFETY_REVIEW'
+  | 'SAFETY_FOLLOWUP'
+  | 'COMPLIANCE_REVIEW'
+  | 'CAPA_OVERDUE'
+  | 'TASK_ASSIGNED'
+  | 'TASK_REVIEW'
+  | 'TASK_REVISION'
+  | 'TASK_OVERDUE'
+  | 'DOCUMENT_EXPIRING'
+  | 'DOCUMENT_EXPIRED'
+  | 'VISIT_DUE'
+  | 'VISIT_OVERDUE'
+  | 'TEAM_ASSIGNMENT';
+
+export type NotificationPriority = 'HIGH' | 'MEDIUM' | 'NORMAL';
+
+export type NotificationStatus = 'UNREAD' | 'READ' | 'DISMISSED';
+
+export type NotificationSourceEntityType =
+  | 'SAFETY_EVENT'
+  | 'PROTOCOL_DEVIATION'
+  | 'TASK'
+  | 'DOCUMENT'
+  | 'VISIT'
+  | 'PARTICIPANT'
+  | 'TEAM_MEMBER';
+
+export interface Notification {
+  id: string;
+  studyId: string;
+  siteId: string;
+  recipientUserId: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  status: NotificationStatus;
+  title: string;
+  message: string;
+  sourceEntityType?: NotificationSourceEntityType;
+  sourceEntityId?: string;
+  actionLabel?: string;
+  actionRoute?: string;
+  createdAt: string;
+  readAt?: string;
+  expiresAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface NotificationFilters {
+  search?: string;
+  type?: NotificationType;
+  priority?: NotificationPriority;
+  status?: NotificationStatus;
+  unreadOnly?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface NotificationSummaryMetrics {
+  total: number;
+  unread: number;
+  highPriority: number;
+  actionRequired: number;
+  today?: number;
+}
+
+// ============================================================
+// AUTHENTICATION & ROLE-BASED PORTAL FOUNDATION DOMAIN MODELS
+// ============================================================
+
+export interface AuthUser {
+  id: string;
+  displayName: string;
+  name?: string; // Convenience alias for displayName
+  email: string;
+  designation: string;
+  status: UserStatus;
+  organization?: string;
+  department?: string;
+  phone?: string;
+}
+
+export interface AuthSession {
+  userId: string;
+  roleId: string;
+  studyId: string;
+  siteId: string;
+  authenticated: boolean;
+  createdAt: string; // ISO string
+  expiresAt?: string; // Optional expiry timestamp
+}
+
+export interface AuthResult {
+  success: boolean;
+  session?: AuthSession;
+  user?: AuthUser;
+  role?: Role;
+  effectivePermissions?: Permission[];
+  error?: string;
+  errorMessage?: string; // Convenience alias for error
+}
+
+export interface DemoCredential {
+  email: string;
+  password: string; // Synthetic demo password only
+  label: string;
+  roleName: string;
+  userName?: string; // Convenience user name display
+  roleId: string;
+  userId: string;
+  studyId: string;
+  siteId: string;
+  description: string;
+}
+
+export interface NavigationItem {
+  name: string;
+  path: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission?: string; // Segment F permission identifier required to see this nav item
+  badge?: string;
+  badgeVariant?: 'danger' | 'warning' | 'neutral';
+}
+
+
 
 
 

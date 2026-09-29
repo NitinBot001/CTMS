@@ -1,6 +1,12 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { useAuth } from '../context/AuthContext';
+import { RequireAuth } from '../components/auth/RequireAuth';
+import { RequirePermission } from '../components/auth/RequirePermission';
+
+// Pages
+import { LoginPage } from '../pages/LoginPage';
 import { DashboardOverviewPage } from '../pages/DashboardOverviewPage';
 import { ParticipantManagementPage } from '../pages/ParticipantManagementPage';
 import { ParticipantDetailPage } from '../pages/ParticipantDetailPage';
@@ -20,21 +26,99 @@ import { DocumentManagementPage } from '../pages/DocumentManagementPage';
 import { DocumentDetailPage } from '../pages/DocumentDetailPage';
 import { ReportsDirectoryPage } from '../pages/ReportsDirectoryPage';
 import { ReportDetailPage } from '../pages/ReportDetailPage';
+import { NotificationsActionCenterPage } from '../pages/NotificationsActionCenterPage';
 import { ModulePlaceholderPage } from '../pages/ModulePlaceholderPage';
+
+// Role Dashboards
+import { SubInvestigatorDashboardPage } from '../pages/dashboards/SubInvestigatorDashboardPage';
+import { CrcDashboardPage } from '../pages/dashboards/CrcDashboardPage';
+import { StudyNurseDashboardPage } from '../pages/dashboards/StudyNurseDashboardPage';
+import { StudyPharmacistDashboardPage } from '../pages/dashboards/StudyPharmacistDashboardPage';
+import { DataEntryDashboardPage } from '../pages/dashboards/DataEntryDashboardPage';
+
+/**
+ * Root redirect handler:
+ * Directs unauthenticated users to /login, and authenticated users to their
+ * role-specific landing dashboard.
+ */
+const RootRedirect: React.FC = () => {
+  const { isAuthenticated, roleLandingRoute, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Navigate to={roleLandingRoute || '/pi/dashboard'} replace />;
+};
 
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/pi/dashboard" replace />} />
-      <Route path="/pi" element={<Navigate to="/pi/dashboard" replace />} />
+      {/* Public Authentication Route */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* Root Navigation Resolution */}
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="/pi" element={<RootRedirect />} />
+
+      {/* Role-Specific Portal Dashboards */}
+      <Route
+        path="/sub-investigator"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="Sub-Investigator Clinical Desk">
+              <SubInvestigatorDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/crc"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="Clinical Research Coordinator Desk">
+              <CrcDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/study-nurse"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="Study Nurse Clinical Station">
+              <StudyNurseDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/pharmacist"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="Investigational Product Dispensary">
+              <StudyPharmacistDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/data-entry"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="eCRF Data Entry Station">
+              <DataEntryDashboardPage />
+            </AppShell>
+          </RequireAuth>
+        }
+      />
 
       {/* PI Operations Overview (Segment A Core Target) */}
       <Route
         path="/pi/dashboard"
         element={
-          <AppShell pageTitle="PI Operations Overview">
-            <DashboardOverviewPage />
-          </AppShell>
+          <RequireAuth>
+            <AppShell pageTitle="PI Operations Overview">
+              <DashboardOverviewPage />
+            </AppShell>
+          </RequireAuth>
         }
       />
 
@@ -42,9 +126,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/patients"
         element={
-          <AppShell pageTitle="Participant Management">
-            <ParticipantManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="PARTICIPANTS_VIEW">
+              <AppShell pageTitle="Participant Management">
+                <ParticipantManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -52,9 +140,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/patients/:participantId"
         element={
-          <AppShell pageTitle="Participant Detail">
-            <ParticipantDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="PARTICIPANTS_VIEW">
+              <AppShell pageTitle="Participant Detail">
+                <ParticipantDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -62,9 +154,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/visits"
         element={
-          <AppShell pageTitle="Visits & Clinical Activities">
-            <VisitsManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="VISITS_VIEW">
+              <AppShell pageTitle="Visits & Clinical Activities">
+                <VisitsManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -72,9 +168,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/visits/:visitId"
         element={
-          <AppShell pageTitle="Visit Detail & Procedures">
-            <VisitDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="VISITS_VIEW">
+              <AppShell pageTitle="Visit Detail & Procedures">
+                <VisitDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -82,9 +182,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/safety"
         element={
-          <AppShell pageTitle="Trial Safety Vigilance">
-            <SafetyManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="SAFETY_VIEW">
+              <AppShell pageTitle="Trial Safety Vigilance">
+                <SafetyManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -92,9 +196,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/safety/:eventId"
         element={
-          <AppShell pageTitle="Safety Event Detail">
-            <SafetyEventDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="SAFETY_VIEW">
+              <AppShell pageTitle="Safety Event Detail">
+                <SafetyEventDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -102,9 +210,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/compliance"
         element={
-          <AppShell pageTitle="Protocol Compliance & Deviations">
-            <ComplianceManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="COMPLIANCE_VIEW">
+              <AppShell pageTitle="Protocol Compliance & Deviations">
+                <ComplianceManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -112,9 +224,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/compliance/:deviationId"
         element={
-          <AppShell pageTitle="Protocol Deviation Detail">
-            <ComplianceDeviationDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="COMPLIANCE_VIEW">
+              <AppShell pageTitle="Protocol Deviation Detail">
+                <ComplianceDeviationDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -122,9 +238,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/team"
         element={
-          <AppShell pageTitle="Site Team Directory">
-            <TeamManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TEAM_VIEW">
+              <AppShell pageTitle="Site Team Directory">
+                <TeamManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -132,9 +252,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/team/roles"
         element={
-          <AppShell pageTitle="Roles & Permission Catalog">
-            <RoleManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TEAM_VIEW">
+              <AppShell pageTitle="Roles & Permission Catalog">
+                <RoleManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -142,9 +266,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/team/roles/:roleId"
         element={
-          <AppShell pageTitle="Role Detail & Permissions">
-            <RoleDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TEAM_VIEW">
+              <AppShell pageTitle="Role Detail & Permissions">
+                <RoleDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -152,9 +280,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/team/:userId"
         element={
-          <AppShell pageTitle="Team Member Profile & Scoped Delegations">
-            <TeamMemberDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TEAM_VIEW">
+              <AppShell pageTitle="Team Member Profile & Scoped Delegations">
+                <TeamMemberDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -162,9 +294,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/tasks"
         element={
-          <AppShell pageTitle="Task Management & Approvals">
-            <TaskManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TASKS_VIEW">
+              <AppShell pageTitle="Task Management & Approvals">
+                <TaskManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -172,9 +308,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/tasks/:taskId"
         element={
-          <AppShell pageTitle="Task Detail & Approvals">
-            <TaskDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="TASKS_VIEW">
+              <AppShell pageTitle="Task Detail & Approvals">
+                <TaskDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -182,9 +322,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/documents"
         element={
-          <AppShell pageTitle="Study & Site Documents">
-            <DocumentManagementPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="DOCUMENTS_VIEW">
+              <AppShell pageTitle="Study & Site Documents">
+                <DocumentManagementPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -192,9 +336,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/documents/:documentId"
         element={
-          <AppShell pageTitle="Document Detail & Versions">
-            <DocumentDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="DOCUMENTS_VIEW">
+              <AppShell pageTitle="Document Detail & Versions">
+                <DocumentDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -202,9 +350,13 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/reports"
         element={
-          <AppShell pageTitle="Reports & Analytics">
-            <ReportsDirectoryPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="REPORTS_VIEW">
+              <AppShell pageTitle="Reports & Analytics">
+                <ReportsDirectoryPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
         }
       />
 
@@ -212,32 +364,50 @@ export const AppRoutes: React.FC = () => {
       <Route
         path="/pi/reports/:reportType"
         element={
-          <AppShell pageTitle="Operational Report View">
-            <ReportDetailPage />
-          </AppShell>
+          <RequireAuth>
+            <RequirePermission permission="REPORTS_VIEW">
+              <AppShell pageTitle="Operational Report View">
+                <ReportDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Notifications & Action Center (Segment J Core Target) */}
+      <Route
+        path="/pi/notifications"
+        element={
+          <RequireAuth>
+            <AppShell pageTitle="Action Center & Notifications">
+              <NotificationsActionCenterPage />
+            </AppShell>
+          </RequireAuth>
         }
       />
 
       <Route
         path="/pi/settings"
         element={
-          <AppShell pageTitle="Site Settings">
-            <ModulePlaceholderPage
-              moduleName="Site & Preferences Settings"
-              plannedSegment="Settings"
-              description="Site facility details, notification preferences, and investigator defaults."
-              capabilities={[
-                'Contact information and facility details',
-                'Notification threshold configuration',
-                'Timezone and regional formats',
-              ]}
-            />
-          </AppShell>
+          <RequireAuth>
+            <AppShell pageTitle="Site Settings">
+              <ModulePlaceholderPage
+                moduleName="Site & Preferences Settings"
+                plannedSegment="Settings"
+                description="Site facility details, notification preferences, and investigator defaults."
+                capabilities={[
+                  'Contact information and facility details',
+                  'Notification threshold configuration',
+                  'Timezone and regional formats',
+                ]}
+              />
+            </AppShell>
+          </RequireAuth>
         }
       />
 
-      {/* Fallback to Overview */}
-      <Route path="*" element={<Navigate to="/pi/dashboard" replace />} />
+      {/* Fallback to Root */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

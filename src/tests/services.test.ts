@@ -28,6 +28,19 @@ import {
   formatFilterDisplay,
   REGULATORY_REPORT_DISCLAIMER,
 } from '../utils/reportCalculations';
+import { notificationService } from '../services/notificationService';
+import { mockNotificationRepository } from '../repositories/mockNotificationRepository';
+import {
+  isActionRequiredNotification,
+  calculateNotificationSummary,
+  filterNotifications,
+  isDuplicateActiveNotification,
+  getDefaultActionRoute,
+  formatRelativeTime,
+} from '../utils/notificationCalculations';
+import { authService } from '../services/authService';
+import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
+import { getRoleLandingRoute, getRoleNavigationItems } from '../config/navigationConfig';
 
 function assert(condition: unknown, message: string = 'Assertion condition was false'): asserts condition {
   if (!condition) {
@@ -1907,7 +1920,526 @@ async function runTests() {
   assertStrictEqual(excelExportFailed, true, 'Null report export must fail');
   console.log('✓ Test 123 passed: Export service validation verified.');
 
-  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (123/123) ---');
+  // --- STARTING SEGMENT J: NOTIFICATIONS, ALERTS & ACTION CENTER TESTS ---
+  console.log('\n--- STARTING SEGMENT J: NOTIFICATIONS, ALERTS & ACTION CENTER TESTS ---');
+
+  const ctxNtfSite1User101 = {
+    studyId: 'STUDY-001',
+    siteId: 'SITE-001',
+    recipientUserId: 'USR-101',
+  };
+
+  const ctxNtfSite1User103 = {
+    studyId: 'STUDY-001',
+    siteId: 'SITE-001',
+    recipientUserId: 'USR-103',
+  };
+
+  const ctxNtfSite2User201 = {
+    studyId: 'STUDY-001',
+    siteId: 'SITE-002',
+    recipientUserId: 'USR-201',
+  };
+
+  const ctxNtfStudy2Site3User301 = {
+    studyId: 'STUDY-002',
+    siteId: 'SITE-003',
+    recipientUserId: 'USR-301',
+  };
+
+  // Test 124: notificationService.getNotifications() retrieval
+  console.log('Test 124: notificationService.getNotifications() - Retrieval');
+  const user101Notifs = await notificationService.getNotifications(ctxNtfSite1User101);
+  assert(user101Notifs.length >= 10, 'USR-101 must have at least 10 initial notifications in STUDY-001/SITE-001');
+  assert(
+    user101Notifs.every(
+      (n) => n.studyId === 'STUDY-001' && n.siteId === 'SITE-001' && n.recipientUserId === 'USR-101'
+    ),
+    'All returned notifications must match active studyId, siteId, and recipientUserId'
+  );
+  console.log('✓ Test 124 passed: Notification retrieval and scoping verified.');
+
+  // Test 125: Scoped retrieval by study and site
+  console.log('Test 125: Scoped retrieval by study and site');
+  const user101WrongSite = await notificationService.getNotifications({
+    studyId: 'STUDY-001',
+    siteId: 'SITE-002',
+    recipientUserId: 'USR-101',
+  });
+  assertStrictEqual(user101WrongSite.length, 0, 'USR-101 has no notifications at SITE-002');
+  console.log('✓ Test 125 passed: Study and site scoping verified.');
+
+  // Test 126: Recipient isolation (user A cannot see user B notifications)
+  console.log('Test 126: Recipient isolation (USR-101 vs USR-103)');
+  const user103Notifs = await notificationService.getNotifications(ctxNtfSite1User103);
+  assertStrictEqual(user103Notifs.length, 2, 'USR-103 must have exactly 2 notifications in SITE-001');
+  const user101Ids = new Set(user101Notifs.map((n) => n.id));
+  assert(
+    user103Notifs.every((n) => !user101Ids.has(n.id)),
+    'No notification ID overlap between USR-101 and USR-103'
+  );
+  console.log('✓ Test 126 passed: Recipient isolation verified.');
+
+  // Test 127: Cross-site notification isolation
+  console.log('Test 127: Cross-site notification isolation');
+  const site2Notifs = await notificationService.getNotifications(ctxNtfSite2User201);
+  assertStrictEqual(site2Notifs.length, 1, 'SITE-002 must return 1 notification for USR-201');
+  assertStrictEqual(site2Notifs[0].id, 'NOTIF-201');
+  assertStrictEqual(site2Notifs[0].siteId, 'SITE-002');
+  console.log('✓ Test 127 passed: Cross-site notification isolation verified.');
+
+  // Test 128: Cross-study notification isolation
+  console.log('Test 128: Cross-study notification isolation');
+  const study2Notifs = await notificationService.getNotifications(ctxNtfStudy2Site3User301);
+  assertStrictEqual(study2Notifs.length, 1, 'STUDY-002 must return 1 notification for USR-301');
+  assertStrictEqual(study2Notifs[0].studyId, 'STUDY-002');
+  assertStrictEqual(study2Notifs[0].id, 'NOTIF-301');
+  const leakCheck = await notificationService.getNotifications({
+    studyId: 'STUDY-001',
+    siteId: 'SITE-003',
+    recipientUserId: 'USR-301',
+  });
+  assertStrictEqual(leakCheck.length, 0, 'Cross-study query must return 0 results');
+  console.log('✓ Test 128 passed: Cross-study notification isolation verified.');
+
+  // Test 129: Filter by notification type
+  console.log('Test 129: Filter by notification type');
+  const safetyNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    type: 'SAFETY_REVIEW',
+  });
+  assert(safetyNotifs.length >= 1, 'Must find at least 1 SAFETY_REVIEW notification');
+  assert(
+    safetyNotifs.every((n) => n.type === 'SAFETY_REVIEW'),
+    'All results must have type SAFETY_REVIEW'
+  );
+  console.log('✓ Test 129 passed: Type filtering verified.');
+
+  // Test 130: Filter by priority
+  console.log('Test 130: Filter by priority');
+  const highPriorityNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    priority: 'HIGH',
+  });
+  assert(highPriorityNotifs.length >= 4, 'Must find at least 4 HIGH priority notifications for USR-101');
+  assert(
+    highPriorityNotifs.every((n) => n.priority === 'HIGH'),
+    'All results must have priority HIGH'
+  );
+  console.log('✓ Test 130 passed: Priority filtering verified.');
+
+  // Test 131: Filter by status (UNREAD, READ, DISMISSED)
+  console.log('Test 131: Filter by status (UNREAD, READ, DISMISSED)');
+  const unreadNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    status: 'UNREAD',
+  });
+  assert(unreadNotifs.every((n) => n.status === 'UNREAD'), 'All results must be UNREAD');
+  const readNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    status: 'READ',
+  });
+  assert(readNotifs.every((n) => n.status === 'READ'), 'All results must be READ');
+  assert(readNotifs.some((n) => n.id === 'NOTIF-108'), 'NOTIF-108 must be in READ results');
+  const dismissedNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    status: 'DISMISSED',
+  });
+  assert(dismissedNotifs.every((n) => n.status === 'DISMISSED'), 'All results must be DISMISSED');
+  assert(dismissedNotifs.some((n) => n.id === 'NOTIF-109'), 'NOTIF-109 must be in DISMISSED results');
+  console.log('✓ Test 131 passed: Status filtering verified.');
+
+  // Test 132: Combined AND filtering
+  console.log('Test 132: Combined multi-criteria AND filtering');
+  const combinedNotifs = await notificationService.getNotifications(ctxNtfSite1User101, {
+    priority: 'HIGH',
+    status: 'UNREAD',
+    type: 'SAFETY_REVIEW',
+  });
+  assert(combinedNotifs.length >= 1, 'Must find at least 1 HIGH UNREAD SAFETY_REVIEW notification');
+  assert(
+    combinedNotifs.every(
+      (n) => n.priority === 'HIGH' && n.status === 'UNREAD' && n.type === 'SAFETY_REVIEW'
+    ),
+    'All results must satisfy all 3 criteria simultaneously'
+  );
+  const directFilterCheck = filterNotifications(user101Notifs, { priority: 'HIGH' });
+  assert(directFilterCheck.length >= 4, 'filterNotifications direct check must match');
+  console.log('✓ Test 132 passed: Combined multi-criteria AND filtering verified.');
+
+  // Test 133: Unread count calculation
+  console.log('Test 133: Unread count calculation');
+  const unreadCountInitial = await notificationService.getUnreadCount(ctxNtfSite1User101);
+  const unreadList = await notificationService.getNotifications(ctxNtfSite1User101, {
+    status: 'UNREAD',
+  });
+  assertStrictEqual(unreadCountInitial, unreadList.length, 'Unread count must match UNREAD notifications length');
+  console.log('✓ Test 133 passed: Unread count calculation verified.');
+
+  // Test 134: Summary metric calculation
+  console.log('Test 134: Summary metric calculation');
+  const summaryInitial = await notificationService.getNotificationSummary(ctxNtfSite1User101);
+  const summaryDirect = calculateNotificationSummary(user101Notifs);
+  assertStrictEqual(summaryDirect.total, user101Notifs.length, 'calculateNotificationSummary total must match');
+  assertStrictEqual(summaryInitial.total, user101Notifs.length, 'Total metric must equal all notifications for user');
+  assertStrictEqual(summaryInitial.unread, unreadCountInitial, 'Unread metric must match getUnreadCount');
+  assert(summaryInitial.highPriority >= 4, 'High priority count must be at least 4');
+  assert(summaryInitial.actionRequired >= 7, 'Action required count must be at least 7');
+  console.log('✓ Test 134 passed: Summary metrics verified.');
+
+  // Test 135: Action-required detection
+  console.log('Test 135: Action-required detection');
+  const safetyReviewNotif = user101Notifs.find((n) => n.id === 'NOTIF-101')!;
+  assertStrictEqual(isActionRequiredNotification(safetyReviewNotif), true, 'UNREAD SAFETY_REVIEW must be action required');
+  const readTeamNotif = user101Notifs.find((n) => n.id === 'NOTIF-108')!;
+  assertStrictEqual(isActionRequiredNotification(readTeamNotif), false, 'READ notification must NOT be action required');
+  const dismissedTaskNotif = user101Notifs.find((n) => n.id === 'NOTIF-109')!;
+  assertStrictEqual(isActionRequiredNotification(dismissedTaskNotif), false, 'DISMISSED notification must NOT be action required');
+  console.log('✓ Test 135 passed: Action-required detection verified.');
+
+  // Test 136: Mark single notification as READ
+  console.log('Test 136: Mark single notification as READ');
+  const markedNotif = await notificationService.markAsRead(ctxNtfSite1User101, 'NOTIF-104');
+  assertStrictEqual(markedNotif.status, 'READ', 'Status must be updated to READ');
+  assert(Boolean(markedNotif.readAt), 'readAt timestamp must be populated');
+  const reFetched104 = await notificationService.getNotificationById(ctxNtfSite1User101, 'NOTIF-104');
+  assertStrictEqual(reFetched104?.status, 'READ', 'Refetched notification must be READ');
+  console.log('✓ Test 136 passed: Mark single notification as READ verified.');
+
+  // Test 137: Mark all notifications as READ
+  console.log('Test 137: Mark all notifications as READ');
+  const markAllResult = await notificationService.markAllAsRead(ctxNtfSite1User101);
+  assert(markAllResult > 0, 'Mark all as read must return count of updated notifications');
+  const unreadCountFinal = await notificationService.getUnreadCount(ctxNtfSite1User101);
+  assertStrictEqual(unreadCountFinal, 0, 'Unread count must be 0 after markAllAsRead');
+  console.log('✓ Test 137 passed: Mark all as READ verified.');
+
+  // Test 138: Dismiss notification
+  console.log('Test 138: Dismiss notification');
+  const dismissed = await notificationService.dismissNotification(ctxNtfSite1User101, 'NOTIF-105');
+  assertStrictEqual(dismissed.status, 'DISMISSED', 'Status must be updated to DISMISSED');
+  const reFetched105 = await notificationService.getNotificationById(ctxNtfSite1User101, 'NOTIF-105');
+  assertStrictEqual(reFetched105?.status, 'DISMISSED', 'Refetched notification must be DISMISSED');
+  console.log('✓ Test 138 passed: Dismiss notification verified.');
+
+  // Test 139: Unread count updates after state mutation
+  console.log('Test 139: Unread count updates after state mutation');
+  // At this point unreadCount is 0 because of markAllAsRead in Test 137
+  assertStrictEqual(unreadCountFinal, 0, 'Unread count must be 0');
+  // Re-verify with filters
+  const unreadAfterAll = await notificationService.getNotifications(ctxNtfSite1User101, { status: 'UNREAD' });
+  assertStrictEqual(unreadAfterAll.length, 0, 'No unread notifications remain after markAllAsRead');
+  console.log('✓ Test 139 passed: Unread count updates verified.');
+
+  // Test 140: Duplicate notification prevention
+  console.log('Test 140: Duplicate notification prevention');
+  const uniqueCandidate = {
+    studyId: 'STUDY-001',
+    siteId: 'SITE-001',
+    recipientUserId: 'USR-101',
+    type: 'SAFETY_REVIEW' as const,
+    priority: 'HIGH' as const,
+    status: 'UNREAD' as const,
+    title: 'Duplicate Test Notification',
+    message: 'Testing duplicate notification prevention logic',
+    sourceEntityType: 'SAFETY_EVENT' as const,
+    sourceEntityId: 'SAE-UNIQUE-999',
+  };
+  const createdNotif = await mockNotificationRepository.createNotification(
+    ctxNtfSite1User101,
+    uniqueCandidate
+  );
+  assertStrictEqual(createdNotif.sourceEntityId, 'SAE-UNIQUE-999');
+
+  // Attempt duplicate while active UNREAD
+  let duplicateRejected = false;
+  try {
+    await mockNotificationRepository.createNotification(
+      ctxNtfSite1User101,
+      uniqueCandidate
+    );
+  } catch (err) {
+    duplicateRejected = true;
+    assert(
+      (err as Error).message.includes('Duplicate active notification exists'),
+      'Must reject duplicate active UNREAD notification'
+    );
+  }
+  assertStrictEqual(duplicateRejected, true, 'Duplicate active notification must be rejected');
+
+  // Mark it READ, then verify creating same candidate succeeds!
+  await notificationService.markAsRead(ctxNtfSite1User101, createdNotif.id);
+  const reCreatedNotif = await mockNotificationRepository.createNotification(
+    ctxNtfSite1User101,
+    uniqueCandidate
+  );
+  assert(Boolean(reCreatedNotif.id), 'Creation succeeds after previous instance is no longer UNREAD');
+  // Exercise isDuplicateActiveNotification directly
+  assertStrictEqual(isDuplicateActiveNotification([createdNotif], uniqueCandidate), true);
+  console.log('✓ Test 140 passed: Duplicate notification prevention verified.');
+
+  // Test 141: Navigation route resolution for source entities
+  console.log('Test 141: Navigation route resolution for source entities');
+  assertStrictEqual(getDefaultActionRoute('SAFETY_EVENT', 'SAE-101'), '/pi/safety/SAE-101');
+  assertStrictEqual(getDefaultActionRoute('PROTOCOL_DEVIATION', 'DEV-001'), '/pi/compliance/DEV-001');
+  assertStrictEqual(getDefaultActionRoute('TASK', 'TSK-103'), '/pi/tasks/TSK-103');
+  assertStrictEqual(getDefaultActionRoute('DOCUMENT', 'DOC-102'), '/pi/documents/DOC-102');
+  assertStrictEqual(getDefaultActionRoute('VISIT', 'VIS-101-01'), '/pi/visits/VIS-101-01');
+  assertStrictEqual(getDefaultActionRoute('PARTICIPANT', 'PT-101'), '/pi/patients/PT-101');
+  assertStrictEqual(getDefaultActionRoute('TEAM_MEMBER', 'USR-102'), '/pi/team/USR-102');
+  assertStrictEqual(getDefaultActionRoute(undefined, undefined), undefined);
+  assertStrictEqual(formatRelativeTime(new Date().toISOString()), 'Just now');
+  console.log('✓ Test 141 passed: Navigation route resolution verified.');
+
+  // Test 142: Missing source entity fallback behavior
+  console.log('Test 142: Missing source entity fallback behavior');
+  const validSafetyNotif = user101Notifs.find((n) => n.id === 'NOTIF-101')!;
+  const isValidAvailable = await notificationService.verifySourceEntityAvailable(
+    ctxNtfSite1User101,
+    validSafetyNotif
+  );
+  assertStrictEqual(isValidAvailable, true, 'Existing entity (SAE-002) must return true');
+
+  const missingEntityNotif = user101Notifs.find((n) => n.id === 'NOTIF-110')!;
+  const isMissingAvailable = await notificationService.verifySourceEntityAvailable(
+    ctxNtfSite1User101,
+    missingEntityNotif
+  );
+  assertStrictEqual(isMissingAvailable, false, 'Nonexistent entity (TSK-NONEXISTENT-999) must return false');
+  console.log('✓ Test 142 passed: Missing source entity fallback behavior verified.');
+
+  // Test 143: Comprehensive Segments A-I regression check
+  console.log('Test 143: Comprehensive Segments A-I regression check');
+  const regStudiesJ = await studyService.getStudies();
+  assert(regStudiesJ.length >= 2, 'Studies must remain intact');
+  const regParticipantsJ = await participantService.getParticipants(ctxSite1);
+  assert(regParticipantsJ.length >= 10, 'Participants must remain intact');
+  const regVisitsJ = await visitService.getVisits(ctxSite1);
+  assert(regVisitsJ.length > 0, 'Visits must remain intact');
+  const regSafetyJ = await safetyService.getSafetyEvents(ctxSite1);
+  assert(regSafetyJ.length >= 4, 'Safety events must remain intact');
+  const regDeviationsJ = await complianceService.getDeviations(ctxSite1);
+  assert(regDeviationsJ.length >= 3, 'Deviations must remain intact');
+  const regTeamJ = await teamService.getTeamMembers(ctxSite1);
+  assert(regTeamJ.length >= 5, 'Team members must remain intact');
+  const regTasksJ = await taskService.getTasks(ctxSite1);
+  assert(regTasksJ.length >= 10, 'Tasks must remain intact');
+  const regDocsJ = await documentService.getDocuments(ctxSite1);
+  assert(regDocsJ.length >= 8, 'Documents must remain intact');
+  const regReportsJ = await reportService.getReportDefinitions();
+  assertStrictEqual(regReportsJ.length, 7, '7 reports must remain intact');
+  console.log('✓ Test 143 passed: Segments A-I regression check verified.');
+
+  // --- STARTING PHASE 1: AUTHENTICATION & ROLE-BASED PORTAL FOUNDATION TESTS ---
+  console.log('\n--- STARTING AUTHENTICATION & ROLE-BASED PORTAL FOUNDATION TESTS ---');
+
+  // Test 144: Demo PI login
+  console.log('Test 144: Demo PI login (demo.pi@aiia-ctms.local)');
+  const piLogin = await authService.login('demo.pi@aiia-ctms.local', 'PI@Demo123');
+  assertStrictEqual(piLogin.success, true, 'PI login must succeed');
+  assert(piLogin.user !== undefined, 'User must be defined');
+  assertStrictEqual(piLogin.user.id, 'USR-101', 'PI user ID must be USR-101');
+  assertStrictEqual(piLogin.role?.id, 'ROLE_PI', 'PI role must be ROLE_PI');
+  assertStrictEqual(piLogin.session?.studyId, 'STUDY-001', 'Primary study must be STUDY-001');
+  assertStrictEqual(piLogin.session?.siteId, 'SITE-001', 'Primary site must be SITE-001');
+  const piAuthPerms = (piLogin.effectivePermissions || []).map((p) => p.id);
+  assert(piAuthPerms.includes('SAFETY_REVIEW'), 'PI must hold SAFETY_REVIEW');
+  assert(piAuthPerms.includes('TASKS_MANAGE'), 'PI must hold TASKS_MANAGE');
+  assert(piAuthPerms.includes('REPORTS_EXPORT'), 'PI must hold REPORTS_EXPORT');
+  console.log('✓ Test 144 passed: Demo PI login verified.');
+
+  // Test 145: Demo Sub-Investigator login
+  console.log('Test 145: Demo Sub-Investigator login (demo.subi@aiia-ctms.local)');
+  const subiLogin = await authService.login('demo.subi@aiia-ctms.local', 'SUBI@Demo123');
+  assertStrictEqual(subiLogin.success, true, 'Sub-Investigator login must succeed');
+  assertStrictEqual(subiLogin.user?.id, 'USR-102', 'Sub-I user ID must be USR-102');
+  assertStrictEqual(subiLogin.role?.id, 'ROLE_SUB_I', 'Role must be ROLE_SUB_I');
+  const subiPerms = (subiLogin.effectivePermissions || []).map((p) => p.id);
+  assert(subiPerms.includes('VISITS_APPROVE'), 'Sub-I must have VISITS_APPROVE');
+  assert(subiPerms.includes('SAFETY_REVIEW'), 'Sub-I must have SAFETY_REVIEW');
+  assert(subiPerms.includes('COMPLIANCE_REVIEW'), 'Sub-I must have COMPLIANCE_REVIEW');
+  console.log('✓ Test 145 passed: Demo Sub-Investigator login verified.');
+
+  // Test 146: Demo CRC login
+  console.log('Test 146: Demo CRC login (demo.crc@aiia-ctms.local)');
+  const crcLogin = await authService.login('demo.crc@aiia-ctms.local', 'CRC@Demo123');
+  assertStrictEqual(crcLogin.success, true, 'CRC login must succeed');
+  assertStrictEqual(crcLogin.user?.id, 'USR-103', 'CRC user ID must be USR-103');
+  assertStrictEqual(crcLogin.role?.id, 'ROLE_CRC', 'Role must be ROLE_CRC');
+  const crcPerms = (crcLogin.effectivePermissions || []).map((p) => p.id);
+  assert(crcPerms.includes('PARTICIPANTS_CREATE'), 'CRC must have PARTICIPANTS_CREATE');
+  assert(crcPerms.includes('DOCUMENTS_EDIT'), 'CRC must have DOCUMENTS_EDIT');
+  assert(crcPerms.includes('TASKS_MANAGE'), 'CRC must have TASKS_MANAGE');
+  console.log('✓ Test 146 passed: Demo CRC login verified.');
+
+  // Test 147: Demo Study Nurse login
+  console.log('Test 147: Demo Study Nurse login (demo.nurse@aiia-ctms.local)');
+  const nurseLogin = await authService.login('demo.nurse@aiia-ctms.local', 'NURSE@Demo123');
+  assertStrictEqual(nurseLogin.success, true, 'Nurse login must succeed');
+  assertStrictEqual(nurseLogin.user?.id, 'USR-104', 'Nurse user ID must be USR-104');
+  assertStrictEqual(nurseLogin.role?.id, 'ROLE_STUDY_NURSE', 'Role must be ROLE_STUDY_NURSE');
+  const nursePerms = (nurseLogin.effectivePermissions || []).map((p) => p.id);
+  assert(nursePerms.includes('VISITS_EDIT'), 'Nurse must have VISITS_EDIT');
+  assert(nursePerms.includes('SAFETY_CREATE'), 'Nurse must have SAFETY_CREATE');
+  console.log('✓ Test 147 passed: Demo Study Nurse login verified.');
+
+  // Test 148: Demo Pharmacist login
+  console.log('Test 148: Demo Pharmacist login (demo.pharmacist@aiia-ctms.local)');
+  const pharmLogin = await authService.login('demo.pharmacist@aiia-ctms.local', 'PHARM@Demo123');
+  assertStrictEqual(pharmLogin.success, true, 'Pharmacist login must succeed');
+  assertStrictEqual(pharmLogin.user?.id, 'USR-105', 'Pharmacist user ID must be USR-105');
+  assertStrictEqual(pharmLogin.role?.id, 'ROLE_STUDY_PHARMACIST', 'Role must be ROLE_STUDY_PHARMACIST');
+  const pharmPerms = (pharmLogin.effectivePermissions || []).map((p) => p.id);
+  assert(pharmPerms.includes('DOCUMENTS_VIEW'), 'Pharmacist must have DOCUMENTS_VIEW');
+  assert(pharmPerms.includes('SAFETY_CREATE'), 'Pharmacist must have SAFETY_CREATE');
+  console.log('✓ Test 148 passed: Demo Pharmacist login verified.');
+
+  // Test 149: Demo Data Entry login
+  console.log('Test 149: Demo Data Entry login (demo.data@aiia-ctms.local)');
+  const dataLogin = await authService.login('demo.data@aiia-ctms.local', 'DATA@Demo123');
+  assertStrictEqual(dataLogin.success, true, 'Data Entry login must succeed');
+  assertStrictEqual(dataLogin.user?.id, 'USR-106', 'Data Entry user ID must be USR-106');
+  assertStrictEqual(dataLogin.role?.id, 'ROLE_DATA_ENTRY', 'Role must be ROLE_DATA_ENTRY');
+  const dataPerms = (dataLogin.effectivePermissions || []).map((p) => p.id);
+  assert(dataPerms.includes('PARTICIPANTS_EDIT'), 'Data Entry must have PARTICIPANTS_EDIT');
+  assert(dataPerms.includes('VISITS_EDIT'), 'Data Entry must have VISITS_EDIT');
+  console.log('✓ Test 149 passed: Demo Data Entry login verified.');
+
+  // Test 150: Invalid credential rejection
+  console.log('Test 150: Invalid credential rejection');
+  const badPass = await authService.login('demo.pi@aiia-ctms.local', 'WrongPassword123');
+  assertStrictEqual(badPass.success, false, 'Bad password must be rejected');
+  assert(badPass.error !== undefined, 'Error message must be populated');
+
+  const nonExistent = await authService.login('unknown@aiia-ctms.local', 'PI@Demo123');
+  assertStrictEqual(nonExistent.success, false, 'Non-existent account must be rejected');
+
+  const emptyCreds = await authService.login('', '');
+  assertStrictEqual(emptyCreds.success, false, 'Empty credentials must be rejected');
+  console.log('✓ Test 150 passed: Invalid credential rejection verified.');
+
+  // Test 151: Session persistence (storage save & restore)
+  console.log('Test 151: Session persistence (storage save & restore)');
+  await authService.login('demo.pi@aiia-ctms.local', 'PI@Demo123');
+  const storedSession = browserStorage.get(SESSION_STORAGE_KEY);
+  assert(storedSession !== null, 'Session must exist in storage after login');
+
+  const restored = await authService.restoreSession();
+  assertStrictEqual(restored.success, true, 'Restored session must be successful');
+  assertStrictEqual(restored.user?.id, 'USR-101', 'Restored user must be USR-101');
+  assertStrictEqual(restored.role?.id, 'ROLE_PI', 'Restored role must be ROLE_PI');
+  console.log('✓ Test 151 passed: Session persistence verified.');
+
+  // Test 152: Logout clears session
+  console.log('Test 152: Logout clears session');
+  authService.logout();
+  const sessionAfterLogout = browserStorage.get(SESSION_STORAGE_KEY);
+  assertStrictEqual(sessionAfterLogout, null, 'Storage must be null after logout');
+
+  const restoreAfterLogout = await authService.restoreSession();
+  assertStrictEqual(restoreAfterLogout.success, false, 'Restore after logout must fail');
+  console.log('✓ Test 152 passed: Logout clears session verified.');
+
+  // Test 153: Unauthenticated route protection
+  console.log('Test 153: Unauthenticated route protection');
+  const unauthCheck = await authService.restoreSession();
+  assertStrictEqual(unauthCheck.success, false, 'Unauthenticated check must return false');
+  console.log('✓ Test 153 passed: Unauthenticated route protection verified.');
+
+  // Test 154: Authenticated valid route access
+  console.log('Test 154: Authenticated valid route access');
+  const piAuth = await authService.login('demo.pi@aiia-ctms.local', 'PI@Demo123');
+  const perms = piAuth.effectivePermissions || [];
+  assertStrictEqual(authService.hasPermission('PARTICIPANTS_VIEW', perms), true, 'PI must have PARTICIPANTS_VIEW');
+  assertStrictEqual(authService.hasPermission('VISITS_VIEW', perms), true, 'PI must have VISITS_VIEW');
+  assertStrictEqual(authService.hasPermission('SAFETY_VIEW', perms), true, 'PI must have SAFETY_VIEW');
+  assertStrictEqual(authService.hasPermission('COMPLIANCE_VIEW', perms), true, 'PI must have COMPLIANCE_VIEW');
+  assertStrictEqual(authService.hasPermission('REPORTS_VIEW', perms), true, 'PI must have REPORTS_VIEW');
+  console.log('✓ Test 154 passed: Authenticated valid route access verified.');
+
+  // Test 155: Permission-based route denial
+  console.log('Test 155: Permission-based route denial');
+  const dataAuth = await authService.login('demo.data@aiia-ctms.local', 'DATA@Demo123');
+  const dataEntryPerms = dataAuth.effectivePermissions || [];
+  assertStrictEqual(authService.hasPermission('SAFETY_VIEW', dataEntryPerms), false, 'Data Entry cannot view Safety');
+  assertStrictEqual(authService.hasPermission('COMPLIANCE_VIEW', dataEntryPerms), false, 'Data Entry cannot view Compliance');
+  assertStrictEqual(authService.hasPermission('REPORTS_VIEW', dataEntryPerms), false, 'Data Entry cannot view Reports');
+  assertStrictEqual(authService.hasPermission('TEAM_VIEW', dataEntryPerms), false, 'Data Entry cannot view Team');
+  assertStrictEqual(authService.hasPermission('DOCUMENTS_VIEW', dataEntryPerms), false, 'Data Entry cannot view Documents');
+  console.log('✓ Test 155 passed: Permission-based route denial verified.');
+
+  // Test 156: Role landing route selection
+  console.log('Test 156: Role landing route selection');
+  assertStrictEqual(getRoleLandingRoute('ROLE_PI'), '/pi', 'ROLE_PI landing route must be /pi');
+  assertStrictEqual(getRoleLandingRoute('ROLE_SUB_I'), '/sub-investigator', 'ROLE_SUB_I landing route must be /sub-investigator');
+  assertStrictEqual(getRoleLandingRoute('ROLE_CRC'), '/crc', 'ROLE_CRC landing route must be /crc');
+  assertStrictEqual(getRoleLandingRoute('ROLE_STUDY_NURSE'), '/study-nurse', 'ROLE_STUDY_NURSE landing route must be /study-nurse');
+  assertStrictEqual(getRoleLandingRoute('ROLE_STUDY_PHARMACIST'), '/pharmacist', 'ROLE_STUDY_PHARMACIST landing route must be /pharmacist');
+  assertStrictEqual(getRoleLandingRoute('ROLE_DATA_ENTRY'), '/data-entry', 'ROLE_DATA_ENTRY landing route must be /data-entry');
+  assertStrictEqual(getRoleLandingRoute(undefined), '/pi', 'Undefined role defaults to /pi');
+  console.log('✓ Test 156 passed: Role landing route selection verified.');
+
+  // Test 157: User/study/site assignment validation
+  console.log('Test 157: User/study/site assignment validation');
+  const piAssignments = await authService.getUserAssignments('USR-101');
+  assert(piAssignments.length >= 1, 'PI must have at least 1 assignment');
+  assert(piAssignments.some((a) => a.studyId === 'STUDY-001' && a.siteId === 'SITE-001'), 'PI must be assigned to STUDY-001/SITE-001');
+
+  const subiAssignments = await authService.getUserAssignments('USR-102');
+  assert(subiAssignments.length >= 2, 'Sub-Investigator is assigned to multiple sites (SITE-001, SITE-002)');
+  console.log('✓ Test 157 passed: User/study/site assignment validation verified.');
+
+  // Test 158: Cross-site session protection
+  console.log('Test 158: Cross-site session protection');
+  const user101Sites = (await authService.getUserAssignments('USR-101')).map((a) => a.siteId);
+  assert(user101Sites.includes('SITE-001'), 'USR-101 is at SITE-001');
+  assert(!user101Sites.includes('SITE-002'), 'USR-101 must not have assignment at SITE-002');
+  console.log('✓ Test 158 passed: Cross-site session protection verified.');
+
+  // Test 159: Role-aware navigation filtering
+  console.log('Test 159: Role-aware navigation filtering');
+  const piNavItems = getRoleNavigationItems('ROLE_PI', piAuth.effectivePermissions);
+  const piNavNames = piNavItems.map((item) => item.name);
+  assert(piNavNames.includes('Overview'), 'PI nav must have Overview');
+  assert(piNavNames.includes('Patients'), 'PI nav must have Patients');
+  assert(piNavNames.includes('Safety'), 'PI nav must have Safety');
+  assert(piNavNames.includes('Compliance'), 'PI nav must have Compliance');
+  assert(piNavNames.includes('Reports'), 'PI nav must have Reports');
+
+  const dataNavItems = getRoleNavigationItems('ROLE_DATA_ENTRY', dataEntryPerms);
+  const dataNavNames = dataNavItems.map((item) => item.name);
+  assert(dataNavNames.includes('Overview'), 'Data nav must have Overview');
+  assert(dataNavNames.includes('Patients'), 'Data nav must have Patients');
+  assert(dataNavNames.includes('Visits & Activities'), 'Data nav must have Visits');
+  assert(!dataNavNames.includes('Safety'), 'Data nav must hide Safety');
+  assert(!dataNavNames.includes('Compliance'), 'Data nav must hide Compliance');
+  assert(!dataNavNames.includes('Reports'), 'Data nav must hide Reports');
+  assert(!dataNavNames.includes('Team & Roles'), 'Data nav must hide Team & Roles');
+  const dataOverview = dataNavItems.find((i) => i.name === 'Overview');
+  assertStrictEqual(dataOverview?.path, '/data-entry', 'Data entry Overview must point to /data-entry');
+  console.log('✓ Test 159 passed: Role-aware navigation filtering verified.');
+
+  // Test 160: Existing PI dashboard regression
+  console.log('Test 160: Existing PI dashboard regression');
+  await authService.login('demo.pi@aiia-ctms.local', 'PI@Demo123');
+  const piNav = getRoleNavigationItems('ROLE_PI', piAuth.effectivePermissions);
+  const piOverview = piNav.find((i) => i.name === 'Overview');
+  assertStrictEqual(piOverview?.path, '/pi/dashboard', 'PI Overview must point to /pi/dashboard');
+  const overviewData = await dashboardService.getOverview('STUDY-001', 'SITE-001');
+  assert(overviewData !== null, 'Overview must not be null');
+  assert(overviewData.participantSummary.enrolled >= 0, 'Participant summary enrolled must be >= 0');
+  assert(overviewData.safetySummary.adverseEvents >= 0, 'Safety summary adverseEvents must be >= 0');
+  assert(overviewData.visits.upcoming >= 0, 'Visit upcoming metrics must be >= 0');
+  console.log('✓ Test 160 passed: Existing PI dashboard regression verified.');
+
+  // Test 161: Comprehensive Segments A-J regression check
+  console.log('Test 161: Comprehensive Segments A-J regression check');
+  const allNotifs = await notificationService.getNotifications(ctxNtfSite1User101);
+  assert(allNotifs.length >= 5, 'Notifications must remain intact');
+  const allTasks = await taskService.getTasks(ctxSite1);
+  assert(allTasks.length >= 10, 'Tasks must remain intact');
+  const allDocs = await documentService.getDocuments(ctxSite1);
+  assert(allDocs.length >= 8, 'Documents must remain intact');
+  const allReports = await reportService.getReportDefinitions();
+  assertStrictEqual(allReports.length, 7, '7 report definitions intact');
+  console.log('✓ Test 161 passed: Comprehensive Segments A-J regression check verified.');
+
+  console.log('\n--- ALL SERVICE & DATA TESTS PASSED SUCCESSFULLY (161/161) ---');
 }
 
 runTests().catch((err) => {

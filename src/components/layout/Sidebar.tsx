@@ -1,49 +1,23 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Users,
-  CalendarCheck,
-  ShieldAlert,
-  FileCheck2,
-  UserCheck,
-  CheckSquare,
-  FileText,
-  BarChart3,
-  Settings,
   X,
   Activity,
 } from 'lucide-react';
 import { useStudy } from '../../context/StudyContext';
+import { useAuth } from '../../context/AuthContext';
+import { getRoleNavigationItems } from '../../config/navigationConfig';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface NavItem {
-  name: string;
-  path: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  badgeVariant?: 'danger' | 'warning' | 'neutral';
-}
-
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { activeStudy, activeSite } = useStudy();
+  const { currentRole, effectivePermissions } = useAuth();
 
-  const navigation: NavItem[] = [
-    { name: 'Overview', path: '/pi/dashboard', icon: LayoutDashboard },
-    { name: 'Patients', path: '/pi/patients', icon: Users },
-    { name: 'Visits & Activities', path: '/pi/visits', icon: CalendarCheck },
-    { name: 'Safety', path: '/pi/safety', icon: ShieldAlert, badge: '1 SAE', badgeVariant: 'danger' },
-    { name: 'Compliance', path: '/pi/compliance', icon: FileCheck2 },
-    { name: 'Team & Roles', path: '/pi/team', icon: UserCheck },
-    { name: 'Tasks', path: '/pi/tasks', icon: CheckSquare, badge: '4', badgeVariant: 'warning' },
-    { name: 'Documents', path: '/pi/documents', icon: FileText },
-    { name: 'Reports', path: '/pi/reports', icon: BarChart3 },
-    { name: 'Settings', path: '/pi/settings', icon: Settings },
-  ];
+  const navigation = getRoleNavigationItems(currentRole?.id, effectivePermissions);
 
   return (
     <>
@@ -97,7 +71,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </p>
           <div className="flex items-center gap-1.5 mt-2">
             <span className="w-2 h-2 rounded-full bg-secondary shrink-0" />
-            <span className="text-[11px] font-medium text-ink-muted">PI Operations Mode</span>
+            <span className="text-[11px] font-medium text-ink-muted">
+              {currentRole?.name || 'Operations Mode'}
+            </span>
           </div>
         </div>
 

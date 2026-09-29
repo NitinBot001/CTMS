@@ -53,6 +53,12 @@ import {
   ReportFilters,
   GeneratedReport,
   ReportSummaryMetricItem,
+  Notification,
+  NotificationFilters,
+  NotificationSummaryMetrics,
+  AuthResult,
+  DemoCredential,
+  User,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -297,3 +303,53 @@ export interface IReportRepository {
     reportType: ReportType
   ): Promise<ReportSummaryMetricItem[]>;
 }
+
+export interface NotificationQueryContext {
+  studyId: string;
+  siteId: string;
+  recipientUserId: string;
+}
+
+export interface INotificationRepository {
+  getNotifications(
+    context: NotificationQueryContext,
+    filters?: NotificationFilters
+  ): Promise<Notification[]>;
+  getNotificationById(
+    context: NotificationQueryContext,
+    notificationId: string
+  ): Promise<Notification | null>;
+  getNotificationSummary(
+    context: NotificationQueryContext
+  ): Promise<NotificationSummaryMetrics>;
+  markAsRead(
+    context: NotificationQueryContext,
+    notificationId: string
+  ): Promise<Notification>;
+  markAllAsRead(
+    context: NotificationQueryContext
+  ): Promise<number>;
+  dismissNotification(
+    context: NotificationQueryContext,
+    notificationId: string
+  ): Promise<Notification>;
+  getUnreadCount(
+    context: NotificationQueryContext
+  ): Promise<number>;
+  createNotification(
+    context: NotificationQueryContext,
+    notification: Omit<Notification, 'id' | 'createdAt'>
+  ): Promise<Notification>;
+}
+
+export interface IAuthRepository {
+  authenticate(email: string, password: string): Promise<AuthResult>;
+  getUserById(userId: string): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
+  getUserAssignments(userId: string): Promise<UserRole[]>;
+  getRoleById(roleId: string): Promise<Role | null>;
+  getEffectivePermissions(userId: string, studyId: string, siteId: string): Promise<Permission[]>;
+  getDemoCredentials(): DemoCredential[];
+}
+
+
