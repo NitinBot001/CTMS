@@ -31,6 +31,15 @@ import {
   AyurvedaAssessmentInstrument,
   AyurvedaTerminologyEntry,
   ProtocolAyurvedaAssessment,
+  AssessmentInstrument,
+  AssessmentInstrumentVersion,
+  AssessmentSection,
+  AssessmentItem,
+  AssessmentRule,
+  AssessmentAssignment,
+  AssessmentSession,
+  AssessmentResponse,
+  AssessmentReview,
 } from '../types';
 import { MOCK_USERS, MOCK_USER_ROLES } from '../data/mockData';
 import {
@@ -53,6 +62,17 @@ import {
   MOCK_AYURVEDA_TERMINOLOGY,
   MOCK_PROTOCOL_AYURVEDA_ASSESSMENTS,
 } from '../data/mockAyurvedaSeed';
+import {
+  MOCK_STAGE3_INSTRUMENTS,
+  MOCK_STAGE3_VERSIONS,
+  MOCK_STAGE3_SECTIONS,
+  MOCK_STAGE3_ITEMS,
+  MOCK_STAGE3_RULES,
+  MOCK_STAGE3_ASSIGNMENTS,
+  MOCK_STAGE3_SESSIONS,
+  MOCK_STAGE3_RESPONSES,
+  MOCK_STAGE3_REVIEWS,
+} from '../data/mockAssessmentSeed';
 
 export const MOCK_MUTATION_PREFIX = 'aiia_ctms_mock_mutation_';
 
@@ -81,6 +101,15 @@ export const MOCK_MUTATION_KEYS = {
   AYURVEDA_INSTRUMENTS: `${MOCK_MUTATION_PREFIX}ayurveda_instruments`,
   AYURVEDA_TERMINOLOGY: `${MOCK_MUTATION_PREFIX}ayurveda_terminology`,
   PROTOCOL_AYURVEDA_ASSESSMENTS: `${MOCK_MUTATION_PREFIX}protocol_ayurveda_assessments`,
+  STAGE3_INSTRUMENTS: `${MOCK_MUTATION_PREFIX}stage3_instruments`,
+  STAGE3_VERSIONS: `${MOCK_MUTATION_PREFIX}stage3_versions`,
+  STAGE3_SECTIONS: `${MOCK_MUTATION_PREFIX}stage3_sections`,
+  STAGE3_ITEMS: `${MOCK_MUTATION_PREFIX}stage3_items`,
+  STAGE3_RULES: `${MOCK_MUTATION_PREFIX}stage3_rules`,
+  STAGE3_ASSIGNMENTS: `${MOCK_MUTATION_PREFIX}stage3_assignments`,
+  STAGE3_SESSIONS: `${MOCK_MUTATION_PREFIX}stage3_sessions`,
+  STAGE3_RESPONSES: `${MOCK_MUTATION_PREFIX}stage3_responses`,
+  STAGE3_REVIEWS: `${MOCK_MUTATION_PREFIX}stage3_reviews`,
 };
 
 export const MOCK_DEFAULT_TEMPORARY_PASSWORD = '128';
@@ -471,6 +500,89 @@ export class MockDataStore {
 
   saveProtocolAyurvedaAssessments(assessments: ProtocolAyurvedaAssessment[]): void {
     browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, assessments);
+  }
+
+  // --- STAGE 3 ASSESSMENTS ---
+
+  getStage3Instruments(): AssessmentInstrument[] {
+    const stored = browserStorage.get<AssessmentInstrument[]>(MOCK_MUTATION_KEYS.STAGE3_INSTRUMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_INSTRUMENTS);
+  }
+
+  saveStage3Instruments(instruments: AssessmentInstrument[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_INSTRUMENTS, instruments);
+  }
+
+  getStage3Versions(): AssessmentInstrumentVersion[] {
+    const stored = browserStorage.get<AssessmentInstrumentVersion[]>(MOCK_MUTATION_KEYS.STAGE3_VERSIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_VERSIONS);
+  }
+
+  saveStage3Versions(versions: AssessmentInstrumentVersion[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_VERSIONS, versions);
+  }
+
+  getStage3Sections(): AssessmentSection[] {
+    const stored = browserStorage.get<AssessmentSection[]>(MOCK_MUTATION_KEYS.STAGE3_SECTIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_SECTIONS);
+  }
+
+  saveStage3Sections(sections: AssessmentSection[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_SECTIONS, sections);
+  }
+
+  getStage3Items(): AssessmentItem[] {
+    const stored = browserStorage.get<AssessmentItem[]>(MOCK_MUTATION_KEYS.STAGE3_ITEMS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_ITEMS);
+  }
+
+  saveStage3Items(items: AssessmentItem[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_ITEMS, items);
+  }
+
+  getStage3Rules(): AssessmentRule[] {
+    const stored = browserStorage.get<AssessmentRule[]>(MOCK_MUTATION_KEYS.STAGE3_RULES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_RULES);
+  }
+
+  saveStage3Rules(rules: AssessmentRule[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_RULES, rules);
+  }
+
+  getStage3Assignments(): AssessmentAssignment[] {
+    const stored = browserStorage.get<AssessmentAssignment[]>(MOCK_MUTATION_KEYS.STAGE3_ASSIGNMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_ASSIGNMENTS);
+  }
+
+  saveStage3Assignments(assignments: AssessmentAssignment[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_ASSIGNMENTS, assignments);
+  }
+
+  getStage3Sessions(): AssessmentSession[] {
+    const stored = browserStorage.get<AssessmentSession[]>(MOCK_MUTATION_KEYS.STAGE3_SESSIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_SESSIONS);
+  }
+
+  saveStage3Sessions(sessions: AssessmentSession[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_SESSIONS, sessions);
+  }
+
+  getStage3Responses(): AssessmentResponse[] {
+    const stored = browserStorage.get<AssessmentResponse[]>(MOCK_MUTATION_KEYS.STAGE3_RESPONSES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_RESPONSES);
+  }
+
+  saveStage3Responses(responses: AssessmentResponse[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_RESPONSES, responses);
+  }
+
+  getStage3Reviews(): AssessmentReview[] {
+    const stored = browserStorage.get<AssessmentReview[]>(MOCK_MUTATION_KEYS.STAGE3_REVIEWS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_STAGE3_REVIEWS);
+  }
+
+  saveStage3Reviews(reviews: AssessmentReview[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.STAGE3_REVIEWS, reviews);
   }
 
   /**

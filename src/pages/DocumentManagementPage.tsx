@@ -7,6 +7,8 @@ import {
   DocumentFilters,
   DocumentSummaryMetrics,
   TeamMemberSummary,
+  DocumentBundle,
+  SiteActivationReadinessResult,
 } from '../types';
 import { DocumentSummaryCards } from '../components/documents/DocumentSummaryCards';
 import { DocumentFiltersBar } from '../components/documents/DocumentFiltersBar';
@@ -17,7 +19,7 @@ import { CreateDocumentVersionModal } from '../components/documents/CreateDocume
 import { Skeleton } from '../components/ui/SkeletonLoader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { RefreshCw, FileText, Plus, ShieldAlert } from 'lucide-react';
+import { RefreshCw, FileText, Plus, ShieldAlert, PackageCheck, CheckCircle2, AlertTriangle, Layers, Info } from 'lucide-react';
 import { isDocumentActionRequired } from '../utils/documentCalculations';
 
 export const DocumentManagementPage: React.FC = () => {
@@ -41,6 +43,10 @@ export const DocumentManagementPage: React.FC = () => {
     actionRequired: 0,
   });
 
+  const [startupBundle, setStartupBundle] = useState<DocumentBundle | null>(null);
+  const [readinessResult, setReadinessResult] = useState<SiteActivationReadinessResult | null>(null);
+  const [scopeView, setScopeView] = useState<'ROUTINE' | 'STARTUP_BUNDLE' | 'ALL'>('ROUTINE');
+
   const [filters, setFilters] = useState<DocumentFilters>({
     search: '',
     category: 'ALL',
@@ -49,6 +55,7 @@ export const DocumentManagementPage: React.FC = () => {
     expiryFilter: 'ALL',
     isRequired: 'ALL',
     ownerUserId: 'ALL',
+    bundleId: 'ROUTINE_ONLY',
   });
 
   const [activeCardFilter, setActiveCardFilter] = useState<string>('ALL');
@@ -94,11 +101,13 @@ export const DocumentManagementPage: React.FC = () => {
 
       const context = { studyId: activeStudyId, siteId: activeSiteId };
 
-      const [filteredData, summary, allDocs, members] = await Promise.all([
+      const [filteredData, summary, allDocs, members, bundle, readiness] = await Promise.all([
         documentService.getDocuments(context, filters),
         documentService.getDocumentSummary(context),
-        documentService.getDocuments(context),
+        documentService.getDocuments(context, { bundleId: 'ALL' }),
         teamService.getTeamMembers(context).catch(() => []),
+        documentService.getStartupBundle(context).catch(() => null),
+        documentService.getSiteActivationReadiness(context).catch(() => null),
       ]);
 
       // If active card filter is ACTION_REQUIRED, filter client-side for action required
@@ -111,6 +120,8 @@ export const DocumentManagementPage: React.FC = () => {
       setTotalSiteCount(allDocs.length);
       setMetrics(summary);
       setTeamMembers(members);
+      setStartupBundle(bundle);
+      setReadinessResult(readiness);
     } catch (err) {
       setError((err as Error).message || 'Failed to load document register.');
     } finally {
@@ -121,6 +132,20 @@ export const DocumentManagementPage: React.FC = () => {
   useEffect(() => {
     loadDocumentsData();
   }, [loadDocumentsData]);
+
+  const handleScopeViewChange = (newScope: 'ROUTINE' | 'STARTUP_BUNDLE' | 'ALL') => {
+    setScopeView(newScope);
+    setActiveCardFilter('ALL');
+    setFilters((prev) => ({
+      ...prev,
+      bundleId:
+        newScope === 'STARTUP_BUNDLE'
+          ? 'CRO-BUNDLE-STUDY001-SITE001-001'
+          : newScope === 'ROUTINE'
+          ? 'ROUTINE_ONLY'
+          : 'ALL',
+    }));
+  };
 
   // Handle Summary Card filter click
   const handleSummaryCardClick = (cardKey: string) => {
@@ -297,6 +322,166 @@ export const DocumentManagementPage: React.FC = () => {
           >
             Review Deficiencies
           </button>
+        </div>
+      )}
+
+      {/* Scope View Selector: Routine vs Start-up Bundle vs All */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center gap-1.5 p-1 bg-surface-soft border border-border rounded-sm">
+          <button
+            onClick={() => handleScopeViewChange('ROUTINE')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 ${
+              scopeView === 'ROUTINE'
+                ? 'bg-surface text-ink shadow-xs border border-border'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Routine Site Documents</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-surface-muted text-ink">
+              12
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleScopeViewChange('STARTUP_BUNDLE')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 ${
+              scopeView === 'STARTUP_BUNDLE'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <PackageCheck className="w-3.5 h-3.5" />
+            <span>CRO Start-up Bundle</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+              scopeView === 'STARTUP_BUNDLE' ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink'
+            }`}>
+              {startupBundle?.totalDocuments || 34}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleScopeViewChange('ALL')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-sm transition-colors flex items-center gap-1.5 ${
+              scopeView === 'ALL'
+                ? 'bg-surface text-ink shadow-xs border border-border'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>All Documents</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-surface-muted text-ink">
+              {totalSiteCount}
+            </span>
+          </button>
+        </div>
+
+        {startupBundle && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-ink-muted">Activation Readiness:</span>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-sm border ${
+                readinessResult?.status === 'READY'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : readinessResult?.status === 'READY_WITH_CONDITIONS'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : 'bg-rose-50 text-rose-800 border-rose-300'
+              }`}
+            >
+              {readinessResult?.status === 'READY' ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+              ) : (
+                <AlertTriangle className="w-3 h-3 text-amber-700" />
+              )}
+              <span>{readinessResult?.statusLabel || 'Mock Site Activation Ready'}</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* CRO Start-up & Site Activation Package Card */}
+      {startupBundle && (scopeView === 'STARTUP_BUNDLE' || scopeView === 'ALL') && (
+        <div className="border border-border rounded-sm bg-surface overflow-hidden shadow-subtle">
+          {/* Synthetic Watermark Notice Banner */}
+          <div className="bg-amber-500/10 border-b border-amber-300/60 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-900 font-semibold tracking-wide">
+              <span className="px-1.5 py-0.5 rounded-sm bg-amber-200 text-amber-900 text-[10px] font-mono uppercase tracking-wider font-bold">
+                TEST PACK
+              </span>
+              <span>SYNTHETIC MOCK TEST BUNDLE — FOR SOFTWARE VALIDATION ONLY</span>
+            </div>
+            <div className="text-[11px] text-amber-800 font-mono">
+              Not a real regulatory submission, approval, or insurance filing
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-ink font-heading">
+                    {startupBundle.bundleName}
+                  </h3>
+                  <span className="text-[10px] font-mono bg-surface-soft border border-border px-1.5 py-0.5 rounded-sm text-ink-muted">
+                    v{startupBundle.version}
+                  </span>
+                </div>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Package Source: <strong className="text-ink">{startupBundle.croOrganizationName}</strong> • Bundle Code: <span className="font-mono">{startupBundle.bundleCode}</span>
+                </p>
+              </div>
+
+              {/* Status Pill */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-sm bg-emerald-50 text-emerald-800 border border-emerald-300">
+                  Ready for Mock Site Activation
+                </span>
+              </div>
+            </div>
+
+            {/* Metrics Breakdown */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-border text-xs">
+              <div className="bg-surface-soft p-2.5 rounded-sm">
+                <div className="text-ink-muted text-[11px]">Total Package Docs</div>
+                <div className="text-lg font-bold text-ink font-mono mt-0.5">
+                  {startupBundle.totalDocuments}
+                </div>
+              </div>
+              <div className="bg-emerald-50/60 p-2.5 rounded-sm border border-emerald-200">
+                <div className="text-emerald-800 text-[11px]">Approved / Valid</div>
+                <div className="text-lg font-bold text-emerald-900 font-mono mt-0.5">
+                  {startupBundle.approvedDocuments}
+                </div>
+              </div>
+              <div className="bg-amber-50/60 p-2.5 rounded-sm border border-amber-200">
+                <div className="text-amber-800 text-[11px]">Expiring Soon (30d)</div>
+                <div className="text-lg font-bold text-amber-900 font-mono mt-0.5">
+                  {startupBundle.expiringSoonDocuments}
+                </div>
+              </div>
+              <div className="bg-blue-50/60 p-2.5 rounded-sm border border-blue-200">
+                <div className="text-blue-800 text-[11px]">Pending Final Sign-off</div>
+                <div className="text-lg font-bold text-blue-900 font-mono mt-0.5">
+                  {startupBundle.pendingDocuments}
+                </div>
+              </div>
+            </div>
+
+            {/* Conditions & Operational Warnings */}
+            {readinessResult && readinessResult.conditions.length > 0 && (
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-sm p-3 text-xs space-y-1">
+                <div className="font-semibold text-amber-900 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Pre-Activation Observations & Conditions ({readinessResult.conditions.length}):</span>
+                </div>
+                <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
+                  {readinessResult.conditions.map((cond, idx) => (
+                    <li key={idx}>{cond}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -27,6 +27,7 @@ import { mockDashboardRepository } from '../repositories/mockDashboardRepository
 import { mockReportRepository } from '../repositories/mockReportRepository';
 import { mockProtocolRepository } from '../repositories/mockProtocolRepository';
 import { mockAyurvedaRepository } from '../repositories/mockAyurvedaRepository';
+import { mockAssessmentRepository } from '../repositories/mockAssessmentRepository';
 
 // Empty Test Repositories
 import {
@@ -46,6 +47,7 @@ import {
   EmptyAuditRepository,
   EmptyProtocolRepository,
   EmptyAyurvedaRepository,
+  EmptyAssessmentRepository,
 } from '../repositories/emptyTestRepositories';
 import { mockAuditRepository } from '../repositories/mockAuditRepository';
 
@@ -66,6 +68,7 @@ import {
   IAuditRepository,
   IProtocolRepository,
   IAyurvedaConfigurationRepository,
+  IAssessmentRepository,
 } from '../repositories/interfaces';
 
 export interface DataEnvironment {
@@ -85,6 +88,7 @@ export interface DataEnvironment {
   reportRepository: IReportRepository;
   protocolRepository: IProtocolRepository;
   ayurvedaRepository: IAyurvedaConfigurationRepository;
+  assessmentRepository: IAssessmentRepository;
   auditRepository?: IAuditRepository;
 }
 
@@ -120,6 +124,7 @@ export class EnvironmentService {
       reportRepository: mockReportRepository,
       protocolRepository: mockProtocolRepository,
       ayurvedaRepository: mockAyurvedaRepository,
+      assessmentRepository: mockAssessmentRepository,
       auditRepository: mockAuditRepository,
     };
 
@@ -140,6 +145,7 @@ export class EnvironmentService {
       reportRepository: new EmptyReportRepository(),
       protocolRepository: new EmptyProtocolRepository(),
       ayurvedaRepository: new EmptyAyurvedaRepository(),
+      assessmentRepository: new EmptyAssessmentRepository(),
       auditRepository: new EmptyAuditRepository(),
     };
   }
@@ -238,6 +244,10 @@ export class EnvironmentService {
 
   getAyurvedaConfigurationRepository(): IAyurvedaConfigurationRepository {
     return this.getActiveEnvironment().ayurvedaRepository;
+  }
+
+  getAssessmentRepository(): IAssessmentRepository {
+    return this.getActiveEnvironment().assessmentRepository;
   }
 
   getAuditRepository(): IAuditRepository | undefined {

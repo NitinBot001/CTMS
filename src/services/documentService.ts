@@ -9,6 +9,8 @@ import {
   CreateDocumentVersionInput,
   UpdateDocumentInput,
   DocumentExpiryState,
+  DocumentBundle,
+  SiteActivationReadinessResult,
 } from '../types';
 
 export class DocumentService {
@@ -142,6 +144,52 @@ export class DocumentService {
     referenceDate?: string
   ): DocumentExpiryState {
     return this.repo.getExpiryState(document, referenceDate);
+  }
+
+  /**
+   * Retrieves canonical start-up document bundle metadata and linked documents
+   */
+  async getStartupBundle(
+    context: ParticipantQueryContext,
+    bundleId?: string
+  ): Promise<DocumentBundle | null> {
+    if (!context.studyId || !context.siteId) {
+      return null;
+    }
+    return this.repo.getStartupBundle(context, bundleId);
+  }
+
+  /**
+   * Evaluates site activation readiness against GCP-ASU / CDSCO benchmarks
+   */
+  async getSiteActivationReadiness(
+    context: ParticipantQueryContext,
+    protocolVersion?: string,
+    options?: { requireColdChain?: boolean; evaluationDate?: string }
+  ): Promise<SiteActivationReadinessResult> {
+    if (!context.studyId || !context.siteId) {
+      return {
+        studyId: context.studyId || '',
+        siteId: context.siteId || '',
+        evaluationDate: options?.evaluationDate || '2026-09-29',
+        protocolVersion: protocolVersion || '1.1',
+        status: 'NOT_READY',
+        statusLabel: 'Document Readiness: Not Ready',
+        isReadyForActivation: false,
+        totalRequired: 0,
+        approvedCount: 0,
+        pendingReviewCount: 0,
+        missingCount: 0,
+        expiredCount: 0,
+        expiringSoonCount: 0,
+        blockingIssues: ['Study and Site context are required.'],
+        conditions: [],
+        warnings: [],
+        categoryBreakdown: {},
+        missingRequiredTypes: [],
+      };
+    }
+    return this.repo.getSiteActivationReadiness(context, protocolVersion, options);
   }
 }
 

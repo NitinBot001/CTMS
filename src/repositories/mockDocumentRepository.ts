@@ -8,6 +8,8 @@ import {
   CreateDocumentVersionInput,
   UpdateDocumentInput,
   DocumentExpiryState,
+  DocumentBundle,
+  SiteActivationReadinessResult,
   User,
   UserRole,
 } from '../types';
@@ -23,6 +25,7 @@ import {
   isDocumentActionRequired,
   DOCUMENT_REFERENCE_DATE,
 } from '../utils/documentCalculations';
+import { calculateSiteActivationReadiness } from '../utils/siteActivationCalculations';
 
 export class MockDocumentRepository implements IDocumentRepository {
   private documents: Document[];
@@ -95,6 +98,17 @@ export class MockDocumentRepository implements IDocumentRepository {
     let result = this.documents.filter(
       (d) => d.studyId === context.studyId && d.siteId === context.siteId
     );
+
+    // Bundle scoping: by default separate start-up package from routine site documents
+    if (filters?.bundleId && filters.bundleId !== 'ALL') {
+      if (filters.bundleId === 'ROUTINE_ONLY') {
+        result = result.filter((d) => !d.bundleId);
+      } else {
+        result = result.filter((d) => d.bundleId === filters.bundleId);
+      }
+    } else if (!filters?.includeStartupBundle && filters?.bundleId !== 'ALL') {
+      result = result.filter((d) => !d.bundleId);
+    }
 
     if (!filters) {
       return structuredClone(result);
@@ -191,7 +205,7 @@ export class MockDocumentRepository implements IDocumentRepository {
       (d) =>
         d.id === documentId &&
         d.studyId === context.studyId &&
-        d.siteId === context.siteId
+        (d.siteId === context.siteId || d.applicability === 'ALL_SITES')
     );
 
     return doc ? structuredClone(doc) : null;
@@ -204,7 +218,7 @@ export class MockDocumentRepository implements IDocumentRepository {
     context: ParticipantQueryContext
   ): Promise<DocumentSummaryMetrics> {
     const docs = this.documents.filter(
-      (d) => d.studyId === context.studyId && d.siteId === context.siteId
+      (d) => d.studyId === context.studyId && d.siteId === context.siteId && !d.bundleId
     );
 
     const total = docs.length;
@@ -511,6 +525,81 @@ export class MockDocumentRepository implements IDocumentRepository {
     referenceDate: string = DOCUMENT_REFERENCE_DATE
   ): DocumentExpiryState {
     return calculateDocumentExpiryState(document, referenceDate);
+  }
+
+  /**
+   * Retrieves canonical start-up bundle metadata and contained document references
+   */
+  async getStartupBundle(
+    context: ParticipantQueryContext,
+    bundleId: string = 'CRO-BUNDLE-STUDY001-SITE001-001'
+  ): Promise<DocumentBundle | null> {
+    if (!context.studyId || !context.siteId) return null;
+
+    const bundleDocs = this.documents.filter(
+      (d) =>
+        d.studyId === context.studyId &&
+        d.bundleId === bundleId &&
+        (d.siteId === context.siteId || d.applicability === 'ALL_SITES')
+    );
+
+    if (bundleDocs.length === 0) return null;
+
+    // A site-scoped bundle must contain documents assigned to the querying site
+    const siteSpecificDocs = bundleDocs.filter((d) => d.siteId === context.siteId);
+    if (siteSpecificDocs.length === 0) return null;
+
+    const approvedCount = bundleDocs.filter(
+      (d) =>
+        (d.status === 'ACTIVE' || d.status === 'EXPIRING_SOON') &&
+        (d.reviewStatus === 'REVIEWED_ACCEPTED' || !d.reviewStatus)
+    ).length;
+
+    const pendingCount = bundleDocs.filter(
+      (d) => d.reviewStatus === 'PENDING_REVIEW' || d.status === 'DRAFT'
+    ).length;
+
+    const expiringSoonCount = bundleDocs.filter(
+      (d) => d.status === 'EXPIRING_SOON'
+    ).length;
+
+    return {
+      bundleId,
+      bundleName: 'Study Start-up & Site Activation Bundle — Synthetic',
+      bundleCode: 'BNDL-STARTUP-S01',
+      studyId: context.studyId,
+      siteId: context.siteId,
+      version: '1.0',
+      croOrganizationId: 'ORG-CRO-001',
+      croOrganizationName: 'Veda Research Operations Pvt. Ltd. — MOCK',
+      status: 'READY_FOR_MOCK_ACTIVATION',
+      watermarkNotice: 'SYNTHETIC MOCK TEST BUNDLE — FOR SOFTWARE VALIDATION ONLY',
+      documentIds: bundleDocs.map((d) => d.id),
+      totalDocuments: bundleDocs.length,
+      approvedDocuments: approvedCount,
+      pendingDocuments: pendingCount,
+      expiringSoonDocuments: expiringSoonCount,
+      createdAt: '2026-09-01T10:00:00Z',
+      updatedAt: '2026-09-28T16:30:00Z',
+      notes: 'Standard synthetic CRO start-up document package for AIIA CTMS validation.',
+    };
+  }
+
+  /**
+   * Evaluates site activation readiness against core document requirements
+   */
+  async getSiteActivationReadiness(
+    context: ParticipantQueryContext,
+    protocolVersion: string = '1.1',
+    options?: { requireColdChain?: boolean; evaluationDate?: string }
+  ): Promise<SiteActivationReadinessResult> {
+    return calculateSiteActivationReadiness(
+      context.studyId,
+      context.siteId,
+      this.documents,
+      protocolVersion,
+      options
+    );
   }
 }
 

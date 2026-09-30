@@ -756,7 +756,10 @@ export type RelatedEntityType =
   | 'PARTICIPANT'
   | 'VISIT'
   | 'COMPLIANCE'
-  | 'SAFETY';
+  | 'SAFETY'
+  | 'TASK'
+  | 'DOCUMENT'
+  | 'DOCUMENT_BUNDLE';
 
 export interface TaskAssignment {
   id: string;
@@ -937,9 +940,94 @@ export interface Document {
   createdBy: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
-  relatedEntityType?: 'PARTICIPANT' | 'VISIT' | 'COMPLIANCE' | 'SAFETY' | 'TASK';
+  relatedEntityType?: 'PARTICIPANT' | 'VISIT' | 'COMPLIANCE' | 'SAFETY' | 'TASK' | 'DOCUMENT' | 'DOCUMENT_BUNDLE';
   relatedEntityId?: string;
   versions: DocumentVersion[];
+  // Bundle and Start-up Governance Metadata
+  bundleId?: string;
+  bundleCategory?: 'REGULATORY_ETHICS' | 'PROTOCOL_SCIENTIFIC' | 'SITE_INVESTIGATOR' | 'CONTRACTUAL_FINANCIAL' | 'IP_PHARMACY' | 'LABORATORY' | 'ACTIVATION_READINESS';
+  sourceType?: 'CRO' | 'SPONSOR' | 'SITE' | 'REGULATORY_AUTHORITY' | 'ETHICS_COMMITTEE' | 'CENTRAL_LAB' | 'VENDOR';
+  sourceName?: string;
+  receivedDate?: string;
+  requiredFor?: 'STUDY_STARTUP' | 'SITE_ACTIVATION' | 'ROUTINE_MONITORING' | 'SAFETY_REPORTING' | 'CLOSE_OUT';
+  applicability?: 'ALL_SITES' | 'SITE_SPECIFIC' | 'CONDITIONAL';
+  isConditional?: boolean;
+  conditionDescription?: string;
+  reviewStatus?: 'PENDING_REVIEW' | 'REVIEWED_ACCEPTED' | 'REJECTED' | 'CONDITIONAL_APPROVAL';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  supersedesDocumentId?: string;
+  isSyntheticWatermarked?: boolean;
+  syntheticWatermarkText?: string;
+}
+
+export interface DocumentBundle {
+  bundleId: string;
+  bundleName: string;
+  bundleCode: string;
+  studyId: string;
+  siteId: string;
+  version: string;
+  croOrganizationId?: string;
+  croOrganizationName?: string;
+  status: 'DRAFT' | 'IN_REVIEW' | 'READY_FOR_MOCK_ACTIVATION' | 'ACTIVATED' | 'REJECTED';
+  watermarkNotice: string;
+  documentIds: string[];
+  totalDocuments: number;
+  approvedDocuments: number;
+  pendingDocuments: number;
+  expiringSoonDocuments: number;
+  createdAt: string;
+  updatedAt: string;
+  activatedAt?: string;
+  activatedBy?: string;
+  notes?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  code: string;
+  type: 'CRO' | 'SPONSOR' | 'SITE' | 'REGULATORY' | 'ETHICS_COMMITTEE' | 'CENTRAL_LAB' | 'VENDOR';
+  status: 'ACTIVE' | 'INACTIVE';
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  isSynthetic: boolean;
+  watermarkNotice?: string;
+}
+
+export interface SiteActivationReadinessResult {
+  studyId: string;
+  siteId: string;
+  evaluationDate: string;
+  protocolVersion: string;
+  status: 'READY' | 'READY_WITH_CONDITIONS' | 'NOT_READY';
+  statusLabel: string;
+  isReadyForActivation: boolean;
+  totalRequired: number;
+  approvedCount: number;
+  pendingReviewCount: number;
+  missingCount: number;
+  expiredCount: number;
+  expiringSoonCount: number;
+  blockingIssues: string[];
+  conditions: string[];
+  warnings: string[];
+  categoryBreakdown: Record<
+    string,
+    {
+      categoryName: string;
+      total: number;
+      approved: number;
+      missing: number;
+      expired: number;
+      isReady: boolean;
+    }
+  >;
+  missingRequiredTypes: string[];
 }
 
 export interface DocumentSummaryMetrics {
@@ -966,6 +1054,8 @@ export interface DocumentFilters {
     | 'NEXT_30_DAYS';
   isRequired?: boolean | 'ALL';
   ownerUserId?: string | 'ALL';
+  bundleId?: string | 'ALL' | 'ROUTINE_ONLY';
+  includeStartupBundle?: boolean;
 }
 
 export interface CreateDocumentInput {
@@ -2234,5 +2324,433 @@ export interface AyurvedaTerminologyFilter {
   status?: AyurvedaTerminologyStatus;
   search?: string;
 }
+
+// ============================================================
+// STAGE 3: AYURVEDA PARTICIPANT + CLINICAL ASSESSMENT FRAMEWORK
+// DIGITAL QUESTIONNAIRE BUILDER + DYNAMIC RESPONSE COLLECTION
+// ============================================================
+
+export type AssessmentAdministrationMode =
+  | 'STAFF_ASSESSOR'
+  | 'PARTICIPANT_SELF_REPORT'
+  | 'STAFF_AND_PARTICIPANT'
+  | 'INSTRUMENT_ONLY';
+
+export type AssessmentContentSourceType =
+  | 'SOURCE_REFERENCED'
+  | 'PROJECT_AUTHORED'
+  | 'SYNTHETIC_DEMO'
+  | 'LICENSED'
+  | 'INTERNAL_RESEARCH_CONTENT';
+
+export type AssessmentRightsStatus =
+  | 'VERIFIED'
+  | 'PENDING_REVIEW'
+  | 'RESTRICTED'
+  | 'UNKNOWN';
+
+export type AssessmentVersionStatus =
+  | 'DRAFT'
+  | 'IN_REVIEW'
+  | 'APPROVED'
+  | 'ACTIVE'
+  | 'RETIRED';
+
+export type AssessmentSessionStatus =
+  | 'DRAFT'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'REVISION_REQUIRED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type AssessmentAssignmentStatus =
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type AssessmentReviewStatus =
+  | 'APPROVED'
+  | 'REVISION_REQUESTED'
+  | 'REJECTED';
+
+export type AssessmentItemType =
+  | 'SINGLE_CHOICE'
+  | 'MULTI_CHOICE'
+  | 'YES_NO'
+  | 'TEXT'
+  | 'LONG_TEXT'
+  | 'INTEGER'
+  | 'DECIMAL'
+  | 'DATE'
+  | 'TIME'
+  | 'DATE_TIME'
+  | 'SCALE'
+  | 'BODY_DIAGRAM'
+  | 'FILE_REFERENCE'
+  | 'OBSERVATION'
+  | 'INSTRUCTION';
+
+export type AssessmentRuleOperator =
+  | 'EQUALS'
+  | 'NOT_EQUALS'
+  | 'CONTAINS'
+  | 'GREATER_THAN'
+  | 'LESS_THAN'
+  | 'IS_ANSWERED'
+  | 'IS_UNANSWERED'
+  | 'IN'
+  | 'NOT_IN';
+
+export type AssessmentRuleAction =
+  | 'SHOW_ITEM'
+  | 'HIDE_ITEM'
+  | 'SHOW_SECTION'
+  | 'HIDE_SECTION'
+  | 'SKIP_TO_ITEM'
+  | 'SKIP_TO_SECTION'
+  | 'END_ASSESSMENT'
+  | 'ENABLE_ITEM'
+  | 'DISABLE_ITEM'
+  | 'REQUIRE_ITEM'
+  | 'OPTIONAL_ITEM';
+
+export interface BodyLocationValue {
+  regionId: string;
+  side?: 'LEFT' | 'RIGHT' | 'BILATERAL' | 'MIDLINE';
+  locationNotes?: string;
+}
+
+export interface AssessmentOption {
+  optionId: string;
+  responseDefinitionId?: string;
+  label: string;
+  value: string;
+  order: number;
+  exclusive?: boolean;
+  otherAllowed?: boolean;
+}
+
+export interface AssessmentItemValidationRule {
+  min?: number;
+  max?: number;
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  customMessage?: string;
+}
+
+export interface AssessmentResponseDefinition {
+  id: string;
+  itemType: AssessmentItemType;
+  options?: AssessmentOption[];
+  minVal?: number;
+  maxVal?: number;
+  stepVal?: number;
+  scaleMinLabel?: string;
+  scaleMaxLabel?: string;
+  placeholder?: string;
+}
+
+export interface AssessmentRule {
+  ruleId: string;
+  instrumentVersionId: string;
+  sourceItemId: string;
+  operator: AssessmentRuleOperator;
+  expectedValue?: any;
+  action: AssessmentRuleAction;
+  targetItemId?: string;
+  targetSectionId?: string;
+  priority: number;
+  active: boolean;
+  logicalOperator?: 'AND' | 'OR';
+  secondarySourceItemId?: string;
+  secondaryOperator?: AssessmentRuleOperator;
+  secondaryExpectedValue?: any;
+}
+
+export interface AssessmentSection {
+  sectionId: string;
+  instrumentVersionId: string;
+  sectionCode: string;
+  title: string;
+  description?: string;
+  order: number;
+  required: boolean;
+  displayCondition?: any;
+}
+
+export interface AssessmentItem {
+  itemId: string;
+  instrumentVersionId: string;
+  sectionId: string;
+  itemCode: string;
+  itemType: AssessmentItemType;
+  questionText: string;
+  helpText?: string;
+  order: number;
+  required: boolean;
+  responseDefinitionId?: string;
+  responseDefinition?: AssessmentResponseDefinition;
+  validationRules?: AssessmentItemValidationRule;
+  administrationMode: AssessmentAdministrationMode;
+  provenance?: string;
+  contentSource: AssessmentContentSourceType;
+  active: boolean;
+}
+
+export interface AssessmentInstrumentVersion {
+  versionId: string;
+  instrumentId: string;
+  versionLabel: string;
+  status: AssessmentVersionStatus;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  itemCount: number;
+  contentSource: AssessmentContentSourceType;
+  rightsStatus: AssessmentRightsStatus;
+  immutableAfterActivation: boolean;
+  licenseNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssessmentInstrument {
+  instrumentId: string;
+  localConceptId?: string | null;
+  linkedStage2BInstrumentId: string;
+  category: AyurvedaCategoryCode;
+  name: string;
+  description: string;
+  administrationMode: AssessmentAdministrationMode;
+  sourceAuthority: string;
+  sourceReference: string;
+  contentStatus: AyurvedaContentStatus;
+  rightsStatus: AssessmentRightsStatus;
+  contentSourceType: AssessmentContentSourceType;
+  scoringStatus: AyurvedaScoringStatus;
+  trainingRequired: boolean;
+  trainingProvider?: string;
+  activeVersionId?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssessmentAssignment {
+  assignmentId: string;
+  studyId: string;
+  siteId: string;
+  participantId: string;
+  instrumentId: string;
+  instrumentVersionId: string;
+  assignedBy: string;
+  assignedAt: string;
+  dueAt?: string;
+  status: AssessmentAssignmentStatus;
+  notes?: string;
+}
+
+export interface AssessmentSession {
+  sessionId: string;
+  assignmentId: string;
+  studyId: string;
+  siteId: string;
+  participantId: string;
+  instrumentId: string;
+  instrumentVersionId: string;
+  startedAt: string;
+  lastSavedAt: string;
+  completedAt?: string;
+  status: AssessmentSessionStatus;
+  currentItemId?: string;
+  completionPercentage: number;
+  startedBy: string;
+  completedBy?: string;
+  isFinal?: boolean;
+}
+
+export interface AssessmentResponse {
+  responseId: string;
+  sessionId: string;
+  assignmentId: string;
+  studyId: string;
+  siteId: string;
+  participantId: string;
+  instrumentId: string;
+  instrumentVersionId: string;
+  itemId: string;
+  valueType: AssessmentItemType;
+  value: any;
+  selectedOptionIds?: string[];
+  textValue?: string;
+  numericValue?: number;
+  booleanValue?: boolean;
+  dateValue?: string;
+  bodyLocationValue?: BodyLocationValue;
+  recordedAt: string;
+  recordedBy: string;
+  isFinal: boolean;
+}
+
+export interface AssessmentReview {
+  reviewId: string;
+  sessionId: string;
+  assignmentId: string;
+  studyId: string;
+  siteId: string;
+  reviewerUserId: string;
+  reviewerName: string;
+  reviewerRole: string;
+  reviewStatus: AssessmentReviewStatus;
+  reviewedAt: string;
+  notes?: string;
+  revisionReason?: string;
+}
+
+// Input Types
+export interface CreateAssessmentInstrumentInput {
+  localConceptId?: string | null;
+  linkedStage2BInstrumentId: string;
+  category: AyurvedaCategoryCode;
+  name: string;
+  description?: string;
+  administrationMode?: AssessmentAdministrationMode;
+  sourceAuthority?: string;
+  sourceReference?: string;
+  rightsStatus?: AssessmentRightsStatus;
+  contentSourceType?: AssessmentContentSourceType;
+  trainingRequired?: boolean;
+  trainingProvider?: string;
+}
+
+export interface CreateAssessmentVersionInput {
+  instrumentId: string;
+  versionLabel: string;
+  contentSource?: AssessmentContentSourceType;
+  rightsStatus?: AssessmentRightsStatus;
+  licenseNote?: string;
+}
+
+export interface CreateAssessmentSectionInput {
+  instrumentVersionId: string;
+  sectionCode: string;
+  title: string;
+  description?: string;
+  order?: number;
+  required?: boolean;
+}
+
+export interface CreateAssessmentItemInput {
+  instrumentVersionId: string;
+  sectionId: string;
+  itemCode: string;
+  itemType: AssessmentItemType;
+  questionText: string;
+  helpText?: string;
+  order?: number;
+  required?: boolean;
+  responseDefinition?: AssessmentResponseDefinition;
+  validationRules?: AssessmentItemValidationRule;
+  administrationMode?: AssessmentAdministrationMode;
+  provenance?: string;
+  contentSource?: AssessmentContentSourceType;
+}
+
+export interface CreateAssessmentRuleInput {
+  instrumentVersionId: string;
+  sourceItemId: string;
+  operator: AssessmentRuleOperator;
+  expectedValue?: any;
+  action: AssessmentRuleAction;
+  targetItemId?: string;
+  targetSectionId?: string;
+  priority?: number;
+}
+
+export interface CreateAssessmentAssignmentInput {
+  participantId: string;
+  instrumentId: string;
+  instrumentVersionId?: string;
+  dueAt?: string;
+  notes?: string;
+}
+
+export interface SaveAssessmentResponseInput {
+  sessionId: string;
+  assignmentId: string;
+  participantId: string;
+  instrumentId: string;
+  instrumentVersionId: string;
+  itemId: string;
+  valueType: AssessmentItemType;
+  value: any;
+  selectedOptionIds?: string[];
+  textValue?: string;
+  numericValue?: number;
+  booleanValue?: boolean;
+  dateValue?: string;
+  bodyLocationValue?: BodyLocationValue;
+  isFinal?: boolean;
+}
+
+export interface CreateAssessmentReviewInput {
+  sessionId: string;
+  assignmentId: string;
+  reviewStatus: AssessmentReviewStatus;
+  notes?: string;
+  revisionReason?: string;
+}
+
+export interface AssessmentInstrumentFilter {
+  category?: AyurvedaCategoryCode;
+  administrationMode?: AssessmentAdministrationMode;
+  contentSourceType?: AssessmentContentSourceType;
+  rightsStatus?: AssessmentRightsStatus;
+  search?: string;
+}
+
+export interface AssessmentAssignmentFilter {
+  participantId?: string;
+  instrumentId?: string;
+  status?: AssessmentAssignmentStatus;
+  assignedBy?: string;
+}
+
+export interface AssessmentSessionFilter {
+  participantId?: string;
+  assignmentId?: string;
+  instrumentId?: string;
+  status?: AssessmentSessionStatus;
+}
+
+export interface AssessmentValidationError {
+  path: string;
+  message: string;
+  code: string;
+}
+
+export interface AssessmentValidationWarning {
+  path: string;
+  message: string;
+  code: string;
+}
+
+export interface AssessmentValidationInfo {
+  path: string;
+  message: string;
+  code: string;
+}
+
+export interface AssessmentValidationResult {
+  isValid: boolean;
+  errors: AssessmentValidationError[];
+  warnings: AssessmentValidationWarning[];
+  info: AssessmentValidationInfo[];
+}
+
 
 

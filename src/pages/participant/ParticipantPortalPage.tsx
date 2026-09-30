@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useStudy } from '../../context/StudyContext';
 import { participantService } from '../../services/participantService';
 import { visitService } from '../../services/visitService';
+import { assessmentService } from '../../services/assessmentService';
 import {
   Participant,
   ParticipantVisit,
@@ -10,6 +12,9 @@ import {
   ParticipantRequest,
   CreateParticipantRequestInput,
   ParticipantRequestType,
+  AssessmentAssignment,
+  AssessmentSession,
+  AssessmentInstrument,
 } from '../../types';
 import {
   User,
@@ -24,9 +29,12 @@ import {
   RefreshCw,
   Plus,
   X,
+  ClipboardList,
+  FileEdit,
 } from 'lucide-react';
 
 export const ParticipantPortalPage: React.FC = () => {
+  const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { activeStudy: currentStudy, activeSite: currentSite } = useStudy();
 
@@ -34,6 +42,9 @@ export const ParticipantPortalPage: React.FC = () => {
   const [onboardingRequest, setOnboardingRequest] = useState<ParticipantOnboardingRequest | null>(null);
   const [visits, setVisits] = useState<ParticipantVisit[]>([]);
   const [participantRequests, setParticipantRequests] = useState<ParticipantRequest[]>([]);
+  const [assignments, setAssignments] = useState<AssessmentAssignment[]>([]);
+  const [sessions, setSessions] = useState<AssessmentSession[]>([]);
+  const [instruments, setInstruments] = useState<AssessmentInstrument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -89,14 +100,20 @@ export const ParticipantPortalPage: React.FC = () => {
       }
       setParticipant(linkedPt);
 
-      // 3. If linked participant exists, fetch visits and participant requests
+      // 3. If linked participant exists, fetch visits, requests, and assessments
       if (linkedPt) {
-        const [vList, reqList] = await Promise.all([
+        const [vList, reqList, assignList, sessList, instList] = await Promise.all([
           visitService.getParticipantVisits({ studyId, siteId }, linkedPt.id),
           participantService.getParticipantRequests({ studyId, siteId }, linkedPt.id),
+          assessmentService.getAssignments({ studyId, siteId }, { participantId: linkedPt.id }),
+          assessmentService.getSessions({ studyId, siteId }, { participantId: linkedPt.id }),
+          assessmentService.getInstruments(),
         ]);
         setVisits(vList);
         setParticipantRequests(reqList);
+        setAssignments(assignList);
+        setSessions(sessList);
+        setInstruments(instList);
         if (vList.length > 0 && !selectedVisitId) {
           setSelectedVisitId(vList[0].id);
         }
@@ -465,6 +482,119 @@ export const ParticipantPortalPage: React.FC = () => {
                           <td className="px-4 py-3 text-neutral-600">{v.assignedStaff || 'Study Team'}</td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* My Clinical Assessments (Stage 3 Self-Report) */}
+            <div className="bg-white rounded-sm shadow-xs border border-neutral-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-neutral-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-neutral-50">
+                <div>
+                  <h2 className="font-serif font-semibold text-base text-neutral-900 flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-emerald-700" />
+                    My Clinical Assessments
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Self-report questionnaires, symptom evaluations, and Ayurveda clinical assessments.
+                  </p>
+                </div>
+              </div>
+
+              {assignments.length === 0 ? (
+                <div className="p-8 text-center text-xs text-neutral-500">
+                  No digital questionnaires currently assigned for self-report.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-neutral-100 text-neutral-700 uppercase tracking-wider font-semibold border-b border-neutral-200">
+                      <tr>
+                        <th className="px-4 py-3">Assessment</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Progress</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-200">
+                      {assignments.map((a) => {
+                        const inst = instruments.find((i) => i.instrumentId === a.instrumentId);
+                        const sess = sessions.find((s) => s.assignmentId === a.assignmentId);
+                        const currentStatus = sess ? sess.status : a.status;
+                        const progress = sess ? sess.completionPercentage : 0;
+
+                        return (
+                          <tr key={a.assignmentId} className="hover:bg-neutral-50/80 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-neutral-900">{inst?.name || a.instrumentId}</div>
+                              {a.notes && <div className="text-[11px] text-neutral-500">{a.notes}</div>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-300">
+                                {inst?.category || 'PRAKRITI'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {currentStatus === 'COMPLETED' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Completed
+                                </span>
+                              ) : currentStatus === 'SUBMITTED' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-300">
+                                  <Clock className="w-3 h-3" />
+                                  Submitted (Under Review)
+                                </span>
+                              ) : currentStatus === 'REVISION_REQUIRED' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-red-100 text-red-800 border border-red-300">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Revision Required
+                                </span>
+                              ) : currentStatus === 'IN_PROGRESS' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                                  <Clock className="w-3 h-3" />
+                                  In Progress
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-neutral-100 text-neutral-700 border border-neutral-300">
+                                  Not Started
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="w-24 bg-neutral-200 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-300 ${
+                                    currentStatus === 'COMPLETED' ? 'bg-emerald-600' : 'bg-amber-600'
+                                  }`}
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-neutral-500 mt-0.5 block">{progress}%</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {currentStatus === 'COMPLETED' || currentStatus === 'SUBMITTED' ? (
+                                <button
+                                  onClick={() => navigate(`/participant/assessments/${a.assignmentId}/complete`)}
+                                  className="px-2.5 py-1 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-sm transition-colors"
+                                >
+                                  View Responses
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => navigate(`/participant/assessments/${a.assignmentId}/complete`)}
+                                  className="flex items-center gap-1 ml-auto px-3 py-1 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-sm shadow-xs transition-colors"
+                                >
+                                  <FileEdit className="w-3.5 h-3.5" />
+                                  <span>{sess ? 'Resume' : 'Start'}</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

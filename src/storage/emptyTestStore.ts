@@ -37,6 +37,15 @@ import {
   AyurvedaAssessmentInstrument,
   AyurvedaTerminologyEntry,
   ProtocolAyurvedaAssessment,
+  AssessmentInstrument,
+  AssessmentInstrumentVersion,
+  AssessmentSection,
+  AssessmentItem,
+  AssessmentRule,
+  AssessmentAssignment,
+  AssessmentSession,
+  AssessmentResponse,
+  AssessmentReview,
 } from '../types';
 import { MOCK_ROLES } from '../data/mockData';
 
@@ -76,6 +85,15 @@ export const EMPTY_TEST_KEYS = {
   AYURVEDA_INSTRUMENTS: `${EMPTY_TEST_PREFIX}ayurveda_instruments`,
   AYURVEDA_TERMINOLOGY: `${EMPTY_TEST_PREFIX}ayurveda_terminology`,
   PROTOCOL_AYURVEDA_ASSESSMENTS: `${EMPTY_TEST_PREFIX}protocol_ayurveda_assessments`,
+  STAGE3_INSTRUMENTS: `${EMPTY_TEST_PREFIX}stage3_instruments`,
+  STAGE3_VERSIONS: `${EMPTY_TEST_PREFIX}stage3_versions`,
+  STAGE3_SECTIONS: `${EMPTY_TEST_PREFIX}stage3_sections`,
+  STAGE3_ITEMS: `${EMPTY_TEST_PREFIX}stage3_items`,
+  STAGE3_RULES: `${EMPTY_TEST_PREFIX}stage3_rules`,
+  STAGE3_ASSIGNMENTS: `${EMPTY_TEST_PREFIX}stage3_assignments`,
+  STAGE3_SESSIONS: `${EMPTY_TEST_PREFIX}stage3_sessions`,
+  STAGE3_RESPONSES: `${EMPTY_TEST_PREFIX}stage3_responses`,
+  STAGE3_REVIEWS: `${EMPTY_TEST_PREFIX}stage3_reviews`,
 };
 
 export const EMPTY_TEST_STUDY: Study = {
@@ -502,6 +520,15 @@ export class EmptyTestStore {
     browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_INSTRUMENTS, EMPTY_AYURVEDA_INSTRUMENTS);
     browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_TERMINOLOGY, []);
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, EMPTY_PROTOCOL_AYURVEDA_ASSESSMENTS);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_INSTRUMENTS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_VERSIONS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_SECTIONS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_ITEMS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_RULES, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_ASSIGNMENTS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_SESSIONS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_RESPONSES, []);
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_REVIEWS, []);
 
     return metadata;
   }
@@ -834,6 +861,98 @@ export class EmptyTestStore {
 
   saveProtocolAyurvedaAssessments(assessments: ProtocolAyurvedaAssessment[]): void {
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, assessments);
+  }
+
+  // --- STAGE 3 ASSESSMENTS (EMPTY TEST MODE) ---
+
+  getStage3Instruments(): AssessmentInstrument[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentInstrument[]>(EMPTY_TEST_KEYS.STAGE3_INSTRUMENTS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Instruments(instruments: AssessmentInstrument[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_INSTRUMENTS, instruments);
+  }
+
+  getStage3Versions(): AssessmentInstrumentVersion[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentInstrumentVersion[]>(EMPTY_TEST_KEYS.STAGE3_VERSIONS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Versions(versions: AssessmentInstrumentVersion[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_VERSIONS, versions);
+  }
+
+  getStage3Sections(): AssessmentSection[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentSection[]>(EMPTY_TEST_KEYS.STAGE3_SECTIONS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Sections(sections: AssessmentSection[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_SECTIONS, sections);
+  }
+
+  getStage3Items(): AssessmentItem[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentItem[]>(EMPTY_TEST_KEYS.STAGE3_ITEMS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Items(items: AssessmentItem[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_ITEMS, items);
+  }
+
+  getStage3Rules(): AssessmentRule[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentRule[]>(EMPTY_TEST_KEYS.STAGE3_RULES);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Rules(rules: AssessmentRule[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_RULES, rules);
+  }
+
+  getStage3Assignments(): AssessmentAssignment[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentAssignment[]>(EMPTY_TEST_KEYS.STAGE3_ASSIGNMENTS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Assignments(assignments: AssessmentAssignment[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_ASSIGNMENTS, assignments);
+  }
+
+  getStage3Sessions(): AssessmentSession[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentSession[]>(EMPTY_TEST_KEYS.STAGE3_SESSIONS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Sessions(sessions: AssessmentSession[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_SESSIONS, sessions);
+  }
+
+  getStage3Responses(): AssessmentResponse[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentResponse[]>(EMPTY_TEST_KEYS.STAGE3_RESPONSES);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Responses(responses: AssessmentResponse[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_RESPONSES, responses);
+  }
+
+  getStage3Reviews(): AssessmentReview[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AssessmentReview[]>(EMPTY_TEST_KEYS.STAGE3_REVIEWS);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveStage3Reviews(reviews: AssessmentReview[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.STAGE3_REVIEWS, reviews);
   }
 }
 

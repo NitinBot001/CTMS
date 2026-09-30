@@ -3,6 +3,7 @@ import {
   BookOpen,
   Users,
   CalendarCheck,
+  ClipboardList,
   ShieldAlert,
   FileCheck2,
   UserCheck,
@@ -42,6 +43,12 @@ export const BASE_NAV_ITEMS: NavigationItem[] = [
     name: 'Visits & Activities',
     path: '/pi/visits',
     icon: CalendarCheck,
+    permission: 'VISITS_VIEW',
+  },
+  {
+    name: 'Assessments',
+    path: '/pi/assessments',
+    icon: ClipboardList,
     permission: 'VISITS_VIEW',
   },
   {

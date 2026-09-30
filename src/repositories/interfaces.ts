@@ -44,6 +44,8 @@ import {
   DocumentVersion,
   DocumentSummaryMetrics,
   DocumentFilters,
+  DocumentBundle,
+  SiteActivationReadinessResult,
   CreateDocumentInput,
   CreateDocumentVersionInput,
   UpdateDocumentInput,
@@ -112,6 +114,28 @@ import {
   AyurvedaInstrumentFilter,
   AyurvedaTerminologyFilter,
   AyurvedaCategoryCode,
+  AssessmentInstrument,
+  AssessmentInstrumentVersion,
+  AssessmentSection,
+  AssessmentItem,
+  AssessmentRule,
+  AssessmentAssignment,
+  AssessmentSession,
+  AssessmentResponse,
+  AssessmentReview,
+  CreateAssessmentInstrumentInput,
+  CreateAssessmentVersionInput,
+  CreateAssessmentSectionInput,
+  CreateAssessmentItemInput,
+  CreateAssessmentRuleInput,
+  CreateAssessmentAssignmentInput,
+  SaveAssessmentResponseInput,
+  CreateAssessmentReviewInput,
+  AssessmentInstrumentFilter,
+  AssessmentAssignmentFilter,
+  AssessmentSessionFilter,
+  AssessmentAssignmentStatus,
+  AssessmentSessionStatus,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -371,6 +395,15 @@ export interface IDocumentRepository {
     document: Document,
     referenceDate?: string
   ): DocumentExpiryState;
+  getStartupBundle(
+    context: ParticipantQueryContext,
+    bundleId?: string
+  ): Promise<DocumentBundle | null>;
+  getSiteActivationReadiness(
+    context: ParticipantQueryContext,
+    protocolVersion?: string,
+    options?: { requireColdChain?: boolean; evaluationDate?: string }
+  ): Promise<SiteActivationReadinessResult>;
 }
 
 export interface IReportRepository {
@@ -639,6 +672,69 @@ export interface IAyurvedaConfigurationRepository {
   // Downstream visit queries
   getAyurvedaAssessmentsForVisit(protocolVersionId: string, visitDefinitionId: string): Promise<ProtocolAyurvedaAssessment[]>;
 }
+
+export interface IAssessmentRepository {
+  // Instruments
+  getInstruments(filter?: AssessmentInstrumentFilter): Promise<AssessmentInstrument[]>;
+  getInstrumentById(instrumentId: string): Promise<AssessmentInstrument | null>;
+  createInstrument(input: CreateAssessmentInstrumentInput): Promise<AssessmentInstrument>;
+  updateInstrument(instrumentId: string, updates: Partial<AssessmentInstrument>): Promise<AssessmentInstrument | null>;
+
+  // Versions
+  getInstrumentVersions(instrumentId: string): Promise<AssessmentInstrumentVersion[]>;
+  getInstrumentVersionById(versionId: string): Promise<AssessmentInstrumentVersion | null>;
+  createInstrumentVersion(input: CreateAssessmentVersionInput): Promise<AssessmentInstrumentVersion>;
+  updateInstrumentVersion(versionId: string, updates: Partial<AssessmentInstrumentVersion>): Promise<AssessmentInstrumentVersion | null>;
+  publishInstrumentVersion(versionId: string): Promise<AssessmentInstrumentVersion | null>;
+
+  // Sections
+  getSections(versionId: string): Promise<AssessmentSection[]>;
+  getSectionById(sectionId: string): Promise<AssessmentSection | null>;
+  createSection(input: CreateAssessmentSectionInput): Promise<AssessmentSection>;
+  updateSection(sectionId: string, updates: Partial<AssessmentSection>): Promise<AssessmentSection | null>;
+  deleteSection(sectionId: string): Promise<boolean>;
+  reorderSections(versionId: string, sectionIds: string[]): Promise<AssessmentSection[]>;
+
+  // Items
+  getItems(versionId: string): Promise<AssessmentItem[]>;
+  getItemById(itemId: string): Promise<AssessmentItem | null>;
+  createItem(input: CreateAssessmentItemInput): Promise<AssessmentItem>;
+  updateItem(itemId: string, updates: Partial<AssessmentItem>): Promise<AssessmentItem | null>;
+  deleteItem(itemId: string): Promise<boolean>;
+  reorderItems(versionId: string, sectionId: string, itemIds: string[]): Promise<AssessmentItem[]>;
+
+  // Rules
+  getRules(versionId: string): Promise<AssessmentRule[]>;
+  getRuleById(ruleId: string): Promise<AssessmentRule | null>;
+  createRule(input: CreateAssessmentRuleInput): Promise<AssessmentRule>;
+  updateRule(ruleId: string, updates: Partial<AssessmentRule>): Promise<AssessmentRule | null>;
+  deleteRule(ruleId: string): Promise<boolean>;
+
+  // Assignments
+  getAssignments(scope: { studyId: string; siteId: string }, filter?: AssessmentAssignmentFilter): Promise<AssessmentAssignment[]>;
+  getAssignmentById(scope: { studyId: string; siteId: string }, assignmentId: string): Promise<AssessmentAssignment | null>;
+  createAssignment(scope: { studyId: string; siteId: string }, input: CreateAssessmentAssignmentInput, assignedBy: string): Promise<AssessmentAssignment>;
+  updateAssignmentStatus(scope: { studyId: string; siteId: string }, assignmentId: string, status: AssessmentAssignmentStatus): Promise<AssessmentAssignment | null>;
+
+  // Sessions
+  getSessions(scope: { studyId: string; siteId: string }, filter?: AssessmentSessionFilter): Promise<AssessmentSession[]>;
+  getSessionById(scope: { studyId: string; siteId: string }, sessionId: string): Promise<AssessmentSession | null>;
+  getSessionByAssignmentId(scope: { studyId: string; siteId: string }, assignmentId: string): Promise<AssessmentSession | null>;
+  startSession(scope: { studyId: string; siteId: string }, assignmentId: string, startedBy: string): Promise<AssessmentSession>;
+  saveSessionProgress(scope: { studyId: string; siteId: string }, sessionId: string, currentItemId?: string, percentage?: number): Promise<AssessmentSession | null>;
+  submitSession(scope: { studyId: string; siteId: string }, sessionId: string, submittedBy: string): Promise<AssessmentSession | null>;
+  updateSessionStatus(scope: { studyId: string; siteId: string }, sessionId: string, newStatus: AssessmentSessionStatus, updatedBy: string): Promise<AssessmentSession | null>;
+
+  // Responses
+  getResponses(scope: { studyId: string; siteId: string }, sessionId: string): Promise<AssessmentResponse[]>;
+  saveResponse(scope: { studyId: string; siteId: string }, input: SaveAssessmentResponseInput, recordedBy: string): Promise<AssessmentResponse>;
+  saveResponsesBatch(scope: { studyId: string; siteId: string }, inputs: SaveAssessmentResponseInput[], recordedBy: string): Promise<AssessmentResponse[]>;
+
+  // Reviews
+  getReviews(scope: { studyId: string; siteId: string }, sessionId: string): Promise<AssessmentReview[]>;
+  createReview(scope: { studyId: string; siteId: string }, input: CreateAssessmentReviewInput, reviewerUser: { id: string; name: string; role: string }): Promise<AssessmentReview>;
+}
+
 
 
 

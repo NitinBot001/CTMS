@@ -39,6 +39,10 @@ import { DataEntryDashboardPage } from '../pages/dashboards/DataEntryDashboardPa
 import { DataEntryRecordPage } from '../pages/dataEntry/DataEntryRecordPage';
 import { VerificationDetailPage } from '../pages/dataEntry/VerificationDetailPage';
 import { ParticipantPortalPage } from '../pages/participant/ParticipantPortalPage';
+import { AssessmentsDirectoryPage } from '../pages/assessments/AssessmentsDirectoryPage';
+import { AssessmentBuilderPage } from '../pages/assessments/AssessmentBuilderPage';
+import { AssessmentRunnerPage } from '../pages/assessments/AssessmentRunnerPage';
+import { AssessmentReviewPage } from '../pages/assessments/AssessmentReviewPage';
 
 /**
  * Root redirect handler:
@@ -68,6 +72,18 @@ export const AppRoutes: React.FC = () => {
           <RequireAuth>
             <RequirePermission permission="PARTICIPANT_SELF_VIEW">
               <ParticipantPortalPage />
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Participant Assessment Self-Report Runner */}
+      <Route
+        path="/participant/assessments/:assignmentId/complete"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="PARTICIPANT_SELF_VIEW">
+              <AssessmentRunnerPage />
             </RequirePermission>
           </RequireAuth>
         }
@@ -249,6 +265,62 @@ export const AppRoutes: React.FC = () => {
             <RequirePermission permission="VISITS_VIEW">
               <AppShell pageTitle="Visit Detail & Procedures">
                 <VisitDetailPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Ayurveda Clinical Assessments Directory (Stage 3) */}
+      <Route
+        path="/pi/assessments"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="VISITS_VIEW">
+              <AppShell pageTitle="Clinical Assessments">
+                <AssessmentsDirectoryPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Assessment Runner / Data Collection (Stage 3) */}
+      <Route
+        path="/pi/assessments/:assignmentId"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="VISITS_VIEW">
+              <AppShell pageTitle="Assessment Execution">
+                <AssessmentRunnerPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Assessment Sub-I & PI Clinical Review (Stage 3) */}
+      <Route
+        path="/pi/assessments/:assignmentId/review"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="DATA_ENTRY_VERIFY">
+              <AppShell pageTitle="Assessment Clinical Review">
+                <AssessmentReviewPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Assessment Questionnaire Builder (Stage 3) */}
+      <Route
+        path="/pi/protocol/assessments/:instrumentId/builder"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="STUDY_MANAGE">
+              <AppShell pageTitle="Questionnaire Builder">
+                <AssessmentBuilderPage />
               </AppShell>
             </RequirePermission>
           </RequireAuth>

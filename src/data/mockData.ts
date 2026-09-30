@@ -1,4 +1,5 @@
 import { Study, DashboardOverviewData, Participant, ProtocolVisitDefinition, ParticipantVisit, SafetyEvent, ProtocolDeviation, User, Role, Permission, UserRole, Task, Document, Notification, VisitDataRecord } from '../types';
+import { MOCK_STARTUP_DOCUMENTS } from './mockDocumentBundleSeed';
 
 export const MOCK_STUDIES: Study[] = [
   {
@@ -3756,6 +3757,8 @@ export const MOCK_DOCUMENTS: Document[] = [
       },
     ],
   },
+  // Canonical CRO -> Site Start-up / Activation Document Bundle (34 documents)
+  ...MOCK_STARTUP_DOCUMENTS,
 ];
 
 // ============================================================
