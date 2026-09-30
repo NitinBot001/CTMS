@@ -22,6 +22,17 @@ import {
   ProtocolVisitDefinition,
   ParticipantOnboardingRequest,
   ParticipantRequest,
+  Protocol,
+  ProtocolVersion,
+  ProtocolEligibilityCriterion,
+  ProtocolAssessmentDefinition,
+  ProtocolInvestigationDefinition,
+  ProtocolOutcomeDefinition,
+  ProtocolFormDefinition,
+  ProtocolConsentRequirement,
+  ProtocolSafetyRequirement,
+  ProtocolDeviationRequirement,
+  ProtocolMilestone,
 } from '../types';
 import { MOCK_ROLES } from '../data/mockData';
 
@@ -45,6 +56,18 @@ export const EMPTY_TEST_KEYS = {
   PASSWORDS: `${EMPTY_TEST_PREFIX}passwords`,
   ONBOARDING_REQUESTS: `${EMPTY_TEST_PREFIX}onboarding_requests`,
   PARTICIPANT_REQUESTS: `${EMPTY_TEST_PREFIX}participant_requests`,
+  PROTOCOLS: `${EMPTY_TEST_PREFIX}protocols`,
+  PROTOCOL_VERSIONS: `${EMPTY_TEST_PREFIX}protocol_versions`,
+  PROTOCOL_ELIGIBILITY: `${EMPTY_TEST_PREFIX}protocol_eligibility`,
+  PROTOCOL_VISITS: `${EMPTY_TEST_PREFIX}protocol_visits`,
+  PROTOCOL_ASSESSMENTS: `${EMPTY_TEST_PREFIX}protocol_assessments`,
+  PROTOCOL_INVESTIGATIONS: `${EMPTY_TEST_PREFIX}protocol_investigations`,
+  PROTOCOL_OUTCOMES: `${EMPTY_TEST_PREFIX}protocol_outcomes`,
+  PROTOCOL_FORMS: `${EMPTY_TEST_PREFIX}protocol_forms`,
+  PROTOCOL_CONSENT: `${EMPTY_TEST_PREFIX}protocol_consent`,
+  PROTOCOL_SAFETY: `${EMPTY_TEST_PREFIX}protocol_safety`,
+  PROTOCOL_DEVIATIONS: `${EMPTY_TEST_PREFIX}protocol_deviations`,
+  PROTOCOL_MILESTONES: `${EMPTY_TEST_PREFIX}protocol_milestones`,
 };
 
 export const EMPTY_TEST_STUDY: Study = {
@@ -94,58 +117,250 @@ export const BOOTSTRAP_PI_USER_ROLE: UserRole = {
   assignedBy: 'SYSTEM_BOOTSTRAP',
 };
 
+export const EMPTY_PROTOCOL: Protocol = {
+  id: 'PROTO-EMPTY-001',
+  studyId: 'EMPTY-STUDY-001',
+  name: 'AIIA Empty Test Clinical Protocol',
+  shortTitle: 'Empty Test Protocol',
+  protocolNumber: 'AIIA-PROTO-EMPTY-001',
+  currentVersionId: 'VER-EMPTY-001-v1',
+  status: 'ACTIVE',
+  description: 'Clean synthetic workflow test protocol for clinical research operations.',
+  sponsorName: 'AIIA Research Directorate',
+  therapeuticArea: 'Ayurveda Clinical Research',
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-01T00:00:00Z',
+};
+
+export const EMPTY_PROTOCOL_VERSION_V1: ProtocolVersion = {
+  id: 'VER-EMPTY-001-v1',
+  protocolId: 'PROTO-EMPTY-001',
+  studyId: 'EMPTY-STUDY-001',
+  versionNumber: '1.0',
+  versionLabel: 'Version 1.0 (Initial Active)',
+  status: 'ACTIVE',
+  effectiveDate: '2026-09-01',
+  approvalDate: '2026-09-01',
+  changeSummary: 'Initial empty test study protocol configuration.',
+  createdBy: 'Dr. Test PI',
+  activatedBy: 'Dr. Test PI',
+  activatedAt: '2026-09-01T00:00:00Z',
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-01T00:00:00Z',
+};
+
+export const EMPTY_PROTOCOL_ELIGIBILITY: ProtocolEligibilityCriterion[] = [
+  {
+    id: 'CRIT-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    type: 'INCLUSION',
+    criterionCode: 'INC-01',
+    title: 'Adult participant aged 18 to 65 years',
+    description: 'Participant must be willing and able to provide written informed consent.',
+    displayOrder: 1,
+    required: true,
+    active: true,
+  },
+  {
+    id: 'CRIT-EMPTY-02',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    type: 'EXCLUSION',
+    criterionCode: 'EXC-01',
+    title: 'Known hypersensitivity to investigational product',
+    description: 'Any active severe medical illness confounding safety assessments.',
+    displayOrder: 2,
+    required: true,
+    active: true,
+  },
+];
+
 export const EMPTY_PROTOCOL_VISITS: ProtocolVisitDefinition[] = [
   {
     id: 'PV-EMPTY-01',
     studyId: 'EMPTY-STUDY-001',
+    protocolVersionId: 'VER-EMPTY-001-v1',
     code: 'SCR',
     name: 'Screening Visit',
     sequence: 1,
     anchor: 'SCREENING_DATE',
     targetOffsetDays: 0,
+    targetDay: 0,
     windowBeforeDays: 0,
     windowAfterDays: 0,
+    required: true,
+    visitType: 'SCREENING',
     requiredActivities: ['ICF', 'INC_EXC', 'VITALS'],
     description: 'Informed consent, eligibility screening, medical history.',
   },
   {
     id: 'PV-EMPTY-02',
     studyId: 'EMPTY-STUDY-001',
+    protocolVersionId: 'VER-EMPTY-001-v1',
     code: 'DAY-01',
     name: 'Baseline & Randomization',
     sequence: 2,
     anchor: 'ENROLLMENT_DATE',
     targetOffsetDays: 0,
+    targetDay: 0,
     windowBeforeDays: 0,
     windowAfterDays: 2,
+    required: true,
+    visitType: 'BASELINE',
     requiredActivities: ['VITALS', 'LAB', 'DISP'],
     description: 'Baseline vital signs, laboratory tests, initial dispensing.',
   },
   {
     id: 'PV-EMPTY-03',
     studyId: 'EMPTY-STUDY-001',
+    protocolVersionId: 'VER-EMPTY-001-v1',
     code: 'WK-04',
     name: 'Week 4 Follow-up',
     sequence: 3,
     anchor: 'ENROLLMENT_DATE',
     targetOffsetDays: 28,
+    targetDay: 28,
     windowBeforeDays: 3,
     windowAfterDays: 3,
+    required: true,
+    visitType: 'TREATMENT',
     requiredActivities: ['VITALS', 'AE_CHECK'],
     description: 'Mid-term safety evaluation, compliance check.',
   },
   {
     id: 'PV-EMPTY-04',
     studyId: 'EMPTY-STUDY-001',
+    protocolVersionId: 'VER-EMPTY-001-v1',
     code: 'WK-12',
     name: 'Week 12 Closeout Visit',
     sequence: 4,
     anchor: 'ENROLLMENT_DATE',
     targetOffsetDays: 84,
+    targetDay: 84,
     windowBeforeDays: 5,
     windowAfterDays: 5,
+    required: true,
+    visitType: 'END_OF_STUDY',
     requiredActivities: ['FINAL_EXAM', 'DRUG_RET'],
     description: 'Study completion procedures, end-of-study assessments.',
+  },
+];
+
+export const EMPTY_PROTOCOL_ASSESSMENTS: ProtocolAssessmentDefinition[] = [
+  {
+    id: 'ASM-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    code: 'ASM-VITALS',
+    name: 'Baseline Vitals & General Exam',
+    category: 'VITALS',
+    visitDefinitionId: 'PV-EMPTY-02',
+    description: 'Measurement of heart rate, blood pressure, temperature, and BMI.',
+    required: true,
+    displayOrder: 1,
+    status: 'ACTIVE',
+    version: '1.0',
+    participantVisible: false,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+];
+
+export const EMPTY_PROTOCOL_INVESTIGATIONS: ProtocolInvestigationDefinition[] = [
+  {
+    id: 'INV-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    code: 'INV-LAB-CBC',
+    name: 'Complete Blood Count (CBC)',
+    category: 'LABORATORY',
+    visitDefinitionId: 'PV-EMPTY-02',
+    description: 'Hemoglobin, total leukocyte count, differential count, and platelet count.',
+    required: true,
+    displayOrder: 1,
+    status: 'ACTIVE',
+    participantVisible: false,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+];
+
+export const EMPTY_PROTOCOL_OUTCOMES: ProtocolOutcomeDefinition[] = [
+  {
+    id: 'OUT-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    code: 'OUT-PRIMARY-01',
+    name: 'Primary Symptom Reduction Score',
+    description: 'Change in clinical symptom severity score from baseline to closeout.',
+    outcomeType: 'PRIMARY',
+    visitDefinitionId: 'PV-EMPTY-02',
+    timepoint: 'Baseline & Closeout',
+    required: true,
+    displayOrder: 1,
+    status: 'ACTIVE',
+  },
+];
+
+export const EMPTY_PROTOCOL_FORMS: ProtocolFormDefinition[] = [
+  {
+    id: 'FORM-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    code: 'FORM-BASELINE-CRF',
+    name: 'Baseline Clinical CRF',
+    formType: 'VISIT',
+    description: 'Case report form capturing baseline vital signs and eligibility confirmation.',
+    applicableVisitDefinitionId: 'PV-EMPTY-02',
+    required: true,
+    displayOrder: 1,
+    status: 'ACTIVE',
+    participantVisible: false,
+    dataDomain: 'CLINICAL',
+    version: '1.0',
+  },
+];
+
+export const EMPTY_PROTOCOL_CONSENT: ProtocolConsentRequirement[] = [
+  {
+    id: 'CNS-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    consentType: 'INFORMED_CONSENT',
+    requiredBefore: 'SCREENING',
+    required: true,
+    versionReference: 'ICF-v1.0',
+    participantVisible: true,
+    description: 'Institutional Ethics Committee approved participant information sheet and consent form.',
+  },
+];
+
+export const EMPTY_PROTOCOL_SAFETY: ProtocolSafetyRequirement[] = [
+  {
+    id: 'SFT-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    eventType: 'AE',
+    required: true,
+    reportingWindow: '24_HOURS',
+    description: 'Adverse event documentation and medical causality assessment within 24 hours of occurrence.',
+    active: true,
+  },
+];
+
+export const EMPTY_PROTOCOL_DEVIATIONS: ProtocolDeviationRequirement[] = [
+  {
+    id: 'DEV-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    category: 'VISIT_WINDOW',
+    description: 'Deviation logged if clinical visit occurs outside protocol-defined allowable window.',
+    required: true,
+    active: true,
+  },
+];
+
+export const EMPTY_PROTOCOL_MILESTONES: ProtocolMilestone[] = [
+  {
+    id: 'MLS-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    type: 'ETHICS_APPROVAL',
+    name: 'Institutional Ethics Committee Approval',
+    status: 'ACHIEVED',
+    required: true,
+    description: 'Formal IEC approval certificate received for study protocol.',
   },
 ];
 
@@ -201,6 +416,18 @@ export class EmptyTestStore {
     });
     browserStorage.set(EMPTY_TEST_KEYS.ONBOARDING_REQUESTS, []);
     browserStorage.set(EMPTY_TEST_KEYS.PARTICIPANT_REQUESTS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOLS, [EMPTY_PROTOCOL]);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_VERSIONS, [EMPTY_PROTOCOL_VERSION_V1]);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_ELIGIBILITY, EMPTY_PROTOCOL_ELIGIBILITY);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_VISITS, EMPTY_PROTOCOL_VISITS);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_ASSESSMENTS, EMPTY_PROTOCOL_ASSESSMENTS);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_INVESTIGATIONS, EMPTY_PROTOCOL_INVESTIGATIONS);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_OUTCOMES, EMPTY_PROTOCOL_OUTCOMES);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_FORMS, EMPTY_PROTOCOL_FORMS);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_CONSENT, EMPTY_PROTOCOL_CONSENT);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_SAFETY, EMPTY_PROTOCOL_SAFETY);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_DEVIATIONS, EMPTY_PROTOCOL_DEVIATIONS);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_MILESTONES, EMPTY_PROTOCOL_MILESTONES);
 
     return metadata;
   }
@@ -369,6 +596,128 @@ export class EmptyTestStore {
 
   saveParticipantRequests(requests: ParticipantRequest[]): void {
     browserStorage.set(EMPTY_TEST_KEYS.PARTICIPANT_REQUESTS, requests);
+  }
+
+  // --- Protocol Domain Accessors ---
+
+  getProtocols(): Protocol[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<Protocol[]>(EMPTY_TEST_KEYS.PROTOCOLS);
+    return stored !== null && stored !== undefined ? stored : [EMPTY_PROTOCOL];
+  }
+
+  saveProtocols(protocols: Protocol[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOLS, protocols);
+  }
+
+  getProtocolVersions(): ProtocolVersion[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolVersion[]>(EMPTY_TEST_KEYS.PROTOCOL_VERSIONS);
+    return stored !== null && stored !== undefined ? stored : [EMPTY_PROTOCOL_VERSION_V1];
+  }
+
+  saveProtocolVersions(versions: ProtocolVersion[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_VERSIONS, versions);
+  }
+
+  getEligibilityCriteria(): ProtocolEligibilityCriterion[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolEligibilityCriterion[]>(EMPTY_TEST_KEYS.PROTOCOL_ELIGIBILITY);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_ELIGIBILITY);
+  }
+
+  saveEligibilityCriteria(criteria: ProtocolEligibilityCriterion[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_ELIGIBILITY, criteria);
+  }
+
+  getProtocolVisits(): ProtocolVisitDefinition[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolVisitDefinition[]>(EMPTY_TEST_KEYS.PROTOCOL_VISITS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_VISITS);
+  }
+
+  saveProtocolVisits(visits: ProtocolVisitDefinition[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_VISITS, visits);
+  }
+
+  getAssessments(): ProtocolAssessmentDefinition[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolAssessmentDefinition[]>(EMPTY_TEST_KEYS.PROTOCOL_ASSESSMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_ASSESSMENTS);
+  }
+
+  saveAssessments(assessments: ProtocolAssessmentDefinition[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_ASSESSMENTS, assessments);
+  }
+
+  getInvestigations(): ProtocolInvestigationDefinition[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolInvestigationDefinition[]>(EMPTY_TEST_KEYS.PROTOCOL_INVESTIGATIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_INVESTIGATIONS);
+  }
+
+  saveInvestigations(investigations: ProtocolInvestigationDefinition[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_INVESTIGATIONS, investigations);
+  }
+
+  getOutcomes(): ProtocolOutcomeDefinition[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolOutcomeDefinition[]>(EMPTY_TEST_KEYS.PROTOCOL_OUTCOMES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_OUTCOMES);
+  }
+
+  saveOutcomes(outcomes: ProtocolOutcomeDefinition[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_OUTCOMES, outcomes);
+  }
+
+  getForms(): ProtocolFormDefinition[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolFormDefinition[]>(EMPTY_TEST_KEYS.PROTOCOL_FORMS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_FORMS);
+  }
+
+  saveForms(forms: ProtocolFormDefinition[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_FORMS, forms);
+  }
+
+  getConsentRequirements(): ProtocolConsentRequirement[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolConsentRequirement[]>(EMPTY_TEST_KEYS.PROTOCOL_CONSENT);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_CONSENT);
+  }
+
+  saveConsentRequirements(requirements: ProtocolConsentRequirement[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_CONSENT, requirements);
+  }
+
+  getSafetyRequirements(): ProtocolSafetyRequirement[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolSafetyRequirement[]>(EMPTY_TEST_KEYS.PROTOCOL_SAFETY);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_SAFETY);
+  }
+
+  saveSafetyRequirements(requirements: ProtocolSafetyRequirement[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_SAFETY, requirements);
+  }
+
+  getDeviationRequirements(): ProtocolDeviationRequirement[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolDeviationRequirement[]>(EMPTY_TEST_KEYS.PROTOCOL_DEVIATIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_DEVIATIONS);
+  }
+
+  saveDeviationRequirements(requirements: ProtocolDeviationRequirement[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_DEVIATIONS, requirements);
+  }
+
+  getMilestones(): ProtocolMilestone[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolMilestone[]>(EMPTY_TEST_KEYS.PROTOCOL_MILESTONES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_MILESTONES);
+  }
+
+  saveMilestones(milestones: ProtocolMilestone[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_MILESTONES, milestones);
   }
 }
 

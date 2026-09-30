@@ -75,6 +75,30 @@ import {
   ParticipantRequest,
   ParticipantSelfRegistrationInput,
   CreateParticipantRequestInput,
+  Protocol,
+  ProtocolVersion,
+  ProtocolEligibilityCriterion,
+  ProtocolAssessmentDefinition,
+  ProtocolInvestigationDefinition,
+  ProtocolOutcomeDefinition,
+  ProtocolFormDefinition,
+  ProtocolConsentRequirement,
+  ProtocolSafetyRequirement,
+  ProtocolDeviationRequirement,
+  ProtocolMilestone,
+  StudyProtocolConfig,
+  CreateProtocolInput,
+  CreateProtocolVersionInput,
+  CreateEligibilityCriterionInput,
+  CreateProtocolVisitDefinitionInput,
+  CreateAssessmentDefinitionInput,
+  CreateInvestigationDefinitionInput,
+  CreateOutcomeDefinitionInput,
+  CreateFormDefinitionInput,
+  CreateConsentRequirementInput,
+  CreateSafetyRequirementInput,
+  CreateDeviationRequirementInput,
+  CreateMilestoneInput,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -530,6 +554,44 @@ export interface IVisitDataRepository {
   getSummaryMetrics(
     context: ParticipantQueryContext
   ): Promise<DataEntrySummaryMetrics>;
+}
+
+export interface IProtocolRepository {
+  getProtocols(studyId: string): Promise<Protocol[]>;
+  getProtocol(studyId: string, protocolId: string): Promise<Protocol | null>;
+  getActiveProtocol(studyId: string): Promise<Protocol | null>;
+  getProtocolVersions(protocolId: string): Promise<ProtocolVersion[]>;
+  getProtocolVersion(versionId: string): Promise<ProtocolVersion | null>;
+  getActiveProtocolVersion(studyId: string): Promise<ProtocolVersion | null>;
+  getStudyProtocolConfig(versionId: string): Promise<StudyProtocolConfig | null>;
+  getEligibilityCriteria(versionId: string): Promise<ProtocolEligibilityCriterion[]>;
+  getVisitDefinitions(versionId: string): Promise<ProtocolVisitDefinition[]>;
+  getAssessmentDefinitions(versionId: string, visitDefinitionId?: string): Promise<ProtocolAssessmentDefinition[]>;
+  getInvestigationDefinitions(versionId: string, visitDefinitionId?: string): Promise<ProtocolInvestigationDefinition[]>;
+  getOutcomeDefinitions(versionId: string, visitDefinitionId?: string): Promise<ProtocolOutcomeDefinition[]>;
+  getFormDefinitions(versionId: string, visitDefinitionId?: string): Promise<ProtocolFormDefinition[]>;
+  getConsentRequirements(versionId: string): Promise<ProtocolConsentRequirement[]>;
+  getSafetyRequirements(versionId: string): Promise<ProtocolSafetyRequirement[]>;
+  getDeviationRequirements(versionId: string): Promise<ProtocolDeviationRequirement[]>;
+  getMilestones(versionId: string): Promise<ProtocolMilestone[]>;
+
+  createProtocol(studyId: string, input: CreateProtocolInput): Promise<Protocol>;
+  createProtocolVersion(protocolId: string, input: CreateProtocolVersionInput): Promise<ProtocolVersion>;
+  updateProtocolVersion(versionId: string, updates: Partial<ProtocolVersion>): Promise<ProtocolVersion | null>;
+  addEligibilityCriterion(versionId: string, input: CreateEligibilityCriterionInput): Promise<ProtocolEligibilityCriterion>;
+  updateEligibilityCriterion(versionId: string, criterionId: string, updates: Partial<ProtocolEligibilityCriterion>): Promise<ProtocolEligibilityCriterion | null>;
+  addVisitDefinition(versionId: string, input: CreateProtocolVisitDefinitionInput): Promise<ProtocolVisitDefinition>;
+  updateVisitDefinition(versionId: string, visitDefId: string, updates: Partial<ProtocolVisitDefinition>): Promise<ProtocolVisitDefinition | null>;
+  addAssessmentDefinition(versionId: string, input: CreateAssessmentDefinitionInput): Promise<ProtocolAssessmentDefinition>;
+  updateAssessmentDefinition(versionId: string, assessmentId: string, updates: Partial<ProtocolAssessmentDefinition>): Promise<ProtocolAssessmentDefinition | null>;
+  addInvestigationDefinition(versionId: string, input: CreateInvestigationDefinitionInput): Promise<ProtocolInvestigationDefinition>;
+  updateInvestigationDefinition(versionId: string, investigationId: string, updates: Partial<ProtocolInvestigationDefinition>): Promise<ProtocolInvestigationDefinition | null>;
+  addOutcomeDefinition(versionId: string, input: CreateOutcomeDefinitionInput): Promise<ProtocolOutcomeDefinition>;
+  addConsentRequirement(versionId: string, input: CreateConsentRequirementInput): Promise<ProtocolConsentRequirement>;
+  addSafetyRequirement(versionId: string, input: CreateSafetyRequirementInput): Promise<ProtocolSafetyRequirement>;
+  addDeviationRequirement(versionId: string, input: CreateDeviationRequirementInput): Promise<ProtocolDeviationRequirement>;
+  addMilestone(versionId: string, input: CreateMilestoneInput): Promise<ProtocolMilestone>;
+  addFormDefinition(versionId: string, input: CreateFormDefinitionInput): Promise<ProtocolFormDefinition>;
 }
 
 

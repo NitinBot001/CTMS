@@ -27,6 +27,7 @@ import { DocumentDetailPage } from '../pages/DocumentDetailPage';
 import { ReportsDirectoryPage } from '../pages/ReportsDirectoryPage';
 import { ReportDetailPage } from '../pages/ReportDetailPage';
 import { NotificationsActionCenterPage } from '../pages/NotificationsActionCenterPage';
+import { ProtocolManagementPage } from '../pages/ProtocolManagementPage';
 import { ModulePlaceholderPage } from '../pages/ModulePlaceholderPage';
 
 // Role Dashboards
@@ -178,6 +179,20 @@ export const AppRoutes: React.FC = () => {
             <RequirePermission permission="STUDY_MANAGE">
               <AppShell pageTitle="PI Operations Overview">
                 <DashboardOverviewPage />
+              </AppShell>
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
+      {/* Protocol Configuration & Management (Stage 2A) */}
+      <Route
+        path="/pi/protocol"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="STUDY_VIEW">
+              <AppShell pageTitle="Protocol Configuration & Management">
+                <ProtocolManagementPage />
               </AppShell>
             </RequirePermission>
           </RequireAuth>

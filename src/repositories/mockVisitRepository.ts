@@ -268,6 +268,8 @@ export class MockVisitRepository implements IVisitRepository {
       participantCode: input.participantId,
       participantInitials: 'P.T.',
       protocolVisitDefinitionId: input.visitDefinitionId || 'PV-01',
+      protocolVersionId: input.protocolVersionId,
+      protocolVersionNumber: input.protocolVersionNumber,
       visitCode: input.visitCode,
       visitName: input.visitName,
       sequence: count,

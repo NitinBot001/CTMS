@@ -15,8 +15,34 @@ import {
   ParticipantVisit,
   ParticipantOnboardingRequest,
   ParticipantRequest,
+  Protocol,
+  ProtocolVersion,
+  ProtocolEligibilityCriterion,
+  ProtocolVisitDefinition,
+  ProtocolAssessmentDefinition,
+  ProtocolInvestigationDefinition,
+  ProtocolOutcomeDefinition,
+  ProtocolFormDefinition,
+  ProtocolConsentRequirement,
+  ProtocolSafetyRequirement,
+  ProtocolDeviationRequirement,
+  ProtocolMilestone,
 } from '../types';
 import { MOCK_USERS, MOCK_USER_ROLES } from '../data/mockData';
+import {
+  MOCK_PROTOCOLS,
+  MOCK_PROTOCOL_VERSIONS,
+  MOCK_PROTOCOL_ELIGIBILITY,
+  MOCK_PROTOCOL_VISITS_STAGE2A,
+  MOCK_PROTOCOL_ASSESSMENTS,
+  MOCK_PROTOCOL_INVESTIGATIONS,
+  MOCK_PROTOCOL_OUTCOMES,
+  MOCK_PROTOCOL_FORMS,
+  MOCK_PROTOCOL_CONSENT,
+  MOCK_PROTOCOL_SAFETY,
+  MOCK_PROTOCOL_DEVIATIONS,
+  MOCK_PROTOCOL_MILESTONES,
+} from '../data/mockProtocolSeed';
 
 export const MOCK_MUTATION_PREFIX = 'aiia_ctms_mock_mutation_';
 
@@ -29,6 +55,18 @@ export const MOCK_MUTATION_KEYS = {
   VISITS: `${MOCK_MUTATION_PREFIX}visits`,
   ONBOARDING_REQUESTS: `${MOCK_MUTATION_PREFIX}onboarding_requests`,
   PARTICIPANT_REQUESTS: `${MOCK_MUTATION_PREFIX}participant_requests`,
+  PROTOCOLS: `${MOCK_MUTATION_PREFIX}protocols`,
+  PROTOCOL_VERSIONS: `${MOCK_MUTATION_PREFIX}protocol_versions`,
+  PROTOCOL_ELIGIBILITY: `${MOCK_MUTATION_PREFIX}protocol_eligibility`,
+  PROTOCOL_VISITS: `${MOCK_MUTATION_PREFIX}protocol_visits`,
+  PROTOCOL_ASSESSMENTS: `${MOCK_MUTATION_PREFIX}protocol_assessments`,
+  PROTOCOL_INVESTIGATIONS: `${MOCK_MUTATION_PREFIX}protocol_investigations`,
+  PROTOCOL_OUTCOMES: `${MOCK_MUTATION_PREFIX}protocol_outcomes`,
+  PROTOCOL_FORMS: `${MOCK_MUTATION_PREFIX}protocol_forms`,
+  PROTOCOL_CONSENT: `${MOCK_MUTATION_PREFIX}protocol_consent`,
+  PROTOCOL_SAFETY: `${MOCK_MUTATION_PREFIX}protocol_safety`,
+  PROTOCOL_DEVIATIONS: `${MOCK_MUTATION_PREFIX}protocol_deviations`,
+  PROTOCOL_MILESTONES: `${MOCK_MUTATION_PREFIX}protocol_milestones`,
 };
 
 export const MOCK_DEFAULT_TEMPORARY_PASSWORD = '128';
@@ -271,6 +309,116 @@ export class MockDataStore {
       list.push(req);
     }
     this.saveAddedParticipantRequests(list);
+  }
+
+  // --- Protocol Domain Accessors (Mock Mode) ---
+
+  getProtocols(): Protocol[] {
+    const stored = browserStorage.get<Protocol[]>(MOCK_MUTATION_KEYS.PROTOCOLS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOLS);
+  }
+
+  saveProtocols(protocols: Protocol[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOLS, protocols);
+  }
+
+  getProtocolVersions(): ProtocolVersion[] {
+    const stored = browserStorage.get<ProtocolVersion[]>(MOCK_MUTATION_KEYS.PROTOCOL_VERSIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_VERSIONS);
+  }
+
+  saveProtocolVersions(versions: ProtocolVersion[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_VERSIONS, versions);
+  }
+
+  getEligibilityCriteria(): ProtocolEligibilityCriterion[] {
+    const stored = browserStorage.get<ProtocolEligibilityCriterion[]>(MOCK_MUTATION_KEYS.PROTOCOL_ELIGIBILITY);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_ELIGIBILITY);
+  }
+
+  saveEligibilityCriteria(criteria: ProtocolEligibilityCriterion[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_ELIGIBILITY, criteria);
+  }
+
+  getProtocolVisits(): ProtocolVisitDefinition[] {
+    const stored = browserStorage.get<ProtocolVisitDefinition[]>(MOCK_MUTATION_KEYS.PROTOCOL_VISITS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_VISITS_STAGE2A);
+  }
+
+  saveProtocolVisits(visits: ProtocolVisitDefinition[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_VISITS, visits);
+  }
+
+  getAssessments(): ProtocolAssessmentDefinition[] {
+    const stored = browserStorage.get<ProtocolAssessmentDefinition[]>(MOCK_MUTATION_KEYS.PROTOCOL_ASSESSMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_ASSESSMENTS);
+  }
+
+  saveAssessments(assessments: ProtocolAssessmentDefinition[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_ASSESSMENTS, assessments);
+  }
+
+  getInvestigations(): ProtocolInvestigationDefinition[] {
+    const stored = browserStorage.get<ProtocolInvestigationDefinition[]>(MOCK_MUTATION_KEYS.PROTOCOL_INVESTIGATIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_INVESTIGATIONS);
+  }
+
+  saveInvestigations(investigations: ProtocolInvestigationDefinition[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_INVESTIGATIONS, investigations);
+  }
+
+  getOutcomes(): ProtocolOutcomeDefinition[] {
+    const stored = browserStorage.get<ProtocolOutcomeDefinition[]>(MOCK_MUTATION_KEYS.PROTOCOL_OUTCOMES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_OUTCOMES);
+  }
+
+  saveOutcomes(outcomes: ProtocolOutcomeDefinition[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_OUTCOMES, outcomes);
+  }
+
+  getForms(): ProtocolFormDefinition[] {
+    const stored = browserStorage.get<ProtocolFormDefinition[]>(MOCK_MUTATION_KEYS.PROTOCOL_FORMS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_FORMS);
+  }
+
+  saveForms(forms: ProtocolFormDefinition[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_FORMS, forms);
+  }
+
+  getConsentRequirements(): ProtocolConsentRequirement[] {
+    const stored = browserStorage.get<ProtocolConsentRequirement[]>(MOCK_MUTATION_KEYS.PROTOCOL_CONSENT);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_CONSENT);
+  }
+
+  saveConsentRequirements(requirements: ProtocolConsentRequirement[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_CONSENT, requirements);
+  }
+
+  getSafetyRequirements(): ProtocolSafetyRequirement[] {
+    const stored = browserStorage.get<ProtocolSafetyRequirement[]>(MOCK_MUTATION_KEYS.PROTOCOL_SAFETY);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_SAFETY);
+  }
+
+  saveSafetyRequirements(requirements: ProtocolSafetyRequirement[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_SAFETY, requirements);
+  }
+
+  getDeviationRequirements(): ProtocolDeviationRequirement[] {
+    const stored = browserStorage.get<ProtocolDeviationRequirement[]>(MOCK_MUTATION_KEYS.PROTOCOL_DEVIATIONS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_DEVIATIONS);
+  }
+
+  saveDeviationRequirements(requirements: ProtocolDeviationRequirement[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_DEVIATIONS, requirements);
+  }
+
+  getMilestones(): ProtocolMilestone[] {
+    const stored = browserStorage.get<ProtocolMilestone[]>(MOCK_MUTATION_KEYS.PROTOCOL_MILESTONES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_MILESTONES);
+  }
+
+  saveMilestones(milestones: ProtocolMilestone[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_MILESTONES, milestones);
   }
 
   /**

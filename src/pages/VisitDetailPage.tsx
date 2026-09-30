@@ -206,6 +206,10 @@ export const VisitDetailPage: React.FC = () => {
                 Visit ID: <strong className="font-mono">{visit.id}</strong>
               </span>
               <span className="flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5 text-primary" />
+                Protocol Version: <strong className="font-mono text-primary-dark">{visit.protocolVersionNumber ? `v${visit.protocolVersionNumber}` : activeStudy?.protocolVersion || 'v1.0'}</strong>
+              </span>
+              <span className="flex items-center gap-1">
                 <Building2 className="w-3.5 h-3.5" />
                 Site: <strong>{activeSite?.name}</strong>
               </span>

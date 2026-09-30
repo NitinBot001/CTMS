@@ -25,6 +25,7 @@ import { mockDocumentRepository } from '../repositories/mockDocumentRepository';
 import { mockNotificationRepository } from '../repositories/mockNotificationRepository';
 import { mockDashboardRepository } from '../repositories/mockDashboardRepository';
 import { mockReportRepository } from '../repositories/mockReportRepository';
+import { mockProtocolRepository } from '../repositories/mockProtocolRepository';
 
 // Empty Test Repositories
 import {
@@ -42,6 +43,7 @@ import {
   EmptyDashboardRepository,
   EmptyReportRepository,
   EmptyAuditRepository,
+  EmptyProtocolRepository,
 } from '../repositories/emptyTestRepositories';
 import { mockAuditRepository } from '../repositories/mockAuditRepository';
 
@@ -60,6 +62,7 @@ import {
   IDashboardRepository,
   IReportRepository,
   IAuditRepository,
+  IProtocolRepository,
 } from '../repositories/interfaces';
 
 export interface DataEnvironment {
@@ -77,6 +80,7 @@ export interface DataEnvironment {
   notificationRepository: INotificationRepository;
   dashboardRepository: IDashboardRepository;
   reportRepository: IReportRepository;
+  protocolRepository: IProtocolRepository;
   auditRepository?: IAuditRepository;
 }
 
@@ -110,6 +114,7 @@ export class EnvironmentService {
       notificationRepository: mockNotificationRepository,
       dashboardRepository: mockDashboardRepository,
       reportRepository: mockReportRepository,
+      protocolRepository: mockProtocolRepository,
       auditRepository: mockAuditRepository,
     };
 
@@ -128,6 +133,7 @@ export class EnvironmentService {
       notificationRepository: new EmptyNotificationRepository(),
       dashboardRepository: new EmptyDashboardRepository(),
       reportRepository: new EmptyReportRepository(),
+      protocolRepository: new EmptyProtocolRepository(),
       auditRepository: new EmptyAuditRepository(),
     };
   }
@@ -214,6 +220,10 @@ export class EnvironmentService {
 
   getReportRepository(): IReportRepository {
     return this.getActiveEnvironment().reportRepository;
+  }
+
+  getProtocolRepository(): IProtocolRepository {
+    return this.getActiveEnvironment().protocolRepository;
   }
 
   getAuditRepository(): IAuditRepository | undefined {

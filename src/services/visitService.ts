@@ -117,7 +117,29 @@ export class VisitService {
       throw new Error('Visit creation not supported by current repository.');
     }
 
-    const created = await this.repo.createVisit(context, input);
+    let protocolVersionId = input.protocolVersionId;
+    let protocolVersionNumber = input.protocolVersionNumber;
+
+    if (!protocolVersionId || !protocolVersionNumber) {
+      try {
+        const protocolRepo = environmentService.getProtocolRepository();
+        const activeVersion = await protocolRepo.getActiveProtocolVersion(context.studyId);
+        if (activeVersion) {
+          if (!protocolVersionId) protocolVersionId = activeVersion.id;
+          if (!protocolVersionNumber) protocolVersionNumber = activeVersion.versionNumber;
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    const visitInput: CreateVisitInput = {
+      ...input,
+      protocolVersionId,
+      protocolVersionNumber,
+    };
+
+    const created = await this.repo.createVisit(context, visitInput);
 
     // Audit Logging
     await auditService.logEvent({

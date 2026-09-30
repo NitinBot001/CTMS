@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  BookOpen,
   Users,
   CalendarCheck,
   ShieldAlert,
@@ -24,6 +25,12 @@ export const BASE_NAV_ITEMS: NavigationItem[] = [
     path: '/pi/dashboard',
     icon: LayoutDashboard,
     // Overview path is dynamically updated per role by getRoleNavigationItems()
+  },
+  {
+    name: 'Protocol',
+    path: '/pi/protocol',
+    icon: BookOpen,
+    permission: 'STUDY_VIEW',
   },
   {
     name: 'Patients',

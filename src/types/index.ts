@@ -207,6 +207,15 @@ export type VisitStatus =
 
 export type VisitAnchor = 'SCREENING_DATE' | 'ENROLLMENT_DATE' | 'PREVIOUS_VISIT';
 
+export type VisitType =
+  | 'SCREENING'
+  | 'BASELINE'
+  | 'TREATMENT'
+  | 'FOLLOW_UP'
+  | 'CLOSE_OUT'
+  | 'END_OF_STUDY'
+  | 'UNSCHEDULED';
+
 export type ClinicalActivityStatus =
   | 'PENDING'
   | 'IN_PROGRESS'
@@ -216,15 +225,21 @@ export type ClinicalActivityStatus =
 export interface ProtocolVisitDefinition {
   id: string;
   studyId: string;
+  protocolVersionId?: string;
   code: string;
   name: string;
   sequence: number;
   anchor: VisitAnchor;
   targetOffsetDays: number;
+  targetDay?: number;
   windowBeforeDays: number;
   windowAfterDays: number;
   requiredActivities: string[];
   description?: string;
+  required?: boolean;
+  visitType?: VisitType;
+  status?: string;
+  notes?: string;
 }
 
 export interface ClinicalActivity {
@@ -248,6 +263,8 @@ export interface ParticipantVisit {
   participantCode: string;
   participantInitials: string;
   protocolVisitDefinitionId: string;
+  protocolVersionId?: string;
+  protocolVersionNumber?: string;
   visitCode: string;
   visitName: string;
   sequence: number;
@@ -1412,6 +1429,8 @@ export interface CreateVisitInput {
   siteId: string;
   participantId: string;
   visitDefinitionId?: string;
+  protocolVersionId?: string;
+  protocolVersionNumber?: string;
   visitCode: string;
   visitName: string;
   visitType: 'SCREENING' | 'BASELINE' | 'TREATMENT' | 'FOLLOW_UP' | 'CLOSE_OUT' | 'UNSCHEDULED';
@@ -1537,5 +1556,376 @@ export interface ParticipantSelfRegistrationInput {
   preferredLanguage?: string;
   notes?: string;
   participantAccountId?: string;
+}
+
+// ============================================================
+// STAGE 2A: CLINICAL PROTOCOL FOUNDATION & CONFIGURATION ENGINE
+// ============================================================
+
+export type ProtocolStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'SUSPENDED'
+  | 'CLOSED'
+  | 'ARCHIVED';
+
+export type ProtocolVersionStatus =
+  | 'DRAFT'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'ACTIVE'
+  | 'SUPERSEDED'
+  | 'RETIRED';
+
+export interface Protocol {
+  id: string;
+  studyId: string;
+  name: string;
+  shortTitle: string;
+  protocolNumber: string;
+  currentVersionId: string;
+  status: ProtocolStatus;
+  description?: string;
+  sponsorName?: string;
+  therapeuticArea?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProtocolVersion {
+  id: string;
+  protocolId: string;
+  studyId: string;
+  versionNumber: string; // e.g. "1.0", "2.0"
+  versionLabel: string; // e.g. "Version 1.0 (Initial Active)"
+  status: ProtocolVersionStatus;
+  effectiveDate?: string;
+  approvalDate?: string;
+  approvedBy?: string;
+  supersedesVersionId?: string;
+  changeSummary?: string;
+  createdBy: string;
+  activatedBy?: string;
+  activatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProtocolEligibilityType = 'INCLUSION' | 'EXCLUSION';
+
+export interface ProtocolEligibilityCriterion {
+  id: string;
+  protocolVersionId: string;
+  type: ProtocolEligibilityType;
+  criterionCode: string;
+  title: string;
+  description: string;
+  displayOrder: number;
+  required: boolean;
+  active: boolean;
+}
+
+export type ProtocolAssessmentCategory =
+  | 'GENERAL'
+  | 'CLINICAL_EXAM'
+  | 'VITALS'
+  | 'ASSESSMENT'
+  | 'QUESTIONNAIRE'
+  | 'OTHER';
+
+export interface ProtocolAssessmentDefinition {
+  id: string;
+  protocolVersionId: string;
+  code: string;
+  name: string;
+  category: ProtocolAssessmentCategory;
+  description?: string;
+  visitDefinitionId: string; // Linked to ProtocolVisitDefinition
+  required: boolean;
+  displayOrder: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  version?: string;
+  sourceReference?: string;
+  participantVisible?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProtocolInvestigationCategory =
+  | 'LABORATORY'
+  | 'IMAGING'
+  | 'DIAGNOSTIC'
+  | 'VITALS'
+  | 'OTHER';
+
+export interface ProtocolInvestigationDefinition {
+  id: string;
+  protocolVersionId: string;
+  code: string;
+  name: string;
+  category: ProtocolInvestigationCategory;
+  description?: string;
+  visitDefinitionId: string; // Linked to ProtocolVisitDefinition
+  required: boolean;
+  displayOrder: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  participantVisible?: boolean;
+  sourceReference?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProtocolOutcomeType = 'PRIMARY' | 'SECONDARY' | 'EXPLORATORY' | 'SAFETY';
+
+export interface ProtocolOutcomeDefinition {
+  id: string;
+  protocolVersionId: string;
+  code: string;
+  name: string;
+  description?: string;
+  outcomeType: ProtocolOutcomeType;
+  visitDefinitionId?: string;
+  timepoint?: string;
+  required: boolean;
+  displayOrder: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  sourceReference?: string;
+}
+
+export type ProtocolFormType =
+  | 'VISIT'
+  | 'ASSESSMENT'
+  | 'INVESTIGATION'
+  | 'OUTCOME'
+  | 'SAFETY'
+  | 'OTHER';
+
+export interface ProtocolFormDefinition {
+  id: string;
+  protocolVersionId: string;
+  code: string;
+  name: string;
+  formType: ProtocolFormType;
+  description?: string;
+  applicableVisitDefinitionId?: string;
+  required: boolean;
+  displayOrder: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  participantVisible?: boolean;
+  dataDomain: string;
+  version: string;
+}
+
+export type ProtocolConsentType =
+  | 'INFORMED_CONSENT'
+  | 'RECONSENT'
+  | 'ASSENT'
+  | 'OTHER';
+
+export interface ProtocolConsentRequirement {
+  id: string;
+  protocolVersionId: string;
+  consentType: ProtocolConsentType;
+  requiredBefore: string;
+  required: boolean;
+  versionReference?: string;
+  participantVisible?: boolean;
+  description?: string;
+}
+
+export type ProtocolSafetyEventType = 'AE' | 'SAE' | 'ADR' | 'SAFETY_SIGNAL';
+
+export interface ProtocolSafetyRequirement {
+  id: string;
+  protocolVersionId: string;
+  eventType: ProtocolSafetyEventType;
+  required: boolean;
+  reportingWindow?: string;
+  description?: string;
+  active: boolean;
+}
+
+export interface ProtocolDeviationRequirement {
+  id: string;
+  protocolVersionId: string;
+  category: string;
+  description?: string;
+  required: boolean;
+  active: boolean;
+}
+
+export type ProtocolMilestoneType =
+  | 'ETHICS_APPROVAL'
+  | 'CTRI_REGISTRATION'
+  | 'SITE_ACTIVATION'
+  | 'FIRST_PATIENT_IN'
+  | 'LAST_PATIENT_IN'
+  | 'LAST_PATIENT_LAST_VISIT'
+  | 'DATABASE_LOCK'
+  | 'CLOSEOUT';
+
+export interface ProtocolMilestone {
+  id: string;
+  protocolVersionId: string;
+  type: ProtocolMilestoneType;
+  name: string;
+  plannedDate?: string;
+  relativeDay?: number;
+  status: 'PLANNED' | 'IN_PROGRESS' | 'ACHIEVED' | 'DELAYED';
+  required: boolean;
+  description?: string;
+}
+
+export interface StudyProtocolConfig {
+  protocol: Protocol;
+  activeVersion: ProtocolVersion;
+  eligibility: ProtocolEligibilityCriterion[];
+  visits: ProtocolVisitDefinition[];
+  assessments: ProtocolAssessmentDefinition[];
+  investigations: ProtocolInvestigationDefinition[];
+  outcomes: ProtocolOutcomeDefinition[];
+  consentRequirements: ProtocolConsentRequirement[];
+  safetyRequirements: ProtocolSafetyRequirement[];
+  deviationRequirements: ProtocolDeviationRequirement[];
+  milestones: ProtocolMilestone[];
+  forms: ProtocolFormDefinition[];
+}
+
+export interface ProtocolValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+// Input Types for Protocol Mutations
+export interface CreateProtocolInput {
+  name: string;
+  shortTitle: string;
+  protocolNumber: string;
+  description?: string;
+  sponsorName?: string;
+  therapeuticArea?: string;
+}
+
+export interface CreateProtocolVersionInput {
+  versionNumber: string;
+  versionLabel?: string;
+  changeSummary?: string;
+  cloneFromVersionId?: string;
+}
+
+export interface CreateEligibilityCriterionInput {
+  type: ProtocolEligibilityType;
+  criterionCode: string;
+  title: string;
+  description: string;
+  displayOrder?: number;
+  required?: boolean;
+  active?: boolean;
+}
+
+export interface CreateProtocolVisitDefinitionInput {
+  code: string;
+  name: string;
+  sequence: number;
+  anchor: VisitAnchor;
+  targetOffsetDays: number;
+  targetDay?: number;
+  windowBeforeDays: number;
+  windowAfterDays: number;
+  requiredActivities?: string[];
+  description?: string;
+  required?: boolean;
+  visitType?: VisitType;
+  status?: string;
+  notes?: string;
+}
+
+export interface CreateAssessmentDefinitionInput {
+  code: string;
+  name: string;
+  category: ProtocolAssessmentCategory;
+  visitDefinitionId: string;
+  description?: string;
+  required?: boolean;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+  version?: string;
+  sourceReference?: string;
+  participantVisible?: boolean;
+}
+
+export interface CreateInvestigationDefinitionInput {
+  code: string;
+  name: string;
+  category: ProtocolInvestigationCategory;
+  visitDefinitionId: string;
+  description?: string;
+  required?: boolean;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+  participantVisible?: boolean;
+  sourceReference?: string;
+}
+
+export interface CreateOutcomeDefinitionInput {
+  code: string;
+  name: string;
+  outcomeType: ProtocolOutcomeType;
+  description?: string;
+  visitDefinitionId?: string;
+  timepoint?: string;
+  required?: boolean;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+  sourceReference?: string;
+}
+
+export interface CreateFormDefinitionInput {
+  code: string;
+  name: string;
+  formType: ProtocolFormType;
+  description?: string;
+  applicableVisitDefinitionId?: string;
+  required?: boolean;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+  participantVisible?: boolean;
+  dataDomain?: string;
+  version?: string;
+}
+
+export interface CreateConsentRequirementInput {
+  consentType: ProtocolConsentType;
+  requiredBefore: string;
+  required?: boolean;
+  versionReference?: string;
+  participantVisible?: boolean;
+  description?: string;
+}
+
+export interface CreateSafetyRequirementInput {
+  eventType: ProtocolSafetyEventType;
+  required?: boolean;
+  reportingWindow?: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface CreateDeviationRequirementInput {
+  category: string;
+  description?: string;
+  required?: boolean;
+  active?: boolean;
+}
+
+export interface CreateMilestoneInput {
+  type: ProtocolMilestoneType;
+  name: string;
+  plannedDate?: string;
+  relativeDay?: number;
+  status?: 'PLANNED' | 'IN_PROGRESS' | 'ACHIEVED' | 'DELAYED';
+  required?: boolean;
+  description?: string;
 }
 
