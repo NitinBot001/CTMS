@@ -2094,6 +2094,12 @@ export const MOCK_PERMISSIONS: Permission[] = [
   { id: 'DATA_ENTRY_RETURN', module: 'DATA_ENTRY', action: 'REVIEW', name: 'Return Data for Correction', description: 'Return incomplete or inaccurate clinical records for correction with mandatory reason.' },
   { id: 'DATA_ENTRY_NOTE', module: 'DATA_ENTRY', action: 'EDIT', name: 'Add Review Notes & Suggestions', description: 'Add operational comments and domain suggestions to visit data records.' },
   { id: 'DATA_ENTRY_CRO_SUBMIT', module: 'DATA_ENTRY', action: 'EXPORT', name: 'Submit Verified Data to CRO', description: 'Perform final site-level PI review and submit verified visit data to CRO.' },
+
+  // PARTICIPANT SELF-PORTAL
+  { id: 'PARTICIPANT_SELF_VIEW', module: 'PARTICIPANT_PORTAL', action: 'VIEW', name: 'View My Study & Profile', description: 'Access own study information, participant status, and study details.' },
+  { id: 'PARTICIPANT_SELF_EDIT', module: 'PARTICIPANT_PORTAL', action: 'EDIT', name: 'Edit My Profile', description: 'Update authorized personal contact information.' },
+  { id: 'PARTICIPANT_SELF_REQUEST', module: 'PARTICIPANT_PORTAL', action: 'CREATE', name: 'Submit Participant Requests', description: 'Submit cannot-attend, reschedule, and study communication requests.' },
+  { id: 'PARTICIPANT_SELF_VISIT_VIEW', module: 'PARTICIPANT_PORTAL', action: 'VIEW', name: 'View My Visits', description: 'Inspect scheduled visits, dates, and locations for own participation.' },
 ];
 
 export const MOCK_ROLES: Role[] = [
@@ -2102,7 +2108,9 @@ export const MOCK_ROLES: Role[] = [
     name: 'Principal Investigator',
     description: 'Full clinical oversight, protocol accountability, medical sign-offs, and site administrative authority.',
     type: 'SYSTEM',
-    permissionIds: MOCK_PERMISSIONS.map((p) => p.id),
+    permissionIds: MOCK_PERMISSIONS.map((p) => p.id).filter(
+      (id) => id !== 'PARTICIPANTS_CREATE' && !id.startsWith('PARTICIPANT_SELF_')
+    ),
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   },
@@ -2114,7 +2122,6 @@ export const MOCK_ROLES: Role[] = [
     permissionIds: [
       'STUDY_VIEW',
       'PARTICIPANTS_VIEW',
-      'PARTICIPANTS_EDIT',
       'VISITS_VIEW',
       'VISITS_EDIT',
       'VISITS_APPROVE',
@@ -2216,13 +2223,26 @@ export const MOCK_ROLES: Role[] = [
     type: 'SYSTEM',
     permissionIds: [
       'PARTICIPANTS_VIEW',
-      'PARTICIPANTS_EDIT',
       'VISITS_VIEW',
       'VISITS_EDIT',
       'TASKS_VIEW',
       'DATA_ENTRY_VIEW',
       'DATA_ENTRY_EDIT',
       'DATA_ENTRY_SUBMIT',
+    ],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'ROLE_PARTICIPANT',
+    name: 'Study Participant',
+    description: 'Enrolled clinical trial subject with self-service access to study status, scheduled visits, and request submissions.',
+    type: 'SYSTEM',
+    permissionIds: [
+      'PARTICIPANT_SELF_VIEW',
+      'PARTICIPANT_SELF_EDIT',
+      'PARTICIPANT_SELF_REQUEST',
+      'PARTICIPANT_SELF_VISIT_VIEW',
     ],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',

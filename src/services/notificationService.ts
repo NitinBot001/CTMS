@@ -162,6 +162,16 @@ export class NotificationService {
       return false;
     }
   }
+
+  async createNotification(
+    context: NotificationQueryContext,
+    notification: Omit<Notification, 'id' | 'createdAt'>
+  ): Promise<Notification> {
+    if (!context.studyId || !context.siteId || !context.recipientUserId) {
+      throw new Error('Study, site, and recipient user context are required to create notification.');
+    }
+    return this.repo.createNotification(context, notification);
+  }
 }
 
 export const notificationService = new NotificationService();

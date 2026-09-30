@@ -1,4 +1,4 @@
-import { IVisitRepository, ParticipantQueryContext } from '../repositories/interfaces';
+import { IVisitRepository, ParticipantQueryContext, WorkflowActor } from '../repositories/interfaces';
 import { environmentService } from './environmentService';
 import {
   ProtocolVisitDefinition,
@@ -8,6 +8,7 @@ import {
   ClinicalActivityStatus,
   CreateVisitInput,
 } from '../types';
+import { auditService } from './auditService';
 
 export class VisitService {
   private _customRepo?: IVisitRepository;
@@ -83,15 +84,91 @@ export class VisitService {
 
   async createVisit(
     context: ParticipantQueryContext,
-    input: CreateVisitInput
+    input: CreateVisitInput,
+    actor?: WorkflowActor
   ): Promise<ParticipantVisit> {
     if (!context.studyId || !context.siteId) {
       throw new Error('Study and site context are required to schedule a visit.');
     }
+
+    // Role check: Only CRC or PI can schedule visits
+    if (actor) {
+      const canSchedule =
+        actor.effectivePermissions?.includes('VISITS_EDIT') ||
+        actor.role === 'ROLE_CRC' ||
+        actor.role === 'ROLE_PI';
+      if (!canSchedule) {
+        throw new Error('You do not have permission to schedule clinical visits.');
+      }
+    }
+
+    // Validation: Participant must exist and belong to scope
+    const participantRepo = environmentService.getParticipantRepository();
+    const participant = await participantRepo.getParticipantById(context, input.participantId);
+    if (!participant) {
+      throw new Error(`Participant "${input.participantId}" not found in current study/site scope.`);
+    }
+
+    if (!input.plannedDate) {
+      throw new Error('Target planned date is required to schedule a visit.');
+    }
+
     if (!this.repo.createVisit) {
       throw new Error('Visit creation not supported by current repository.');
     }
-    return this.repo.createVisit(context, input);
+
+    const created = await this.repo.createVisit(context, input);
+
+    // Audit Logging
+    await auditService.logEvent({
+      actorUserId: actor?.userId || 'SYSTEM_OPERATOR',
+      actorRole: actor?.role || 'ROLE_CRC',
+      studyId: context.studyId,
+      siteId: context.siteId,
+      targetEntity: 'VISIT',
+      action: 'VISIT_CREATED',
+      metadata: {
+        visitId: created.id,
+        participantId: created.participantId,
+        visitCode: created.visitCode,
+        plannedDate: created.targetDate,
+      },
+    });
+
+    return created;
+  }
+
+  async updateVisit(
+    context: ParticipantQueryContext,
+    visitId: string,
+    updates: Partial<ParticipantVisit>,
+    actor?: WorkflowActor
+  ): Promise<ParticipantVisit | null> {
+    if (!context.studyId || !context.siteId || !visitId) {
+      throw new Error('Study, site, and visit ID are required.');
+    }
+
+    if (!this.repo.updateVisit) {
+      throw new Error('Visit update not supported by current repository.');
+    }
+
+    const updated = await this.repo.updateVisit(context, visitId, updates);
+    if (updated) {
+      await auditService.logEvent({
+        actorUserId: actor?.userId || 'SYSTEM_OPERATOR',
+        actorRole: actor?.role || 'ROLE_CRC',
+        studyId: context.studyId,
+        siteId: context.siteId,
+        targetEntity: 'VISIT',
+        action: 'VISIT_UPDATED',
+        metadata: {
+          visitId: updated.id,
+          updatedFields: Object.keys(updates),
+        },
+      });
+    }
+
+    return updated;
   }
 }
 

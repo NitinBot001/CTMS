@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { notificationService } from '../services/notificationService';
 import {
   Notification,
@@ -21,7 +22,8 @@ import { filterNotifications } from '../utils/notificationCalculations';
 
 export const NotificationsActionCenterPage: React.FC = () => {
   const { activeStudy, activeSite } = useStudy();
-  const recipientUserId = 'USR-101'; // Dr. Ananya Sharma (Principal Investigator)
+  const { currentUser } = useAuth();
+  const recipientUserId = currentUser?.id || '';
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [summary, setSummary] = useState<NotificationSummaryMetrics>({

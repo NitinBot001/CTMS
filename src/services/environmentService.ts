@@ -43,6 +43,7 @@ import {
   EmptyReportRepository,
   EmptyAuditRepository,
 } from '../repositories/emptyTestRepositories';
+import { mockAuditRepository } from '../repositories/mockAuditRepository';
 
 import {
   IAuthRepository,
@@ -109,6 +110,7 @@ export class EnvironmentService {
       notificationRepository: mockNotificationRepository,
       dashboardRepository: mockDashboardRepository,
       reportRepository: mockReportRepository,
+      auditRepository: mockAuditRepository,
     };
 
     this.emptyEnv = {

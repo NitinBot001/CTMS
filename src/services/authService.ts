@@ -6,6 +6,7 @@ import {
   AuthUser,
   DemoCredential,
   Permission,
+  User,
   UserRole,
 } from '../types';
 import { browserStorage, SESSION_STORAGE_KEY } from '../storage/browserStorage';
@@ -145,6 +146,65 @@ export class AuthService {
    */
   getRoleLandingRoute(roleId?: string): string {
     return getRoleLandingRoute(roleId);
+  }
+
+  /**
+   * Registers a participant user account with ROLE_PARTICIPANT in active environment.
+   */
+  async registerParticipantUser(input: {
+    email: string;
+    name: string;
+    password?: string;
+    studyId: string;
+    siteId: string;
+  }): Promise<User> {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const mode = environmentService.getMode();
+    const userId = `USR-PT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
+
+    const newUser: User = {
+      id: userId,
+      displayName: input.name.trim(),
+      email: normalizedEmail,
+      designation: 'Study Participant',
+      status: 'ACTIVE',
+      organization: 'Clinical Trial Participant',
+      department: 'Subject Panel',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const newUserRole: UserRole = {
+      id: `UR-PT-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`,
+      userId,
+      roleId: 'ROLE_PARTICIPANT',
+      studyId: input.studyId,
+      siteId: input.siteId,
+      assignedAt: new Date().toISOString(),
+      assignedBy: 'SELF_REGISTRATION',
+    };
+
+    const pwd = input.password?.trim() || 'Participant@123';
+
+    if (mode === 'EMPTY_TEST') {
+      const { emptyTestStore } = await import('../storage/emptyTestStore');
+      const users = emptyTestStore.getUsers().filter((u) => u.email.toLowerCase() !== normalizedEmail);
+      users.push(newUser);
+      emptyTestStore.saveUsers(users);
+
+      const roles = emptyTestStore.getUserRoles().filter((ur) => ur.userId !== userId);
+      roles.push(newUserRole);
+      emptyTestStore.saveUserRoles(roles);
+
+      emptyTestStore.setUserPassword(normalizedEmail, pwd);
+    } else {
+      const { mockDataStore } = await import('../storage/mockDataStore');
+      mockDataStore.addMockUser(newUser);
+      mockDataStore.addMockUserRole(newUserRole);
+      mockDataStore.setUserPassword(normalizedEmail, pwd);
+    }
+
+    return newUser;
   }
 }
 

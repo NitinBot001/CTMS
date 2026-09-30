@@ -98,8 +98,12 @@ import {
   ReviewNoteType,
   VerificationAction,
   VisitDataFilters,
-  DataEntrySummaryMetrics,
   AuditLogEvent,
+  DataEntrySummaryMetrics,
+  ParticipantOnboardingRequest,
+  ParticipantRequest,
+  ParticipantSelfRegistrationInput,
+  CreateParticipantRequestInput,
 } from '../types';
 import {
   emptyTestStore,
@@ -397,7 +401,14 @@ export class EmptyParticipantRepository implements IParticipantRepository {
   }
 
   private get repo(): MockParticipantRepository {
-    return new MockParticipantRepository(this.getStore(), (store) => this.saveStore(store));
+    return new MockParticipantRepository(
+      this.getStore(),
+      (store) => this.saveStore(store),
+      emptyTestStore.getOnboardingRequests(),
+      (reqs) => emptyTestStore.saveOnboardingRequests(reqs),
+      emptyTestStore.getParticipantRequests(),
+      (preqs) => emptyTestStore.saveParticipantRequests(preqs)
+    );
   }
 
   async getParticipants(context: ParticipantQueryContext, filters?: ParticipantFilters): Promise<Participant[]> {
@@ -414,6 +425,48 @@ export class EmptyParticipantRepository implements IParticipantRepository {
 
   async createParticipant(context: ParticipantQueryContext, input: CreateParticipantInput): Promise<Participant> {
     return this.repo.createParticipant(context, input);
+  }
+
+  async updateParticipant(
+    context: ParticipantQueryContext,
+    participantId: string,
+    updates: Partial<Participant>
+  ): Promise<Participant | null> {
+    return this.repo.updateParticipant(context, participantId, updates);
+  }
+
+  async getOnboardingRequests(context: ParticipantQueryContext): Promise<ParticipantOnboardingRequest[]> {
+    return this.repo.getOnboardingRequests(context);
+  }
+
+  async getOnboardingRequestById(
+    context: ParticipantQueryContext,
+    requestId: string
+  ): Promise<ParticipantOnboardingRequest | null> {
+    return this.repo.getOnboardingRequestById(context, requestId);
+  }
+
+  async createOnboardingRequest(input: ParticipantSelfRegistrationInput): Promise<ParticipantOnboardingRequest> {
+    return this.repo.createOnboardingRequest(input);
+  }
+
+  async updateOnboardingRequest(req: ParticipantOnboardingRequest): Promise<ParticipantOnboardingRequest> {
+    return this.repo.updateOnboardingRequest(req);
+  }
+
+  async getParticipantRequests(
+    context: ParticipantQueryContext,
+    participantId?: string
+  ): Promise<ParticipantRequest[]> {
+    return this.repo.getParticipantRequests(context, participantId);
+  }
+
+  async createParticipantRequest(input: CreateParticipantRequestInput): Promise<ParticipantRequest> {
+    return this.repo.createParticipantRequest(input);
+  }
+
+  async updateParticipantRequest(req: ParticipantRequest): Promise<ParticipantRequest> {
+    return this.repo.updateParticipantRequest(req);
   }
 }
 
@@ -485,6 +538,14 @@ export class EmptyVisitRepository implements IVisitRepository {
 
   async createVisit(context: ParticipantQueryContext, input: CreateVisitInput): Promise<ParticipantVisit> {
     return this.repo.createVisit(context, input);
+  }
+
+  async updateVisit(
+    context: ParticipantQueryContext,
+    visitId: string,
+    updates: Partial<ParticipantVisit>
+  ): Promise<ParticipantVisit | null> {
+    return this.repo.updateVisit(context, visitId, updates);
   }
 }
 

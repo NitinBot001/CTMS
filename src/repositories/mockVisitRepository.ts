@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { MOCK_PROTOCOL_VISITS, MOCK_VISITS } from '../data/mockData';
 import { calculateActivityMetrics, getReferenceDate, parseDateISO } from '../utils/visitCalculations';
+import { mockDataStore } from '../storage/mockDataStore';
 
 export class MockVisitRepository implements IVisitRepository {
   // In-memory mutable copy to support interactive status updates in session
@@ -21,7 +22,22 @@ export class MockVisitRepository implements IVisitRepository {
     initialProtocolVisits?: Record<string, ProtocolVisitDefinition[]>,
     onSaveStore?: (store: Record<string, Record<string, ParticipantVisit[]>>) => void
   ) {
-    this.visitsStore = initialVisits ? structuredClone(initialVisits) : structuredClone(MOCK_VISITS);
+    if (initialVisits) {
+      this.visitsStore = structuredClone(initialVisits);
+    } else {
+      this.visitsStore = structuredClone(MOCK_VISITS);
+      const added = mockDataStore.getAddedVisits();
+      for (const v of added) {
+        if (!this.visitsStore[v.studyId]) this.visitsStore[v.studyId] = {};
+        if (!this.visitsStore[v.studyId][v.siteId]) this.visitsStore[v.studyId][v.siteId] = [];
+        const existingIdx = this.visitsStore[v.studyId][v.siteId].findIndex((x) => x.id === v.id);
+        if (existingIdx >= 0) {
+          this.visitsStore[v.studyId][v.siteId][existingIdx] = v;
+        } else {
+          this.visitsStore[v.studyId][v.siteId].push(v);
+        }
+      }
+    }
     this.protocolVisitsStore = initialProtocolVisits ? structuredClone(initialProtocolVisits) : structuredClone(MOCK_PROTOCOL_VISITS);
     this.onSaveStore = onSaveStore;
   }
@@ -268,8 +284,43 @@ export class MockVisitRepository implements IVisitRepository {
     };
 
     siteVisits.push(newVisit);
-    this.onSaveStore?.(this.visitsStore);
+    if (this.onSaveStore) {
+      this.onSaveStore(this.visitsStore);
+    } else {
+      mockDataStore.addMockVisit(newVisit);
+    }
     return structuredClone(newVisit);
+  }
+
+  async updateVisit(
+    context: ParticipantQueryContext,
+    visitId: string,
+    updates: Partial<ParticipantVisit>
+  ): Promise<ParticipantVisit | null> {
+    const studyVisits = this.visitsStore[context.studyId];
+    if (!studyVisits) return null;
+    const siteVisits = studyVisits[context.siteId];
+    if (!siteVisits) return null;
+
+    const index = siteVisits.findIndex((v) => v.id === visitId);
+    if (index === -1) return null;
+
+    const existing = siteVisits[index];
+    const updated: ParticipantVisit = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      studyId: existing.studyId,
+      siteId: existing.siteId,
+    };
+    siteVisits[index] = updated;
+
+    if (this.onSaveStore) {
+      this.onSaveStore(this.visitsStore);
+    } else {
+      mockDataStore.updateMockVisit(updated);
+    }
+    return structuredClone(updated);
   }
 }
 

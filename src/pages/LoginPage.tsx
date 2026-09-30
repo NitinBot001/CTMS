@@ -22,7 +22,9 @@ import {
   RefreshCw,
   Info,
 } from 'lucide-react';
-import { AppEnvironmentMode, DemoCredential } from '../types';
+import { AppEnvironmentMode, DemoCredential, Study, Site } from '../types';
+import { studyService } from '../services/studyService';
+import { ParticipantSelfOnboardingModal } from '../components/auth/ParticipantSelfOnboardingModal';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,6 +72,25 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoPanelExpanded, setDemoPanelExpanded] = useState(true);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+
+  useEffect(() => {
+    const loadStudiesAndSites = async () => {
+      try {
+        const studyList = await studyService.getStudies();
+        setStudies(studyList);
+        if (studyList.length > 0) {
+          const siteList = await studyService.getSites(studyList[0].id);
+          setSites(siteList);
+        }
+      } catch (err) {
+        console.error('Failed to load studies in login page', err);
+      }
+    };
+    loadStudiesAndSites();
+  }, [selectedMode]);
 
   // Pre-fill for MOCK mode on initial mount
   useEffect(() => {
@@ -407,6 +428,18 @@ export const LoginPage: React.FC = () => {
                     )}
                   </button>
                 </div>
+
+                {/* Self-Onboarding Entry */}
+                <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+                  <span className="text-stone-500">Trial Candidate?</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsOnboardingModalOpen(true)}
+                    className="font-semibold text-emerald-800 hover:text-emerald-950 underline hover:no-underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>New Participant? Enroll Online →</span>
+                  </button>
+                </div>
               </form>
 
               {/* Disclaimer */}
@@ -610,6 +643,20 @@ export const LoginPage: React.FC = () => {
           Multi-Role Clinical Portal
         </p>
       </footer>
+
+      {/* Participant Self-Onboarding Modal */}
+      <ParticipantSelfOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        studies={studies}
+        sites={sites}
+        onRegistrationComplete={(regEmail) => {
+          setEmail(regEmail);
+          setPassword('128');
+          setIsOnboardingModalOpen(false);
+          refreshEmptyCredentials();
+        }}
+      />
     </div>
   );
 };

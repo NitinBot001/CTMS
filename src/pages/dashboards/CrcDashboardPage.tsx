@@ -6,7 +6,7 @@ import { participantService } from '../../services/participantService';
 import { visitService } from '../../services/visitService';
 import { taskService } from '../../services/taskService';
 import { documentService } from '../../services/documentService';
-import { Participant, ParticipantVisit, Task, Document } from '../../types';
+import { Participant, ParticipantVisit, Task, Document, ParticipantOnboardingRequest, ParticipantRequest } from '../../types';
 import {
   ClipboardList,
   Users,
@@ -15,6 +15,7 @@ import {
   FileText,
   ArrowRight,
   UserCheck,
+  UserPlus,
 } from 'lucide-react';
 
 export const CrcDashboardPage: React.FC = () => {
@@ -25,6 +26,8 @@ export const CrcDashboardPage: React.FC = () => {
   const [visits, setVisits] = useState<ParticipantVisit[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [onboardingRequests, setOnboardingRequests] = useState<ParticipantOnboardingRequest[]>([]);
+  const [participantRequests, setParticipantRequests] = useState<ParticipantRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -32,12 +35,14 @@ export const CrcDashboardPage: React.FC = () => {
     setIsLoading(true);
     try {
       const context = { studyId: activeStudyId, siteId: activeSiteId };
-      const [fetchedParticipants, fetchedVisits, fetchedTasks, fetchedDocuments] =
+      const [fetchedParticipants, fetchedVisits, fetchedTasks, fetchedDocuments, fetchedOnboarding, fetchedRequests] =
         await Promise.all([
           participantService.getParticipants(context),
           visitService.getVisits(context),
           taskService.getTasks(context),
           documentService.getDocuments(context),
+          participantService.getOnboardingRequests(context),
+          participantService.getParticipantRequests(context),
         ]);
 
       setParticipants(fetchedParticipants);
@@ -48,6 +53,8 @@ export const CrcDashboardPage: React.FC = () => {
       );
       setTasks(fetchedTasks.filter((t) => t.status !== 'COMPLETED'));
       setDocuments(fetchedDocuments.filter((d) => d.status === 'EXPIRED' || d.isRequired));
+      setOnboardingRequests(fetchedOnboarding);
+      setParticipantRequests(fetchedRequests);
     } catch (err) {
       console.error('Failed to load CRC dashboard data', err);
     } finally {
@@ -61,6 +68,12 @@ export const CrcDashboardPage: React.FC = () => {
 
   const activeParticipants = participants.filter((p) => p.status === 'ACTIVE' || p.status === 'ENROLLED');
   const overdueVisits = visits.filter((v) => v.status === 'OVERDUE');
+  const pendingOnboarding = onboardingRequests.filter(
+    (r) => r.status === 'SUBMITTED' || r.status === 'NEEDS_CLARIFICATION'
+  );
+  const pendingRequests = participantRequests.filter(
+    (r) => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW'
+  );
 
   return (
     <div className="space-y-6">
@@ -94,6 +107,61 @@ export const CrcDashboardPage: React.FC = () => {
           <span>Role: <strong className="text-stone-800">{currentRole?.name}</strong></span>
         </div>
       </div>
+
+      {/* Onboarding & Participant Action Alerts */}
+      {(pendingOnboarding.length > 0 || pendingRequests.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {pendingOnboarding.length > 0 && (
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-sm p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-sm bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  {pendingOnboarding.length}
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-emerald-900">
+                    Pending Onboarding Applications
+                  </h3>
+                  <p className="text-[11px] text-emerald-700">
+                    Candidate submissions awaiting eligibility review and participant ID assignment.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/pi/patients"
+                className="text-xs font-semibold px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-sm shrink-0 inline-flex items-center gap-1"
+              >
+                <span>Review</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          )}
+
+          {pendingRequests.length > 0 && (
+            <div className="bg-amber-50/80 border border-amber-200 rounded-sm p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-sm bg-amber-700 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  {pendingRequests.length}
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-amber-900">
+                    Pending Participant Requests
+                  </h3>
+                  <p className="text-[11px] text-amber-700">
+                    Subject requests for visit reschedule or attendance issues requiring coordinator action.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/pi/patients"
+                className="text-xs font-semibold px-2.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-sm shrink-0 inline-flex items-center gap-1"
+              >
+                <span>Review</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -136,7 +204,7 @@ export const CrcDashboardPage: React.FC = () => {
 
       {/* Main Grid: Coordinator Operations */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (8 cols): Visits & Tasks */}
+        {/* Left Column (8 cols): Visits & Tasks & Onboarding */}
         <div className="lg:col-span-8 space-y-6">
           {/* Active Visit Schedule Card */}
           <div className="bg-white border border-stone-200 rounded-sm shadow-xs p-5">
@@ -237,6 +305,108 @@ export const CrcDashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Onboarding & Participant Requests Queue Card */}
+          <div className="bg-white border border-stone-200 rounded-sm shadow-xs p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-serif text-base font-bold text-stone-900">
+                  Subject Onboarding & Portal Request Queues
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Candidate self-registrations and participant inquiries
+                </p>
+              </div>
+              <Link
+                to="/pi/patients"
+                className="text-xs text-[#1F5C3F] hover:underline font-medium inline-flex items-center"
+              >
+                Participant Desk <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Link>
+            </div>
+
+            {isLoading ? (
+              <p className="text-xs text-stone-500 py-4 text-center">Loading queues...</p>
+            ) : onboardingRequests.length === 0 && participantRequests.length === 0 ? (
+              <div className="py-6 text-center text-xs text-stone-500 bg-stone-50 rounded-sm border border-stone-100">
+                No active onboarding applications or portal requests for this site.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {onboardingRequests.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">
+                      Recent Candidate Applications ({onboardingRequests.length})
+                    </h3>
+                    <div className="divide-y divide-stone-100">
+                      {onboardingRequests.slice(0, 3).map((req) => (
+                        <div key={req.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="font-semibold text-stone-900">{req.requestedName}</span>
+                            <span className="text-stone-500 ml-2 font-mono text-[11px]">{req.requestedEmail}</span>
+                            <p className="text-[11px] text-stone-400 mt-0.5">
+                              Submitted: {new Date(req.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                                req.status === 'SUBMITTED'
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  : req.status === 'APPROVED'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-stone-100 text-stone-700'
+                              }`}
+                            >
+                              {req.status}
+                            </span>
+                            <Link
+                              to="/pi/patients"
+                              className="text-[11px] font-semibold text-[#1F5C3F] hover:underline"
+                            >
+                              Review
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {participantRequests.length > 0 && (
+                  <div className="pt-2 border-t border-stone-100">
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">
+                      Recent Participant Requests ({participantRequests.length})
+                    </h3>
+                    <div className="divide-y divide-stone-100">
+                      {participantRequests.slice(0, 3).map((pr) => (
+                        <div key={pr.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                          <div>
+                            <span className="font-mono font-semibold text-stone-900">{pr.participantId}</span>
+                            <span className="text-stone-600 ml-2 font-medium">{pr.requestType.replace(/_/g, ' ')}</span>
+                            <p className="text-[11px] text-stone-500 mt-0.5 italic truncate max-w-xs">{pr.message}</p>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                              pr.status === 'SUBMITTED'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : pr.status === 'UNDER_REVIEW'
+                                ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                : pr.status === 'APPROVED'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-rose-50 text-rose-800 border border-rose-200'
+                            }`}
+                          >
+                            {pr.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column (4 cols): Quick Operations & Regulatory Docs */}
@@ -247,6 +417,17 @@ export const CrcDashboardPage: React.FC = () => {
               Coordinator Quick Actions
             </h2>
             <div className="space-y-2">
+              <Link
+                to="/pi/patients"
+                className="w-full flex items-center justify-between p-2.5 rounded-sm border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-xs text-stone-800 transition-colors"
+              >
+                <div className="flex items-center space-x-2">
+                  <UserPlus className="w-4 h-4 text-emerald-700" />
+                  <span>Onboarding Queue ({pendingOnboarding.length})</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-stone-400" />
+              </Link>
+
               <Link
                 to="/pi/patients"
                 className="w-full flex items-center justify-between p-2.5 rounded-sm border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-xs text-stone-800 transition-colors"

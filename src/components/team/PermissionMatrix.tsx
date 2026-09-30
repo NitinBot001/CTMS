@@ -65,6 +65,11 @@ const MODULE_DISPLAY_CONFIG: Record<
     description: 'Clinical transcription, source doc verification, correction loops, and CRO release',
     badgeColor: 'bg-orange-50 text-orange-900 border-orange-200',
   },
+  PARTICIPANT_PORTAL: {
+    label: 'Participant Portal Self-Service',
+    description: 'Participant self-service portal, visit attendance, and request submissions',
+    badgeColor: 'bg-lime-50 text-lime-900 border-lime-200',
+  },
 };
 
 export const PermissionMatrix: React.FC<PermissionMatrixProps> = ({

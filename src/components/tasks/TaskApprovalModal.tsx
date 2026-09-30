@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Task, TaskApprovalDecision } from '../../types';
 import { taskService } from '../../services/taskService';
+import { useAuth } from '../../context/AuthContext';
 
 interface TaskApprovalModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const TaskApprovalModal: React.FC<TaskApprovalModalProps> = ({
   siteId,
   task,
 }) => {
+  const { currentUser } = useAuth();
   const [decision, setDecision] = useState<TaskApprovalDecision>('APPROVED');
   const [comments, setComments] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -40,7 +42,7 @@ export const TaskApprovalModal: React.FC<TaskApprovalModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const reviewerId = 'USR-101'; // Dr. Ananya Sharma (PI)
+      const reviewerId = currentUser?.id || 'USR-101';
       const reviewComments = comments.trim() || 'Clinically reviewed and approved by Principal Investigator.';
 
       if (decision === 'APPROVED') {

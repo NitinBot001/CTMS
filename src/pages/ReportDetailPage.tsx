@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { reportService } from '../services/reportService';
 import { studyService } from '../services/studyService';
 import { ReportType, GeneratedReport, ReportFilters } from '../types';
@@ -18,6 +19,7 @@ export const ReportDetailPage: React.FC = () => {
   const { reportType: paramType } = useParams<{ reportType: string }>();
   const navigate = useNavigate();
   const { activeStudyId, activeSiteId, isLoading: isStudyLoading } = useStudy();
+  const { currentUser } = useAuth();
 
   const reportType = (paramType || '').toUpperCase() as ReportType;
   const isValidType = REPORT_DEFINITIONS.some((d) => d.reportType === reportType);
@@ -48,8 +50,7 @@ export const ReportDetailPage: React.FC = () => {
       const context = { studyId: activeStudyId, siteId: activeSiteId };
       const [generated, canExport, ctx] = await Promise.all([
         reportService.generateReport(context, reportType, filters),
-        // By default check PI permission (USR-101 has ROLE_PI)
-        reportService.checkReportPermission('USR-101', context, 'REPORTS_EXPORT'),
+        reportService.checkReportPermission(currentUser?.id || '', context, 'REPORTS_EXPORT'),
         studyService.getCurrentContext(activeStudyId, activeSiteId),
       ]);
 

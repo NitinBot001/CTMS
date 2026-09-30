@@ -20,6 +20,8 @@ import {
   Notification,
   AuditLogEvent,
   ProtocolVisitDefinition,
+  ParticipantOnboardingRequest,
+  ParticipantRequest,
 } from '../types';
 import { MOCK_ROLES } from '../data/mockData';
 
@@ -41,6 +43,8 @@ export const EMPTY_TEST_KEYS = {
   NOTIFICATIONS: `${EMPTY_TEST_PREFIX}notifications`,
   AUDIT: `${EMPTY_TEST_PREFIX}audit`,
   PASSWORDS: `${EMPTY_TEST_PREFIX}passwords`,
+  ONBOARDING_REQUESTS: `${EMPTY_TEST_PREFIX}onboarding_requests`,
+  PARTICIPANT_REQUESTS: `${EMPTY_TEST_PREFIX}participant_requests`,
 };
 
 export const EMPTY_TEST_STUDY: Study = {
@@ -195,6 +199,8 @@ export class EmptyTestStore {
     browserStorage.set(EMPTY_TEST_KEYS.PASSWORDS, {
       [BOOTSTRAP_PI_USER.email.toLowerCase()]: BOOTSTRAP_PI_PASSWORD,
     });
+    browserStorage.set(EMPTY_TEST_KEYS.ONBOARDING_REQUESTS, []);
+    browserStorage.set(EMPTY_TEST_KEYS.PARTICIPANT_REQUESTS, []);
 
     return metadata;
   }
@@ -345,6 +351,24 @@ export class EmptyTestStore {
     const passwords = this.getUserPasswords();
     passwords[email.trim().toLowerCase()] = password;
     browserStorage.set(EMPTY_TEST_KEYS.PASSWORDS, passwords);
+  }
+
+  getOnboardingRequests(): ParticipantOnboardingRequest[] {
+    this.initWorkspace();
+    return browserStorage.get<ParticipantOnboardingRequest[]>(EMPTY_TEST_KEYS.ONBOARDING_REQUESTS, []) || [];
+  }
+
+  saveOnboardingRequests(requests: ParticipantOnboardingRequest[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.ONBOARDING_REQUESTS, requests);
+  }
+
+  getParticipantRequests(): ParticipantRequest[] {
+    this.initWorkspace();
+    return browserStorage.get<ParticipantRequest[]>(EMPTY_TEST_KEYS.PARTICIPANT_REQUESTS, []) || [];
+  }
+
+  saveParticipantRequests(requests: ParticipantRequest[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PARTICIPANT_REQUESTS, requests);
   }
 }
 

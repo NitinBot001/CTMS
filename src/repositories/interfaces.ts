@@ -71,6 +71,10 @@ import {
   CreateParticipantInput,
   CreateVisitInput,
   AuditLogEvent,
+  ParticipantOnboardingRequest,
+  ParticipantRequest,
+  ParticipantSelfRegistrationInput,
+  CreateParticipantRequestInput,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -92,7 +96,15 @@ export interface IParticipantRepository {
   getParticipants(context: ParticipantQueryContext, filters?: ParticipantFilters): Promise<Participant[]>;
   getParticipantById(context: ParticipantQueryContext, participantId: string): Promise<Participant | null>;
   getParticipantSummary(context: ParticipantQueryContext): Promise<ParticipantSummaryMetrics>;
-  createParticipant?(context: ParticipantQueryContext, input: CreateParticipantInput): Promise<Participant>;
+  createParticipant(context: ParticipantQueryContext, input: CreateParticipantInput): Promise<Participant>;
+  updateParticipant?(context: ParticipantQueryContext, participantId: string, updates: Partial<Participant>): Promise<Participant | null>;
+  getOnboardingRequests?(context: ParticipantQueryContext): Promise<ParticipantOnboardingRequest[]>;
+  getOnboardingRequestById?(context: ParticipantQueryContext, requestId: string): Promise<ParticipantOnboardingRequest | null>;
+  createOnboardingRequest?(input: ParticipantSelfRegistrationInput): Promise<ParticipantOnboardingRequest>;
+  updateOnboardingRequest?(req: ParticipantOnboardingRequest): Promise<ParticipantOnboardingRequest>;
+  getParticipantRequests?(context: ParticipantQueryContext, participantId?: string): Promise<ParticipantRequest[]>;
+  createParticipantRequest?(input: CreateParticipantRequestInput): Promise<ParticipantRequest>;
+  updateParticipantRequest?(req: ParticipantRequest): Promise<ParticipantRequest>;
 }
 
 export interface IVisitRepository {
@@ -108,6 +120,11 @@ export interface IVisitRepository {
     status: ClinicalActivityStatus
   ): Promise<ParticipantVisit | null>;
   createVisit?(context: ParticipantQueryContext, input: CreateVisitInput): Promise<ParticipantVisit>;
+  updateVisit?(
+    context: ParticipantQueryContext,
+    visitId: string,
+    updates: Partial<ParticipantVisit>
+  ): Promise<ParticipantVisit | null>;
 }
 
 export interface ISafetyRepository {
@@ -385,6 +402,8 @@ export interface WorkflowActor {
   name: string;
   roleId: string;
   roleName: string;
+  role?: string;
+  effectivePermissions?: string[];
 }
 
 export interface CreateDraftRecordInput {

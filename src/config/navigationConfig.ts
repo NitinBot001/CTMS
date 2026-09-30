@@ -104,6 +104,8 @@ export function getRoleLandingRoute(roleId?: string): string {
       return '/pharmacist';
     case 'ROLE_DATA_ENTRY':
       return '/data-entry';
+    case 'ROLE_PARTICIPANT':
+      return '/participant';
     case 'ROLE_PI':
     default:
       return '/pi';

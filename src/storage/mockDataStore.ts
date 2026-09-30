@@ -7,7 +7,15 @@
  * Strictly isolated from Empty Test Mode (`aiia_ctms_empty_test_*`).
  */
 import { browserStorage } from './browserStorage';
-import { User, UserRole, UserStatus } from '../types';
+import {
+  User,
+  UserRole,
+  UserStatus,
+  Participant,
+  ParticipantVisit,
+  ParticipantOnboardingRequest,
+  ParticipantRequest,
+} from '../types';
 import { MOCK_USERS, MOCK_USER_ROLES } from '../data/mockData';
 
 export const MOCK_MUTATION_PREFIX = 'aiia_ctms_mock_mutation_';
@@ -17,6 +25,10 @@ export const MOCK_MUTATION_KEYS = {
   USER_ROLES: `${MOCK_MUTATION_PREFIX}user_roles`,
   PASSWORDS: `${MOCK_MUTATION_PREFIX}passwords`,
   USER_STATUSES: `${MOCK_MUTATION_PREFIX}user_statuses`,
+  PARTICIPANTS: `${MOCK_MUTATION_PREFIX}participants`,
+  VISITS: `${MOCK_MUTATION_PREFIX}visits`,
+  ONBOARDING_REQUESTS: `${MOCK_MUTATION_PREFIX}onboarding_requests`,
+  PARTICIPANT_REQUESTS: `${MOCK_MUTATION_PREFIX}participant_requests`,
 };
 
 export const MOCK_DEFAULT_TEMPORARY_PASSWORD = '128';
@@ -133,6 +145,132 @@ export class MockDataStore {
     const canonical = MOCK_USER_ROLES.map((ur) => ({ ...ur }));
     const added = this.getAddedUserRoles();
     return [...canonical, ...added];
+  }
+
+  /**
+   * Participants added or mutated in Mock Mode
+   */
+  getAddedParticipants(): Participant[] {
+    return browserStorage.get<Participant[]>(MOCK_MUTATION_KEYS.PARTICIPANTS, []) || [];
+  }
+
+  saveAddedParticipants(participants: Participant[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PARTICIPANTS, participants);
+  }
+
+  addMockParticipant(participant: Participant): void {
+    const list = this.getAddedParticipants();
+    const filtered = list.filter((p) => p.id !== participant.id);
+    filtered.push(participant);
+    this.saveAddedParticipants(filtered);
+  }
+
+  updateMockParticipant(participant: Participant): void {
+    const list = this.getAddedParticipants();
+    const index = list.findIndex((p) => p.id === participant.id);
+    if (index >= 0) {
+      list[index] = participant;
+    } else {
+      list.push(participant);
+    }
+    this.saveAddedParticipants(list);
+  }
+
+  /**
+   * Visits added or mutated in Mock Mode
+   */
+  getAddedVisits(): ParticipantVisit[] {
+    return browserStorage.get<ParticipantVisit[]>(MOCK_MUTATION_KEYS.VISITS, []) || [];
+  }
+
+  saveAddedVisits(visits: ParticipantVisit[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.VISITS, visits);
+  }
+
+  addMockVisit(visit: ParticipantVisit): void {
+    const list = this.getAddedVisits();
+    const filtered = list.filter((v) => v.id !== visit.id);
+    filtered.push(visit);
+    this.saveAddedVisits(filtered);
+  }
+
+  updateMockVisit(visit: ParticipantVisit): void {
+    const list = this.getAddedVisits();
+    const index = list.findIndex((v) => v.id === visit.id);
+    if (index >= 0) {
+      list[index] = visit;
+    } else {
+      list.push(visit);
+    }
+    this.saveAddedVisits(list);
+  }
+
+  /**
+   * Onboarding requests in Mock Mode
+   */
+  getAddedOnboardingRequests(): ParticipantOnboardingRequest[] {
+    return (
+      browserStorage.get<ParticipantOnboardingRequest[]>(
+        MOCK_MUTATION_KEYS.ONBOARDING_REQUESTS,
+        []
+      ) || []
+    );
+  }
+
+  saveAddedOnboardingRequests(requests: ParticipantOnboardingRequest[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.ONBOARDING_REQUESTS, requests);
+  }
+
+  addOnboardingRequest(req: ParticipantOnboardingRequest): void {
+    const list = this.getAddedOnboardingRequests();
+    const filtered = list.filter((r) => r.id !== req.id);
+    filtered.push(req);
+    this.saveAddedOnboardingRequests(filtered);
+  }
+
+  updateOnboardingRequest(req: ParticipantOnboardingRequest): void {
+    const list = this.getAddedOnboardingRequests();
+    const index = list.findIndex((r) => r.id === req.id);
+    if (index >= 0) {
+      list[index] = req;
+    } else {
+      list.push(req);
+    }
+    this.saveAddedOnboardingRequests(list);
+  }
+
+  /**
+   * Participant requests in Mock Mode
+   */
+  getAddedParticipantRequests(): ParticipantRequest[] {
+    return (
+      browserStorage.get<ParticipantRequest[]>(
+        MOCK_MUTATION_KEYS.PARTICIPANT_REQUESTS,
+        []
+      ) || []
+    );
+  }
+
+  saveAddedParticipantRequests(requests: ParticipantRequest[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PARTICIPANT_REQUESTS, requests);
+  }
+
+  addParticipantRequest(req: ParticipantRequest): void {
+    const list = this.getAddedParticipantRequests();
+    const filtered = list.filter((r) => r.id !== req.id);
+    filtered.push(req);
+    this.saveAddedParticipantRequests(filtered);
+  }
+
+  updateParticipantRequest(req: ParticipantRequest): void {
+    const list = this.getAddedParticipantRequests();
+    const index = list.findIndex((r) => r.id === req.id);
+    if (index >= 0) {
+      list[index] = req;
+    } else {
+      list.push(req);
+    }
+    this.saveAddedParticipantRequests(list);
   }
 
   /**

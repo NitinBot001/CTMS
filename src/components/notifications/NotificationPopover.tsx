@@ -5,6 +5,7 @@ import { Notification } from '../../types';
 import { notificationService } from '../../services/notificationService';
 import { NotificationPriorityBadge } from './NotificationPriorityBadge';
 import { NotificationTypeBadge } from './NotificationTypeBadge';
+import { useAuth } from '../../context/AuthContext';
 import {
   formatRelativeTime,
   getDefaultActionRoute,
@@ -20,8 +21,10 @@ interface NotificationPopoverProps {
 export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
   studyId,
   siteId,
-  recipientUserId = 'USR-101',
+  recipientUserId: propRecipientUserId,
 }) => {
+  const { currentUser } = useAuth();
+  const recipientUserId = propRecipientUserId || currentUser?.id || '';
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);

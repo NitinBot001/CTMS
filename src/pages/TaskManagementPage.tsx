@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { taskService } from '../services/taskService';
 import { teamService } from '../services/teamService';
 import {
@@ -27,6 +28,7 @@ export const TaskManagementPage: React.FC = () => {
     activeSiteId,
     isLoading: isStudyLoading,
   } = useStudy();
+  const { currentUser } = useAuth();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [totalSiteCount, setTotalSiteCount] = useState<number>(0);
@@ -92,7 +94,7 @@ export const TaskManagementPage: React.FC = () => {
       }
 
       const context = { studyId: activeStudyId, siteId: activeSiteId };
-      const currentUserId = 'USR-101'; // Dr. Ananya Sharma (PI)
+      const currentUserId = currentUser?.id || '';
 
       const [filteredData, summary, allTasks, members] = await Promise.all([
         taskService.getTasks(context, filters),

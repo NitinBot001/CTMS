@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { visitService } from '../services/visitService';
 import { participantService } from '../services/participantService';
 import {
@@ -13,16 +14,20 @@ import { VisitSummaryCards } from '../components/visits/VisitSummaryCards';
 import { VisitFiltersBar } from '../components/visits/VisitFiltersBar';
 import { VisitTable } from '../components/visits/VisitTable';
 import { VisitMobileCard } from '../components/visits/VisitMobileCard';
+import { ScheduleVisitModal } from '../components/visits/ScheduleVisitModal';
 import { Skeleton } from '../components/ui/SkeletonLoader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { RefreshCw, CalendarDays } from 'lucide-react';
+import { RefreshCw, CalendarDays, Plus } from 'lucide-react';
 
 export const VisitsManagementPage: React.FC = () => {
   const { activeStudy, activeSite, activeStudyId, activeSiteId, isLoading: isStudyLoading } =
     useStudy();
+  const { effectivePermissions } = useAuth();
+  const canEditVisits = effectivePermissions.some((p) => p.id === 'VISITS_EDIT');
 
   const [visits, setVisits] = useState<ParticipantVisit[]>([]);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [totalSiteCount, setTotalSiteCount] = useState<number>(0);
   const [protocolVisits, setProtocolVisits] = useState<ProtocolVisitDefinition[]>([]);
   const [participantsList, setParticipantsList] = useState<
@@ -196,6 +201,16 @@ export const VisitsManagementPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {canEditVisits && (
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white rounded-sm shadow-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Schedule Visit</span>
+            </button>
+          )}
           <span className="text-xs font-semibold px-2.5 py-1 bg-surface-soft border border-border rounded-sm text-ink-secondary">
             Site-Level Schedule
           </span>
@@ -277,6 +292,13 @@ export const VisitsManagementPage: React.FC = () => {
           </div>
         </>
       )}
+
+      {/* Schedule Visit Modal */}
+      <ScheduleVisitModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSuccess={loadVisitsData}
+      />
     </div>
   );
 };

@@ -127,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
           <NotificationPopover
             studyId={activeStudy?.id}
             siteId={activeSite?.id}
-            recipientUserId={currentUser?.id || 'USR-101'}
+            recipientUserId={currentUser?.id}
           />
 
           {/* User Menu */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useStudy } from '../context/StudyContext';
+import { useAuth } from '../context/AuthContext';
 import { participantService } from '../services/participantService';
 import { visitService } from '../services/visitService';
 import { safetyService } from '../services/safetyService';
@@ -14,6 +15,7 @@ import { SafetyReviewBadge } from '../components/safety/SafetyReviewBadge';
 import { DeviationClassificationBadge } from '../components/compliance/DeviationClassificationBadge';
 import { DeviationStatusBadge } from '../components/compliance/DeviationStatusBadge';
 import { DeviationCapaBadge } from '../components/compliance/DeviationCapaBadge';
+import { ScheduleVisitModal } from '../components/visits/ScheduleVisitModal';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Skeleton } from '../components/ui/SkeletonLoader';
@@ -32,11 +34,14 @@ import {
   AlertCircle,
   ArrowRight,
   CalendarDays,
+  Plus,
 } from 'lucide-react';
 
 export const ParticipantDetailPage: React.FC = () => {
   const { participantId } = useParams<{ participantId: string }>();
   const { activeStudy, activeSite, activeStudyId, activeSiteId, isLoading: isStudyLoading } = useStudy();
+  const { effectivePermissions } = useAuth();
+  const canEditVisits = effectivePermissions.some((p) => p.id === 'VISITS_EDIT');
 
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [participantVisits, setParticipantVisits] = useState<ParticipantVisit[]>([]);
@@ -44,6 +49,7 @@ export const ParticipantDetailPage: React.FC = () => {
   const [complianceSummary, setComplianceSummary] = useState<ParticipantComplianceSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   const loadParticipant = useCallback(async () => {
     if (!activeStudyId || !activeSiteId || !participantId) {
@@ -294,6 +300,18 @@ export const ParticipantDetailPage: React.FC = () => {
         <CardHeader
           title="Protocol Visit Schedule"
           subtitle="Participant-specific timeline of study visits, windows, and procedural checklists"
+          action={
+            canEditVisits ? (
+              <button
+                type="button"
+                onClick={() => setIsScheduleModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white rounded-sm shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Schedule Visit</span>
+              </button>
+            ) : undefined
+          }
         />
         <CardContent className="p-0">
           <div className="divide-y divide-border">
@@ -555,6 +573,15 @@ export const ParticipantDetailPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {participant && (
+        <ScheduleVisitModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          preselectedParticipantId={participant.id}
+          onSuccess={loadParticipant}
+        />
+      )}
     </div>
   );
 };

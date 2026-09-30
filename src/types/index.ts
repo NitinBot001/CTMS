@@ -152,10 +152,12 @@ export interface Participant {
   studyId: string;
   siteId: string;
   participantCode: string;
+  participantNumber?: string;
   screeningCode: string;
   initials: string;
   age: number;
   sex: 'M' | 'F' | 'Other';
+  email?: string;
   screeningDate: string;
   enrollmentDate: string | null;
   status: ParticipantLifecycleStatus;
@@ -584,6 +586,7 @@ export interface User {
   mustChangePassword?: boolean;
   isTemporaryPassword?: boolean;
   notes?: string;
+  participantId?: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
 }
@@ -610,7 +613,8 @@ export type PermissionModule =
   | 'DOCUMENTS'
   | 'TASKS'
   | 'REPORTS'
-  | 'DATA_ENTRY';
+  | 'DATA_ENTRY'
+  | 'PARTICIPANT_PORTAL';
 
 export type PermissionAction =
   | 'VIEW'
@@ -1087,7 +1091,11 @@ export type NotificationType =
   | 'DATA_ENTRY_SUBMITTED'
   | 'DATA_ENTRY_RETURNED'
   | 'DATA_ENTRY_VERIFIED'
-  | 'DATA_ENTRY_CRO_SUBMITTED';
+  | 'DATA_ENTRY_CRO_SUBMITTED'
+  | 'PARTICIPANT_ONBOARDING_APPROVED'
+  | 'PARTICIPANT_ONBOARDING_CLARIFICATION'
+  | 'PARTICIPANT_ONBOARDING_REJECTED'
+  | 'PARTICIPANT_REQUEST_SUBMITTED';
 
 export type NotificationPriority = 'HIGH' | 'MEDIUM' | 'NORMAL';
 
@@ -1409,6 +1417,8 @@ export interface CreateVisitInput {
   visitType: 'SCREENING' | 'BASELINE' | 'TREATMENT' | 'FOLLOW_UP' | 'CLOSE_OUT' | 'UNSCHEDULED';
   plannedDate: string;
   status?: 'SCHEDULED' | 'DUE' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | 'MISSED' | 'CANCELLED';
+  assignedStaff?: string;
+  notes?: string;
 }
 
 export interface AuditLogEvent {
@@ -1422,3 +1432,110 @@ export interface AuditLogEvent {
   timestamp: string;
   metadata?: Record<string, unknown>;
 }
+
+// ============================================================
+// Stage 1: Participant Onboarding & Portal Domain Types
+// ============================================================
+
+export type ParticipantOnboardingRequestStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'NEEDS_CLARIFICATION'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CONVERTED_TO_PARTICIPANT';
+
+export interface ParticipantOnboardingRequest {
+  id: string;
+  studyId: string;
+  siteId: string;
+  participantAccountId?: string;
+  requestedEmail: string;
+  requestedName: string;
+  age?: number;
+  dob?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  phone?: string;
+  preferredLanguage?: string;
+  notes?: string;
+  status: ParticipantOnboardingRequestStatus;
+  submittedAt: string;
+  reviewedByUserId?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  decisionReason?: string;
+  participantId?: string;
+  participantNumber?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewOnboardingRequestInput {
+  decision: 'APPROVE' | 'REQUEST_CLARIFICATION' | 'REJECT';
+  reason?: string;
+  participantNumber?: string;
+}
+
+export type ParticipantRequestType =
+  | 'RESCHEDULE_VISIT'
+  | 'CANNOT_ATTEND'
+  | 'GENERAL_STUDY_REQUEST';
+
+export type ParticipantRequestStatus =
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export interface ParticipantRequest {
+  id: string;
+  participantId: string;
+  participantName?: string;
+  studyId: string;
+  siteId: string;
+  requestType: ParticipantRequestType;
+  visitId?: string;
+  visitName?: string;
+  message: string;
+  proposedDate?: string;
+  status: ParticipantRequestStatus;
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  reviewerComment?: string;
+}
+
+export interface CreateParticipantRequestInput {
+  participantId: string;
+  studyId: string;
+  siteId: string;
+  requestType: ParticipantRequestType;
+  visitId?: string;
+  visitName?: string;
+  message: string;
+  proposedDate?: string;
+}
+
+export interface ReviewParticipantRequestInput {
+  decision: 'APPROVE' | 'REJECT';
+  comment?: string;
+  newPlannedDate?: string;
+}
+
+export interface ParticipantSelfRegistrationInput {
+  studyId: string;
+  siteId: string;
+  requestedEmail: string;
+  requestedName: string;
+  password?: string;
+  age?: number;
+  dob?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  phone?: string;
+  preferredLanguage?: string;
+  notes?: string;
+  participantAccountId?: string;
+}
+

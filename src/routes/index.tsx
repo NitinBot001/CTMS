@@ -37,6 +37,7 @@ import { StudyPharmacistDashboardPage } from '../pages/dashboards/StudyPharmacis
 import { DataEntryDashboardPage } from '../pages/dashboards/DataEntryDashboardPage';
 import { DataEntryRecordPage } from '../pages/dataEntry/DataEntryRecordPage';
 import { VerificationDetailPage } from '../pages/dataEntry/VerificationDetailPage';
+import { ParticipantPortalPage } from '../pages/participant/ParticipantPortalPage';
 
 /**
  * Root redirect handler:
@@ -59,14 +60,28 @@ export const AppRoutes: React.FC = () => {
       {/* Root Navigation Resolution */}
       <Route path="/" element={<RootRedirect />} />
 
+      {/* Participant Portal */}
+      <Route
+        path="/participant"
+        element={
+          <RequireAuth>
+            <RequirePermission permission="PARTICIPANT_SELF_VIEW">
+              <ParticipantPortalPage />
+            </RequirePermission>
+          </RequireAuth>
+        }
+      />
+
       {/* Role-Specific Portal Dashboards */}
       <Route
         path="/sub-investigator"
         element={
           <RequireAuth>
-            <AppShell pageTitle="Sub-Investigator Clinical Desk">
-              <SubInvestigatorDashboardPage />
-            </AppShell>
+            <RequirePermission permission="DATA_ENTRY_VERIFY">
+              <AppShell pageTitle="Sub-Investigator Clinical Desk">
+                <SubInvestigatorDashboardPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -74,9 +89,11 @@ export const AppRoutes: React.FC = () => {
         path="/crc"
         element={
           <RequireAuth>
-            <AppShell pageTitle="Clinical Research Coordinator Desk">
-              <CrcDashboardPage />
-            </AppShell>
+            <RequirePermission permission="PARTICIPANTS_CREATE">
+              <AppShell pageTitle="Clinical Research Coordinator Desk">
+                <CrcDashboardPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -84,9 +101,11 @@ export const AppRoutes: React.FC = () => {
         path="/study-nurse"
         element={
           <RequireAuth>
-            <AppShell pageTitle="Study Nurse Clinical Station">
-              <StudyNurseDashboardPage />
-            </AppShell>
+            <RequirePermission permission="VISITS_EDIT">
+              <AppShell pageTitle="Study Nurse Clinical Station">
+                <StudyNurseDashboardPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -94,9 +113,11 @@ export const AppRoutes: React.FC = () => {
         path="/pharmacist"
         element={
           <RequireAuth>
-            <AppShell pageTitle="Investigational Product Dispensary">
-              <StudyPharmacistDashboardPage />
-            </AppShell>
+            <RequirePermission permission="STUDY_VIEW">
+              <AppShell pageTitle="Investigational Product Dispensary">
+                <StudyPharmacistDashboardPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -104,9 +125,11 @@ export const AppRoutes: React.FC = () => {
         path="/data-entry"
         element={
           <RequireAuth>
-            <AppShell pageTitle="eCRF Data Entry Station">
-              <DataEntryDashboardPage />
-            </AppShell>
+            <RequirePermission permission="DATA_ENTRY_VIEW">
+              <AppShell pageTitle="eCRF Data Entry Station">
+                <DataEntryDashboardPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -126,7 +149,7 @@ export const AppRoutes: React.FC = () => {
         path="/sub-investigator/verification/:recordId"
         element={
           <RequireAuth>
-            <RequirePermission permission="DATA_ENTRY_VIEW">
+            <RequirePermission permission="DATA_ENTRY_VERIFY">
               <AppShell pageTitle="Clinical Data Verification & Source Audit">
                 <VerificationDetailPage />
               </AppShell>
@@ -140,9 +163,11 @@ export const AppRoutes: React.FC = () => {
         path="/pi"
         element={
           <RequireAuth>
-            <AppShell pageTitle="PI Operations Overview">
-              <DashboardOverviewPage />
-            </AppShell>
+            <RequirePermission permission="STUDY_MANAGE">
+              <AppShell pageTitle="PI Operations Overview">
+                <DashboardOverviewPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
@@ -150,9 +175,11 @@ export const AppRoutes: React.FC = () => {
         path="/pi/dashboard"
         element={
           <RequireAuth>
-            <AppShell pageTitle="PI Operations Overview">
-              <DashboardOverviewPage />
-            </AppShell>
+            <RequirePermission permission="STUDY_MANAGE">
+              <AppShell pageTitle="PI Operations Overview">
+                <DashboardOverviewPage />
+              </AppShell>
+            </RequirePermission>
           </RequireAuth>
         }
       />
