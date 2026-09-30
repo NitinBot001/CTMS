@@ -1647,6 +1647,15 @@ export interface ProtocolAssessmentDefinition {
   version?: string;
   sourceReference?: string;
   participantVisible?: boolean;
+  clinicalSystem?: 'AYURVEDA' | 'CONVENTIONAL';
+  ayurvedaCategory?: AyurvedaCategoryCode;
+  instrumentId?: string;
+  instrumentVersion?: string;
+  terminologySystem?: AyurvedaTerminologySystem;
+  terminologyCode?: string | null;
+  validationStatus?: AyurvedaValidationStatus;
+  assessorRoleRequirement?: AssessorRequirement;
+  contentStatus?: AyurvedaContentStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -1789,6 +1798,12 @@ export interface StudyProtocolConfig {
   deviationRequirements: ProtocolDeviationRequirement[];
   milestones: ProtocolMilestone[];
   forms: ProtocolFormDefinition[];
+  ayurveda?: {
+    categories: AyurvedaAssessmentCategory[];
+    instruments: AyurvedaAssessmentInstrument[];
+    protocolAssessments: ProtocolAyurvedaAssessment[];
+    terminologyReferences: AyurvedaTerminologyEntry[];
+  };
 }
 
 export interface ProtocolValidationResult {
@@ -1928,4 +1943,296 @@ export interface CreateMilestoneInput {
   required?: boolean;
   description?: string;
 }
+
+// ============================================================
+// STAGE 2B — AYURVEDA CLINICAL CONFIGURATION FOUNDATION
+// ============================================================
+
+export type CanonicalAyurvedaCategoryCode =
+  | 'PRAKRITI'
+  | 'VIKRITI'
+  | 'AYURVEDA_GENERAL_CLINICAL_EXAMINATION'
+  | 'DASHAVIDHA_PARIKSHA'
+  | 'ASHTAVIDHA_PARIKSHA'
+  | 'AGNI'
+  | 'KOSHTHA'
+  | 'DHATU_RELATED_ASSESSMENT'
+  | 'AYURVEDA_HEALTH_ASSESSMENT'
+  | 'AYURVEDA_DISEASE_SPECIFIC_ASSESSMENT'
+  | 'AYURVEDA_OUTCOME_ASSESSMENT'
+  | 'AYURVEDA_INTERVENTION_ASSESSMENT'
+  | 'OTHER_AYURVEDA_ASSESSMENT';
+
+export type AyurvedaCategoryCode = CanonicalAyurvedaCategoryCode | (string & {});
+
+export type AyurvedaValidationStatus =
+  | 'VALIDATED'
+  | 'SOURCE_REFERENCED'
+  | 'PROTOCOL_DEFINED'
+  | 'PENDING_VALIDATION'
+  | 'DEPRECATED';
+
+export type AyurvedaUsageStatus = 'ACTIVE' | 'DEPRECATED' | 'RETIRED';
+
+export type AyurvedaScoringMethod = 'NONE' | 'SOURCE_DEFINED' | 'IMPLEMENT_LATER';
+
+export type AyurvedaScoringStatus = 'NOT_CONFIGURED' | 'SOURCE_DOCUMENTED' | 'IMPLEMENT_LATER';
+
+export type AyurvedaContentStatus =
+  | 'METADATA_ONLY'
+  | 'ITEMS_CONFIGURED'
+  | 'DIGITAL_INSTRUMENT_READY';
+
+export type AyurvedaTerminologySystem =
+  | 'NAMASTE'
+  | 'WHO_AYURVEDA_TERMINOLOGY'
+  | 'CCRAS'
+  | 'INSTITUTIONAL'
+  | 'PROTOCOL_SPECIFIC'
+  | 'OTHER_VALIDATED';
+
+export type AyurvedaTerminologyStatus =
+  | 'VALIDATED'
+  | 'SOURCE_REFERENCED'
+  | 'PROTOCOL_DEFINED'
+  | 'PENDING_VALIDATION'
+  | 'DEPRECATED'
+  | 'PENDING_TERMINOLOGY_MAPPING';
+
+export type OfficialCodeVerificationStatus =
+  | 'VERIFIED_SOURCE'
+  | 'PENDING_MAPPING'
+  | 'INTERNAL_ONLY';
+
+export type AyurvedaLanguageSupportStatus =
+  | 'SOURCE_VERIFIED'
+  | 'SOURCE_UNVERIFIED'
+  | 'INSTITUTIONAL_SPECIFIED'
+  | 'NOT_SPECIFIED';
+
+export type ClassicalSourceType =
+  | 'CLASSICAL_TEXT'
+  | 'CCRAS'
+  | 'MINISTRY_OF_AYUSH'
+  | 'WHO'
+  | 'INSTITUTIONAL_PROTOCOL'
+  | 'PEER_REVIEWED'
+  | 'OTHER';
+
+export interface AssessorRequirement {
+  requiredRole?: string;
+  trainingRequired: boolean;
+  trainingReference?: string;
+  certificationReference?: string;
+  notes?: string;
+}
+
+export interface ClassicalSourceMetadata {
+  sourceName: string;
+  citation: string;
+  edition?: string;
+  chapterSection?: string;
+  pageReference?: string;
+  sourceType: ClassicalSourceType;
+}
+
+export interface AyurvedaAssessmentCategory {
+  id: string;
+  code: AyurvedaCategoryCode;
+  name: string;
+  description: string;
+  sourceAuthority: string;
+  sourceReference?: string;
+  status: AyurvedaValidationStatus;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AyurvedaAssessmentInstrument {
+  id: string;
+  code: string;
+  name: string;
+  category: AyurvedaCategoryCode;
+  description: string;
+  sourceAuthority: string;
+  sourceReference: string;
+  version: string;
+  validationStatus: AyurvedaValidationStatus;
+  usageStatus: AyurvedaUsageStatus;
+  trainingRequired: boolean;
+  trainingProvider?: string;
+  trainingReference?: string;
+  licenseNote?: string;
+  languageSupport: string[];
+  languageSupportStatus?: AyurvedaLanguageSupportStatus;
+  scoringMethod: AyurvedaScoringMethod;
+  scoringStatus: AyurvedaScoringStatus;
+  itemSourceReference?: string;
+  contentStatus: AyurvedaContentStatus;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AyurvedaTerminologyEntry {
+  id: string;
+  localConceptId?: string | null;
+  system: AyurvedaTerminologySystem;
+  code: string | null;
+  officialCodeVerification: OfficialCodeVerificationStatus;
+  display: string;
+  shortDefinition?: string;
+  longDefinition?: string;
+  language: string;
+  sourceAuthority: string;
+  sourceReference: string;
+  version: string;
+  parentCode?: string | null;
+  status: AyurvedaTerminologyStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProtocolAyurvedaAssessment {
+  id: string;
+  protocolVersionId: string;
+  assessmentCode: string;
+  name: string;
+  category: AyurvedaCategoryCode;
+  instrumentId: string;
+  instrumentVersion: string;
+  visitDefinitionId: string;
+  required: boolean;
+  participantVisible: boolean;
+  assessorRequirement?: AssessorRequirement;
+  sourceReference?: string;
+  validationStatus: AyurvedaValidationStatus;
+  contentStatus: AyurvedaContentStatus;
+  terminologySystem?: AyurvedaTerminologySystem;
+  terminologyCode?: string | null;
+  localConceptId?: string | null;
+  displayOrder: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAyurvedaCategoryInput {
+  code: AyurvedaCategoryCode;
+  name: string;
+  description: string;
+  sourceAuthority: string;
+  sourceReference?: string;
+  status?: AyurvedaValidationStatus;
+  isActive?: boolean;
+}
+
+export interface CreateAyurvedaInstrumentInput {
+  code: string;
+  name: string;
+  category: AyurvedaCategoryCode;
+  description?: string;
+  sourceAuthority: string;
+  sourceReference?: string;
+  version: string;
+  validationStatus?: AyurvedaValidationStatus;
+  usageStatus?: AyurvedaUsageStatus;
+  trainingRequired?: boolean;
+  trainingProvider?: string;
+  trainingReference?: string;
+  licenseNote?: string;
+  languageSupport?: string[];
+  languageSupportStatus?: AyurvedaLanguageSupportStatus;
+  scoringMethod?: AyurvedaScoringMethod;
+  scoringStatus?: AyurvedaScoringStatus;
+  itemSourceReference?: string;
+  contentStatus?: AyurvedaContentStatus;
+  isActive?: boolean;
+}
+
+export interface UpdateAyurvedaInstrumentInput {
+  name?: string;
+  description?: string;
+  sourceAuthority?: string;
+  sourceReference?: string;
+  version?: string;
+  validationStatus?: AyurvedaValidationStatus;
+  usageStatus?: AyurvedaUsageStatus;
+  trainingRequired?: boolean;
+  trainingProvider?: string;
+  trainingReference?: string;
+  licenseNote?: string;
+  languageSupport?: string[];
+  languageSupportStatus?: AyurvedaLanguageSupportStatus;
+  scoringMethod?: AyurvedaScoringMethod;
+  scoringStatus?: AyurvedaScoringStatus;
+  itemSourceReference?: string;
+  contentStatus?: AyurvedaContentStatus;
+  isActive?: boolean;
+}
+
+export interface CreateAyurvedaTerminologyInput {
+  system: AyurvedaTerminologySystem;
+  code: string | null;
+  localConceptId?: string | null;
+  officialCodeVerification?: OfficialCodeVerificationStatus;
+  display: string;
+  shortDefinition?: string;
+  longDefinition?: string;
+  language: string;
+  sourceAuthority: string;
+  sourceReference: string;
+  version: string;
+  parentCode?: string | null;
+  status?: AyurvedaTerminologyStatus;
+}
+
+export interface CreateProtocolAyurvedaAssessmentInput {
+  assessmentCode: string;
+  name: string;
+  category: AyurvedaCategoryCode;
+  instrumentId: string;
+  instrumentVersion?: string;
+  visitDefinitionId: string;
+  required?: boolean;
+  participantVisible?: boolean;
+  assessorRequirement?: AssessorRequirement;
+  sourceReference?: string;
+  validationStatus?: AyurvedaValidationStatus;
+  contentStatus?: AyurvedaContentStatus;
+  terminologySystem?: AyurvedaTerminologySystem;
+  terminologyCode?: string | null;
+  localConceptId?: string | null;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface UpdateProtocolAyurvedaAssessmentInput {
+  name?: string;
+  required?: boolean;
+  participantVisible?: boolean;
+  assessorRequirement?: AssessorRequirement;
+  sourceReference?: string;
+  validationStatus?: AyurvedaValidationStatus;
+  contentStatus?: AyurvedaContentStatus;
+  localConceptId?: string | null;
+  displayOrder?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface AyurvedaInstrumentFilter {
+  category?: AyurvedaCategoryCode;
+  sourceAuthority?: string;
+  validationStatus?: AyurvedaValidationStatus;
+  usageStatus?: AyurvedaUsageStatus;
+  isActive?: boolean;
+}
+
+export interface AyurvedaTerminologyFilter {
+  system?: AyurvedaTerminologySystem;
+  status?: AyurvedaTerminologyStatus;
+  search?: string;
+}
+
 

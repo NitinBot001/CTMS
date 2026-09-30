@@ -13,6 +13,9 @@ import {
   CreateInvestigationDefinitionInput,
   CreateOutcomeDefinitionInput,
   CreateFormDefinitionInput,
+  CreateProtocolAyurvedaAssessmentInput,
+  CreateAyurvedaInstrumentInput,
+  CreateAyurvedaTerminologyInput,
 } from '../types';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -26,6 +29,10 @@ import { AddAssessmentModal } from '../components/protocol/AddAssessmentModal';
 import { AddInvestigationModal } from '../components/protocol/AddInvestigationModal';
 import { AddOutcomeModal } from '../components/protocol/AddOutcomeModal';
 import { AddFormModal } from '../components/protocol/AddFormModal';
+import { AddAyurvedaAssessmentModal } from '../components/protocol/AddAyurvedaAssessmentModal';
+import { RegisterInstrumentModal } from '../components/protocol/RegisterInstrumentModal';
+import { AddTerminologyEntryModal } from '../components/protocol/AddTerminologyEntryModal';
+import { ayurvedaConfigurationService } from '../services/ayurvedaConfigurationService';
 import {
   BookOpen,
   GitBranch,
@@ -42,6 +49,9 @@ import {
   FileText,
   Shield,
   Sparkles,
+  Languages,
+  Trash2,
+  Info,
 } from 'lucide-react';
 
 type TabType =
@@ -49,6 +59,7 @@ type TabType =
   | 'visits'
   | 'eligibility'
   | 'assessments'
+  | 'ayurveda'
   | 'investigations'
   | 'outcomes'
   | 'forms'
@@ -80,6 +91,12 @@ export const ProtocolManagementPage: React.FC = () => {
   const [isInvestigationModalOpen, setIsInvestigationModalOpen] = useState(false);
   const [isOutcomeModalOpen, setIsOutcomeModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isAyurvedaAssessmentModalOpen, setIsAyurvedaAssessmentModalOpen] = useState(false);
+  const [isRegisterInstrumentModalOpen, setIsRegisterInstrumentModalOpen] = useState(false);
+  const [isAddTerminologyModalOpen, setIsAddTerminologyModalOpen] = useState(false);
+  const [ayurvedaSubTab, setAyurvedaSubTab] = useState<
+    'overview' | 'categories' | 'instruments' | 'assessments' | 'terminology' | 'governance'
+  >('overview');
 
   const loadProtocolData = useCallback(async (preferredVersionId?: string) => {
     if (!activeStudyId) {
@@ -262,6 +279,40 @@ export const ProtocolManagementPage: React.FC = () => {
     if (!selectedVersionId) return;
     await protocolService.addFormDefinition(selectedVersionId, input, actor);
     showSuccess(`Form "${input.name}" added.`);
+    await loadProtocolData(selectedVersionId);
+  };
+
+  const handleAddAyurvedaAssessment = async (input: CreateProtocolAyurvedaAssessmentInput) => {
+    if (!selectedVersionId) return;
+    await ayurvedaConfigurationService.addProtocolAyurvedaAssessment(selectedVersionId, input, actor);
+    showSuccess('Ayurveda clinical assessment linked to protocol version.');
+    await loadProtocolData(selectedVersionId);
+  };
+
+  const handleRegisterInstrument = async (input: CreateAyurvedaInstrumentInput) => {
+    await ayurvedaConfigurationService.createInstrument(input, actor);
+    showSuccess(`Clinical instrument "${input.name}" registered in registry.`);
+    await loadProtocolData(selectedVersionId);
+  };
+
+  const handleAddTerminologyEntry = async (input: CreateAyurvedaTerminologyInput) => {
+    await ayurvedaConfigurationService.createTerminologyEntry(input, actor);
+    showSuccess(`Ayurveda terminology entry "${input.display}" recorded.`);
+    await loadProtocolData(selectedVersionId);
+  };
+
+  const handleDeprecateInstrument = async (instrumentId: string) => {
+    if (!window.confirm('Are you sure you want to mark this instrument as deprecated? Existing historical protocol associations will be preserved.')) return;
+    await ayurvedaConfigurationService.deprecateInstrument(instrumentId, actor);
+    showSuccess('Instrument marked as deprecated.');
+    await loadProtocolData(selectedVersionId);
+  };
+
+  const handleDeleteAyurvedaAssessment = async (assessmentId: string) => {
+    if (!selectedVersionId) return;
+    if (!window.confirm('Are you sure you want to remove this Ayurveda assessment from the draft protocol?')) return;
+    await ayurvedaConfigurationService.deleteProtocolAyurvedaAssessment(selectedVersionId, assessmentId, actor);
+    showSuccess('Ayurveda assessment removed from protocol version.');
     await loadProtocolData(selectedVersionId);
   };
 
@@ -579,6 +630,19 @@ export const ProtocolManagementPage: React.FC = () => {
         >
           <Activity className="w-4 h-4" />
           <span>Assessments ({config?.assessments.length || 0})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('ayurveda')}
+          className={`px-4 py-2.5 border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === 'ayurveda'
+              ? 'border-amber-900 text-amber-900 font-bold bg-amber-50/50'
+              : 'border-transparent text-amber-900/80 hover:text-amber-950 hover:bg-amber-50/30'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-800" />
+          <span>Ayurveda Clinical ({config?.ayurveda?.protocolAssessments.length || 0})</span>
         </button>
 
         <button
@@ -1036,6 +1100,708 @@ export const ProtocolManagementPage: React.FC = () => {
         </Card>
       )}
 
+      {/* Tab: Ayurveda Clinical Configuration */}
+      {activeTab === 'ayurveda' && (
+        <div className="space-y-6">
+          {/* Ayurveda Sub-navigation Header */}
+          <div className="border-b border-border bg-surface-alt px-4 pt-3 rounded-t-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+              <div>
+                <h3 className="font-heading font-bold text-sm text-ink flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-800" />
+                  <span>Ayurveda Clinical Configuration Engine</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                    STAGE 2B FOUNDATION
+                  </span>
+                </h3>
+                <p className="text-xs text-ink-muted">
+                  Protocol-linked standardized Ayurvedic assessment categories, clinical instruments, and authoritative terminology mappings
+                </p>
+              </div>
+
+              {canManage && isDraft && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-700 text-amber-900 hover:bg-amber-50 text-xs"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setIsAyurvedaAssessmentModalOpen(true)}
+                  >
+                    + Add Assessment to Protocol
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Sub-tab pills */}
+            <div className="flex items-center gap-2 overflow-x-auto text-xs font-semibold pt-1">
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('overview')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'overview'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('categories')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'categories'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Categories ({config?.ayurveda?.categories.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('instruments')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'instruments'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Clinical Instruments ({config?.ayurveda?.instruments.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('assessments')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'assessments'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Protocol Assessments ({config?.ayurveda?.protocolAssessments.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('terminology')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'terminology'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Terminology References ({config?.ayurveda?.terminologyReferences.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAyurvedaSubTab('governance')}
+                className={`px-3 py-1.5 border-b-2 transition-colors whitespace-nowrap ${
+                  ayurvedaSubTab === 'governance'
+                    ? 'border-amber-900 text-amber-900 font-bold'
+                    : 'border-transparent text-ink-muted hover:text-ink'
+                }`}
+              >
+                Governance & Training
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-tab 1: Overview */}
+          {ayurvedaSubTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Summary KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white border border-border p-4 rounded-xs shadow-xs">
+                  <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider block">
+                    Assessment Categories
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-2xl font-bold font-heading text-ink">
+                      {config?.ayurveda?.categories.length || 0}
+                    </span>
+                    <span className="text-[10px] text-emerald-800 font-bold px-1.5 py-0.5 bg-emerald-50 rounded-xs">
+                      13 Standard
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-border p-4 rounded-xs shadow-xs">
+                  <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider block">
+                    Registered Instruments
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-2xl font-bold font-heading text-ink">
+                      {config?.ayurveda?.instruments.length || 0}
+                    </span>
+                    <span className="text-[10px] text-amber-800 font-bold px-1.5 py-0.5 bg-amber-50 rounded-xs">
+                      Metadata Only
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-border p-4 rounded-xs shadow-xs">
+                  <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider block">
+                    Linked Protocol Assessments
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-2xl font-bold font-heading text-primary">
+                      {config?.ayurveda?.protocolAssessments.length || 0}
+                    </span>
+                    <span className="text-[10px] text-indigo-800 font-bold px-1.5 py-0.5 bg-indigo-50 rounded-xs">
+                      v{selectedVersion?.versionNumber}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-border p-4 rounded-xs shadow-xs">
+                  <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider block">
+                    Terminology Mappings
+                  </span>
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-2xl font-bold font-heading text-ink">
+                      {config?.ayurveda?.terminologyReferences.length || 0}
+                    </span>
+                    <span className="text-[10px] text-stone-700 font-bold px-1.5 py-0.5 bg-stone-100 rounded-xs">
+                      NAMASTE / WHO
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Architectural Guardrails Alert */}
+              <div className="bg-amber-50/60 border border-amber-300 p-4 rounded-xs text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-900">
+                  <Info className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>Stage 2B Architectural Guardrails & Governance Notice</span>
+                </div>
+                <p className="text-amber-950 leading-relaxed">
+                  <strong>Domain Separation:</strong> Terminology &ne; Assessment Category &ne; Assessment Instrument &ne; Assessment Item &ne; Response &ne; Score &ne; Interpretation.
+                </p>
+                <p className="text-amber-900 leading-relaxed">
+                  <strong>Metadata-Only Status:</strong> All instruments registered in Stage 2B carry <code className="font-mono bg-amber-100 px-1 py-0.5 text-amber-900 rounded">contentStatus: METADATA_ONLY</code>. Digital questionnaire items, field-level inputs, and automated Ayurvedic scoring algorithms are strictly scheduled for Stage 3.
+                </p>
+                <p className="text-amber-900 leading-relaxed">
+                  <strong>Authentic Coding Policy:</strong> In compliance with Ayush research governance, standard codes (NAMASTE / WHO / CCRAS) are recorded only from authentic published sources. Unverified concepts carry status <code className="font-mono bg-amber-100 px-1 py-0.5 text-amber-900 rounded">PENDING_TERMINOLOGY_MAPPING</code> with <code className="font-mono bg-amber-100 px-1 py-0.5 text-amber-900 rounded">code: null</code> without blocking protocol authoring.
+                </p>
+              </div>
+
+              {/* Quick Actions */}
+              {canManage && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {isDraft && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Plus className="w-3.5 h-3.5" />}
+                      onClick={() => setIsAyurvedaAssessmentModalOpen(true)}
+                    >
+                      Add Ayurveda Assessment
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-stone-300 text-stone-800 hover:bg-stone-50"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setIsRegisterInstrumentModalOpen(true)}
+                  >
+                    Register Clinical Instrument
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-stone-300 text-stone-800 hover:bg-stone-50"
+                    icon={<Languages className="w-3.5 h-3.5" />}
+                    onClick={() => setIsAddTerminologyModalOpen(true)}
+                  >
+                    Add Terminology Reference
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sub-tab 2: Categories */}
+          {ayurvedaSubTab === 'categories' && (
+            <Card>
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h4 className="font-heading font-bold text-sm text-ink">
+                    Authoritative Ayurveda Assessment Categories (13 Standard)
+                  </h4>
+                  <p className="text-xs text-ink-muted">
+                    Clinical taxonomy covering constitution, morbidity, clinical examination, physiological states, and disease manifestations
+                  </p>
+                </div>
+              </div>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">Category Code / Internal ID</th>
+                        <th className="px-4 py-3">Category Name</th>
+                        <th className="px-4 py-3">Source Authority</th>
+                        <th className="px-4 py-3">Clinical Scope & Description</th>
+                        <th className="px-4 py-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {config?.ayurveda?.categories.map((c) => (
+                        <tr key={c.id} className="hover:bg-surface-hover">
+                          <td className="px-4 py-3">
+                            <span className="font-mono font-bold text-amber-900 block">{c.code}</span>
+                            <span className="font-mono text-[10px] text-ink-muted">Internal ID: {c.id}</span>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-ink">{c.name}</td>
+                          <td className="px-4 py-3 text-stone-700 font-medium">{c.sourceAuthority}</td>
+                          <td className="px-4 py-3 text-ink-muted max-w-md">{c.description}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`px-2 py-0.5 rounded-xs text-[10px] font-semibold ${
+                                c.status === 'SOURCE_REFERENCED'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {c.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sub-tab 3: Instruments */}
+          {ayurvedaSubTab === 'instruments' && (
+            <Card>
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h4 className="font-heading font-bold text-sm text-ink">
+                    Clinical Instrument Registry
+                  </h4>
+                  <p className="text-xs text-ink-muted">
+                    Validated scales, standardized questionnaires, and classical assessment criteria (Content status: METADATA_ONLY)
+                  </p>
+                </div>
+                {canManage && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setIsRegisterInstrumentModalOpen(true)}
+                  >
+                    + Register Instrument
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">Instrument Code / Internal ID</th>
+                        <th className="px-4 py-3">Instrument Name</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Source Authority & Reference</th>
+                        <th className="px-4 py-3">Content Status</th>
+                        <th className="px-4 py-3">Training Req.</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {config?.ayurveda?.instruments.map((inst) => (
+                        <tr key={inst.id} className="hover:bg-surface-hover">
+                          <td className="px-4 py-3">
+                            <span className="font-mono font-bold text-stone-900 block">{inst.code}</span>
+                            <span className="font-mono text-[10px] text-ink-muted">
+                              Internal ID: {inst.id} • v{inst.version}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-ink block">{inst.name}</span>
+                            {inst.description && <span className="text-[11px] text-ink-muted">{inst.description}</span>}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-stone-700">{inst.category}</td>
+                          <td className="px-4 py-3 text-ink-muted">
+                            <span className="font-semibold text-ink block">{inst.sourceAuthority}</span>
+                            {inst.sourceReference && <span className="text-[10px] text-ink-muted">{inst.sourceReference}</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                              {inst.contentStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {inst.trainingRequired ? (
+                              <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-purple-100 text-purple-800">
+                                TRAINING REQ.
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-ink-muted">Standard</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-xs text-[10px] font-semibold ${
+                                inst.usageStatus === 'ACTIVE'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-stone-100 text-stone-700'
+                              }`}
+                            >
+                              {inst.usageStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {canManage && inst.usageStatus === 'ACTIVE' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeprecateInstrument(inst.id)}
+                                className="text-stone-600 hover:text-stone-900 text-xs font-semibold underline"
+                              >
+                                Deprecate
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {(!config?.ayurveda?.instruments || config.ayurveda.instruments.length === 0) && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-8 text-center text-ink-muted">
+                            No instruments registered in registry.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sub-tab 4: Protocol Assessments */}
+          {ayurvedaSubTab === 'assessments' && (
+            <Card>
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h4 className="font-heading font-bold text-sm text-ink">
+                    Protocol-Linked Ayurveda Assessments
+                  </h4>
+                  <p className="text-xs text-ink-muted">
+                    Assessments scheduled for protocol visits in version v{selectedVersion?.versionNumber}
+                  </p>
+                </div>
+                {canManage && isDraft && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setIsAyurvedaAssessmentModalOpen(true)}
+                  >
+                    + Add Ayurveda Assessment
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">Assessment Code / Internal ID</th>
+                        <th className="px-4 py-3">Assessment Name</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Instrument</th>
+                        <th className="px-4 py-3">Applicable Visit</th>
+                        <th className="px-4 py-3">Assessor Req.</th>
+                        <th className="px-4 py-3">Portal Visible</th>
+                        <th className="px-4 py-3">Required</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {config?.ayurveda?.protocolAssessments.map((pa) => {
+                        const linkedVisit = config.visits.find((v) => v.id === pa.visitDefinitionId);
+                        const linkedInst = config.ayurveda?.instruments.find(
+                          (i) => i.id === pa.instrumentId || i.code === pa.instrumentId
+                        );
+                        return (
+                          <tr key={pa.id} className="hover:bg-surface-hover">
+                            <td className="px-4 py-3">
+                              <span className="font-mono font-bold text-amber-900 block">{pa.assessmentCode}</span>
+                              <span className="font-mono text-[10px] text-ink-muted">Internal ID: {pa.id}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-ink block">{pa.name}</span>
+                              {pa.sourceReference && <span className="text-[11px] text-ink-muted">{pa.sourceReference}</span>}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-stone-800">{pa.category}</td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-ink block">{linkedInst?.name || pa.instrumentId}</span>
+                              <span className="text-[10px] text-ink-muted font-mono">
+                                Catalog Code: {linkedInst?.code || pa.instrumentId}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-ink">
+                                {linkedVisit ? `${linkedVisit.name} (${linkedVisit.code})` : pa.visitDefinitionId}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[11px] text-stone-700">
+                              {pa.assessorRequirement?.trainingRequired
+                                ? 'Training Required'
+                                : pa.assessorRequirement?.requiredRole || 'Investigator'}
+                            </td>
+                            <td className="px-4 py-3">
+                              {pa.participantVisible ? (
+                                <span className="text-emerald-700 font-semibold">Yes</span>
+                              ) : (
+                                <span className="text-ink-muted">No</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {pa.required ? (
+                                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs text-[10px] font-semibold">
+                                  MANDATORY
+                                </span>
+                              ) : (
+                                <span className="text-ink-muted text-[10px]">OPTIONAL</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {canManage && isDraft && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAyurvedaAssessment(pa.id)}
+                                  className="text-rose-600 hover:text-rose-800 p-1 rounded-xs hover:bg-rose-50 inline-flex items-center"
+                                  title="Remove from protocol"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(!config?.ayurveda?.protocolAssessments || config.ayurveda.protocolAssessments.length === 0) && (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-8 text-center text-ink-muted">
+                            No Ayurveda assessments linked to this protocol version.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sub-tab 5: Terminology */}
+          {ayurvedaSubTab === 'terminology' && (
+            <Card>
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h4 className="font-heading font-bold text-sm text-ink">
+                    Standardized Ayurveda Terminology Registry
+                  </h4>
+                  <p className="text-xs text-ink-muted">
+                    Authentic clinical concepts linked to NAMASTE, WHO, CCRAS, and institutional vocabularies
+                  </p>
+                </div>
+                {canManage && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setIsAddTerminologyModalOpen(true)}
+                  >
+                    + Add Terminology Reference
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">System & Internal ID</th>
+                        <th className="px-4 py-3">Concept & Local Identifier</th>
+                        <th className="px-4 py-3">Official Terminology Code</th>
+                        <th className="px-4 py-3">Code Verification</th>
+                        <th className="px-4 py-3">Short Definition</th>
+                        <th className="px-4 py-3">Source Authority & Citation</th>
+                        <th className="px-4 py-3">Language</th>
+                        <th className="px-4 py-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {config?.ayurveda?.terminologyReferences.map((t) => (
+                        <tr key={t.id} className="hover:bg-surface-hover">
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-stone-900 block">{t.system}</span>
+                            <span className="font-mono text-[10px] text-ink-muted block">Internal ID: {t.id}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-ink block">{t.display}</span>
+                            {t.localConceptId ? (
+                              <span className="font-mono text-[10px] text-stone-600 block bg-stone-100 px-1 py-0.5 rounded-xs w-fit mt-0.5">
+                                Local ID: {t.localConceptId}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3">
+                            {t.code && t.officialCodeVerification === 'VERIFIED_SOURCE' ? (
+                              <div>
+                                <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-1.5 py-0.5 rounded-xs border border-emerald-200 block w-fit">
+                                  {t.code}
+                                </span>
+                                <span className="text-[10px] text-emerald-700 block mt-0.5">Verified Official Code</span>
+                              </div>
+                            ) : t.officialCodeVerification === 'INTERNAL_ONLY' ? (
+                              <div>
+                                <span className="px-1.5 py-0.5 rounded-xs text-[10px] font-semibold bg-stone-100 text-stone-700 border border-stone-200 block w-fit">
+                                  INTERNAL ONLY
+                                </span>
+                                <span className="text-[10px] text-ink-muted block mt-0.5">No official code (Local concept)</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="px-1.5 py-0.5 rounded-xs text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 block w-fit">
+                                  PENDING MAPPING
+                                </span>
+                                <span className="text-[10px] text-amber-800 block mt-0.5">Official code unconfirmed (null)</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {t.officialCodeVerification === 'VERIFIED_SOURCE' ? (
+                              <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-block">
+                                VERIFIED SOURCE
+                              </span>
+                            ) : t.officialCodeVerification === 'INTERNAL_ONLY' ? (
+                              <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-stone-100 text-stone-700 border border-stone-300 inline-block">
+                                INTERNAL ONLY
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-xs text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 inline-block">
+                                PENDING MAPPING
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-ink-muted max-w-xs">{t.shortDefinition || '—'}</td>
+                          <td className="px-4 py-3 text-ink-muted">
+                            <span className="font-medium text-ink block">{t.sourceAuthority}</span>
+                            <span className="text-[10px] text-ink-muted block">{t.sourceReference}</span>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-stone-600">{t.language}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`px-2 py-0.5 rounded-xs text-[10px] font-semibold ${
+                                t.status === 'VALIDATED'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : t.status === 'SOURCE_REFERENCED'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : t.status === 'PROTOCOL_DEFINED'
+                                  ? 'bg-stone-100 text-stone-700'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {t.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!config?.ayurveda?.terminologyReferences || config.ayurveda.terminologyReferences.length === 0) && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-8 text-center text-ink-muted">
+                            No terminology entries registered.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sub-tab 6: Governance */}
+          {ayurvedaSubTab === 'governance' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader title="Clinical Assessor Qualification & Governance" />
+                <CardContent className="space-y-4 text-xs text-ink-muted">
+                  <p>
+                    Ayurveda clinical trials conducted at AIIA require verified clinical qualifications for protocol investigators conducting standardized physical and phenotypic examinations.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <div className="border border-border p-3 rounded-xs bg-surface-alt">
+                      <h5 className="font-bold text-ink mb-1">CCRAS Prakriti Assessment Scale</h5>
+                      <p className="text-ink-muted mb-2">
+                        Requires certified training provided by CCRAS or AIIA clinical research faculty. Assessor credentials must be verified prior to visit sign-off.
+                      </p>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-800 rounded-xs">
+                        TRAINING REQUIRED
+                      </span>
+                    </div>
+
+                    <div className="border border-border p-3 rounded-xs bg-surface-alt">
+                      <h5 className="font-bold text-ink mb-1">Ashtavidha Pariksha (Eight-Fold Clinical Examination)</h5>
+                      <p className="text-ink-muted mb-2">
+                        Must be performed exclusively by qualified Ayurvedic clinical investigators (BAMS/MD Ayush) as specified in classical treatises (Yogaratnakara).
+                      </p>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-xs">
+                        INVESTIGATOR ONLY
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader title="Classical Text Citations & Regulatory References" />
+                <CardContent className="p-0">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">Classical Work</th>
+                        <th className="px-4 py-3">Sthana & Chapter</th>
+                        <th className="px-4 py-3">Verse / Reference</th>
+                        <th className="px-4 py-3">Clinical Application</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      <tr>
+                        <td className="px-4 py-3 font-semibold text-ink">Charaka Samhita</td>
+                        <td className="px-4 py-3">Vimana Sthana, Chapter 8</td>
+                        <td className="px-4 py-3 font-mono text-primary">Verse 94–96</td>
+                        <td className="px-4 py-3 text-ink-muted">Dashavidha Pariksha & Rogi Pariksha Vidhi</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 font-semibold text-ink">Sushruta Samhita</td>
+                        <td className="px-4 py-3">Sutra Sthana, Chapter 35</td>
+                        <td className="px-4 py-3 font-mono text-primary">Verse 3–12</td>
+                        <td className="px-4 py-3 text-ink-muted">Ayurdaya & Shareera Lakshana Pariksha</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 font-semibold text-ink">Yogaratnakara</td>
+                        <td className="px-4 py-3">Rogi Pariksha Prakarana</td>
+                        <td className="px-4 py-3 font-mono text-primary">Verse 1–8</td>
+                        <td className="px-4 py-3 text-ink-muted">Ashtavidha Pariksha (Nadi, Mutra, Mala, Jihva, etc.)</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tab 5: Investigations */}
       {activeTab === 'investigations' && (
         <Card>
@@ -1452,6 +2218,29 @@ export const ProtocolManagementPage: React.FC = () => {
         visits={config?.visits || []}
         nextOrder={(config?.forms.length || 0) + 1}
         onSubmit={handleAddForm}
+      />
+
+      <AddAyurvedaAssessmentModal
+        isOpen={isAyurvedaAssessmentModalOpen}
+        onClose={() => setIsAyurvedaAssessmentModalOpen(false)}
+        visits={config?.visits || []}
+        categories={config?.ayurveda?.categories || []}
+        instruments={config?.ayurveda?.instruments || []}
+        nextOrder={(config?.ayurveda?.protocolAssessments.length || 0) + 1}
+        onSubmit={handleAddAyurvedaAssessment}
+      />
+
+      <RegisterInstrumentModal
+        isOpen={isRegisterInstrumentModalOpen}
+        onClose={() => setIsRegisterInstrumentModalOpen(false)}
+        categories={config?.ayurveda?.categories || []}
+        onSubmit={handleRegisterInstrument}
+      />
+
+      <AddTerminologyEntryModal
+        isOpen={isAddTerminologyModalOpen}
+        onClose={() => setIsAddTerminologyModalOpen(false)}
+        onSubmit={handleAddTerminologyEntry}
       />
     </div>
   );

@@ -77,6 +77,13 @@ export class MockProtocolRepository implements IProtocolRepository {
     const milestones = await this.getMilestones(versionId);
     const forms = await this.getFormDefinitions(versionId);
 
+    const categories = mockDataStore.getAyurvedaCategories();
+    const instruments = mockDataStore.getAyurvedaInstruments();
+    const protocolAssessments = mockDataStore
+      .getProtocolAyurvedaAssessments()
+      .filter((a) => a.protocolVersionId === versionId);
+    const terminologyReferences = mockDataStore.getAyurvedaTerminology();
+
     return {
       protocol,
       activeVersion: version,
@@ -90,6 +97,12 @@ export class MockProtocolRepository implements IProtocolRepository {
       deviationRequirements,
       milestones,
       forms,
+      ayurveda: {
+        categories,
+        instruments,
+        protocolAssessments,
+        terminologyReferences,
+      },
     };
   }
 
@@ -351,6 +364,19 @@ export class MockProtocolRepository implements IProtocolRepository {
         });
       });
       mockDataStore.saveMilestones(allMilestones);
+
+      // 11. Ayurveda Assessments (Stage 2B)
+      const srcAyuAssessments = mockDataStore.getProtocolAyurvedaAssessments().filter((a) => a.protocolVersionId === srcVersionId);
+      const allAyuAssessments = mockDataStore.getProtocolAyurvedaAssessments();
+      srcAyuAssessments.forEach((a) => {
+        allAyuAssessments.push({
+          ...a,
+          id: `AYU-ASSESS-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+          protocolVersionId: newVersionId,
+          visitDefinitionId: visitIdMap[a.visitDefinitionId] || a.visitDefinitionId,
+        });
+      });
+      mockDataStore.saveProtocolAyurvedaAssessments(allAyuAssessments);
     }
 
     return newVersion;

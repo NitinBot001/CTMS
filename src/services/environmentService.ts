@@ -26,6 +26,7 @@ import { mockNotificationRepository } from '../repositories/mockNotificationRepo
 import { mockDashboardRepository } from '../repositories/mockDashboardRepository';
 import { mockReportRepository } from '../repositories/mockReportRepository';
 import { mockProtocolRepository } from '../repositories/mockProtocolRepository';
+import { mockAyurvedaRepository } from '../repositories/mockAyurvedaRepository';
 
 // Empty Test Repositories
 import {
@@ -44,6 +45,7 @@ import {
   EmptyReportRepository,
   EmptyAuditRepository,
   EmptyProtocolRepository,
+  EmptyAyurvedaRepository,
 } from '../repositories/emptyTestRepositories';
 import { mockAuditRepository } from '../repositories/mockAuditRepository';
 
@@ -63,6 +65,7 @@ import {
   IReportRepository,
   IAuditRepository,
   IProtocolRepository,
+  IAyurvedaConfigurationRepository,
 } from '../repositories/interfaces';
 
 export interface DataEnvironment {
@@ -81,6 +84,7 @@ export interface DataEnvironment {
   dashboardRepository: IDashboardRepository;
   reportRepository: IReportRepository;
   protocolRepository: IProtocolRepository;
+  ayurvedaRepository: IAyurvedaConfigurationRepository;
   auditRepository?: IAuditRepository;
 }
 
@@ -115,6 +119,7 @@ export class EnvironmentService {
       dashboardRepository: mockDashboardRepository,
       reportRepository: mockReportRepository,
       protocolRepository: mockProtocolRepository,
+      ayurvedaRepository: mockAyurvedaRepository,
       auditRepository: mockAuditRepository,
     };
 
@@ -134,6 +139,7 @@ export class EnvironmentService {
       dashboardRepository: new EmptyDashboardRepository(),
       reportRepository: new EmptyReportRepository(),
       protocolRepository: new EmptyProtocolRepository(),
+      ayurvedaRepository: new EmptyAyurvedaRepository(),
       auditRepository: new EmptyAuditRepository(),
     };
   }
@@ -153,6 +159,10 @@ export class EnvironmentService {
     }
 
     this.notifyListeners();
+  }
+
+  setEnvironment(mode: AppEnvironmentMode): void {
+    this.setMode(mode);
   }
 
   resetEmptyTestWorkspace(): void {
@@ -224,6 +234,10 @@ export class EnvironmentService {
 
   getProtocolRepository(): IProtocolRepository {
     return this.getActiveEnvironment().protocolRepository;
+  }
+
+  getAyurvedaConfigurationRepository(): IAyurvedaConfigurationRepository {
+    return this.getActiveEnvironment().ayurvedaRepository;
   }
 
   getAuditRepository(): IAuditRepository | undefined {

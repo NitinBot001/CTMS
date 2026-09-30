@@ -27,6 +27,10 @@ import {
   ProtocolSafetyRequirement,
   ProtocolDeviationRequirement,
   ProtocolMilestone,
+  AyurvedaAssessmentCategory,
+  AyurvedaAssessmentInstrument,
+  AyurvedaTerminologyEntry,
+  ProtocolAyurvedaAssessment,
 } from '../types';
 import { MOCK_USERS, MOCK_USER_ROLES } from '../data/mockData';
 import {
@@ -43,6 +47,12 @@ import {
   MOCK_PROTOCOL_DEVIATIONS,
   MOCK_PROTOCOL_MILESTONES,
 } from '../data/mockProtocolSeed';
+import {
+  MOCK_AYURVEDA_CATEGORIES,
+  MOCK_AYURVEDA_INSTRUMENTS,
+  MOCK_AYURVEDA_TERMINOLOGY,
+  MOCK_PROTOCOL_AYURVEDA_ASSESSMENTS,
+} from '../data/mockAyurvedaSeed';
 
 export const MOCK_MUTATION_PREFIX = 'aiia_ctms_mock_mutation_';
 
@@ -67,6 +77,10 @@ export const MOCK_MUTATION_KEYS = {
   PROTOCOL_SAFETY: `${MOCK_MUTATION_PREFIX}protocol_safety`,
   PROTOCOL_DEVIATIONS: `${MOCK_MUTATION_PREFIX}protocol_deviations`,
   PROTOCOL_MILESTONES: `${MOCK_MUTATION_PREFIX}protocol_milestones`,
+  AYURVEDA_CATEGORIES: `${MOCK_MUTATION_PREFIX}ayurveda_categories`,
+  AYURVEDA_INSTRUMENTS: `${MOCK_MUTATION_PREFIX}ayurveda_instruments`,
+  AYURVEDA_TERMINOLOGY: `${MOCK_MUTATION_PREFIX}ayurveda_terminology`,
+  PROTOCOL_AYURVEDA_ASSESSMENTS: `${MOCK_MUTATION_PREFIX}protocol_ayurveda_assessments`,
 };
 
 export const MOCK_DEFAULT_TEMPORARY_PASSWORD = '128';
@@ -419,6 +433,44 @@ export class MockDataStore {
 
   saveMilestones(milestones: ProtocolMilestone[]): void {
     browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_MILESTONES, milestones);
+  }
+
+  // --- Ayurveda Domain Accessors ---
+
+  getAyurvedaCategories(): AyurvedaAssessmentCategory[] {
+    const stored = browserStorage.get<AyurvedaAssessmentCategory[]>(MOCK_MUTATION_KEYS.AYURVEDA_CATEGORIES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_AYURVEDA_CATEGORIES);
+  }
+
+  saveAyurvedaCategories(categories: AyurvedaAssessmentCategory[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.AYURVEDA_CATEGORIES, categories);
+  }
+
+  getAyurvedaInstruments(): AyurvedaAssessmentInstrument[] {
+    const stored = browserStorage.get<AyurvedaAssessmentInstrument[]>(MOCK_MUTATION_KEYS.AYURVEDA_INSTRUMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_AYURVEDA_INSTRUMENTS);
+  }
+
+  saveAyurvedaInstruments(instruments: AyurvedaAssessmentInstrument[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.AYURVEDA_INSTRUMENTS, instruments);
+  }
+
+  getAyurvedaTerminology(): AyurvedaTerminologyEntry[] {
+    const stored = browserStorage.get<AyurvedaTerminologyEntry[]>(MOCK_MUTATION_KEYS.AYURVEDA_TERMINOLOGY);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_AYURVEDA_TERMINOLOGY);
+  }
+
+  saveAyurvedaTerminology(entries: AyurvedaTerminologyEntry[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.AYURVEDA_TERMINOLOGY, entries);
+  }
+
+  getProtocolAyurvedaAssessments(): ProtocolAyurvedaAssessment[] {
+    const stored = browserStorage.get<ProtocolAyurvedaAssessment[]>(MOCK_MUTATION_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(MOCK_PROTOCOL_AYURVEDA_ASSESSMENTS);
+  }
+
+  saveProtocolAyurvedaAssessments(assessments: ProtocolAyurvedaAssessment[]): void {
+    browserStorage.set(MOCK_MUTATION_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, assessments);
   }
 
   /**

@@ -99,6 +99,19 @@ import {
   CreateSafetyRequirementInput,
   CreateDeviationRequirementInput,
   CreateMilestoneInput,
+  AyurvedaAssessmentCategory,
+  AyurvedaAssessmentInstrument,
+  AyurvedaTerminologyEntry,
+  ProtocolAyurvedaAssessment,
+  CreateAyurvedaCategoryInput,
+  CreateAyurvedaInstrumentInput,
+  UpdateAyurvedaInstrumentInput,
+  CreateAyurvedaTerminologyInput,
+  CreateProtocolAyurvedaAssessmentInput,
+  UpdateProtocolAyurvedaAssessmentInput,
+  AyurvedaInstrumentFilter,
+  AyurvedaTerminologyFilter,
+  AyurvedaCategoryCode,
 } from '../types';
 
 export interface ParticipantQueryContext {
@@ -593,5 +606,39 @@ export interface IProtocolRepository {
   addMilestone(versionId: string, input: CreateMilestoneInput): Promise<ProtocolMilestone>;
   addFormDefinition(versionId: string, input: CreateFormDefinitionInput): Promise<ProtocolFormDefinition>;
 }
+
+export interface IAyurvedaConfigurationRepository {
+  // Categories
+  getCategories(activeOnly?: boolean): Promise<AyurvedaAssessmentCategory[]>;
+  getCategoryById(id: string): Promise<AyurvedaAssessmentCategory | null>;
+  getCategoryByCode(code: AyurvedaCategoryCode): Promise<AyurvedaAssessmentCategory | null>;
+  createCategory(input: CreateAyurvedaCategoryInput): Promise<AyurvedaAssessmentCategory>;
+  updateCategory(id: string, updates: Partial<AyurvedaAssessmentCategory>): Promise<AyurvedaAssessmentCategory | null>;
+
+  // Instruments
+  getInstruments(filter?: AyurvedaInstrumentFilter): Promise<AyurvedaAssessmentInstrument[]>;
+  getInstrumentById(id: string): Promise<AyurvedaAssessmentInstrument | null>;
+  getInstrumentByCode(code: string): Promise<AyurvedaAssessmentInstrument | null>;
+  createInstrument(input: CreateAyurvedaInstrumentInput): Promise<AyurvedaAssessmentInstrument>;
+  updateInstrument(id: string, updates: UpdateAyurvedaInstrumentInput): Promise<AyurvedaAssessmentInstrument | null>;
+  deprecateInstrument(id: string): Promise<AyurvedaAssessmentInstrument | null>;
+
+  // Terminology
+  getTerminologyEntries(filter?: AyurvedaTerminologyFilter): Promise<AyurvedaTerminologyEntry[]>;
+  getTerminologyEntryById(id: string): Promise<AyurvedaTerminologyEntry | null>;
+  createTerminologyEntry(input: CreateAyurvedaTerminologyInput): Promise<AyurvedaTerminologyEntry>;
+  updateTerminologyEntry(id: string, updates: Partial<AyurvedaTerminologyEntry>): Promise<AyurvedaTerminologyEntry | null>;
+
+  // Protocol-Linked Ayurveda Assessments
+  getProtocolAyurvedaAssessments(protocolVersionId: string): Promise<ProtocolAyurvedaAssessment[]>;
+  getProtocolAyurvedaAssessmentById(id: string): Promise<ProtocolAyurvedaAssessment | null>;
+  addProtocolAyurvedaAssessment(protocolVersionId: string, input: CreateProtocolAyurvedaAssessmentInput): Promise<ProtocolAyurvedaAssessment>;
+  updateProtocolAyurvedaAssessment(protocolVersionId: string, assessmentId: string, updates: UpdateProtocolAyurvedaAssessmentInput): Promise<ProtocolAyurvedaAssessment | null>;
+  deleteProtocolAyurvedaAssessment(protocolVersionId: string, assessmentId: string): Promise<boolean>;
+
+  // Downstream visit queries
+  getAyurvedaAssessmentsForVisit(protocolVersionId: string, visitDefinitionId: string): Promise<ProtocolAyurvedaAssessment[]>;
+}
+
 
 

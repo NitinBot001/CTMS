@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useStudy } from '../context/StudyContext';
 import { visitService } from '../services/visitService';
 import { complianceService } from '../services/complianceService';
-import { ParticipantVisit, ClinicalActivityStatus, ProtocolDeviation } from '../types';
+import { ParticipantVisit, ClinicalActivityStatus, ProtocolDeviation, ProtocolAyurvedaAssessment } from '../types';
 import { VisitStatusBadge } from '../components/visits/VisitStatusBadge';
 import { VisitWindowDisplay } from '../components/visits/VisitWindowDisplay';
 import { ClinicalActivityList } from '../components/visits/ClinicalActivityList';
@@ -14,6 +14,7 @@ import { Button } from '../components/ui/Button';
 import { Skeleton } from '../components/ui/SkeletonLoader';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { ayurvedaConfigurationService } from '../services/ayurvedaConfigurationService';
 import {
   ArrowLeft,
   Calendar,
@@ -24,6 +25,8 @@ import {
   CheckCircle2,
   ClipboardList,
   ArrowRight,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 
 export const VisitDetailPage: React.FC = () => {
@@ -33,6 +36,7 @@ export const VisitDetailPage: React.FC = () => {
 
   const [visit, setVisit] = useState<ParticipantVisit | null>(null);
   const [visitDeviations, setVisitDeviations] = useState<ProtocolDeviation[]>([]);
+  const [ayurvedaAssessments, setAyurvedaAssessments] = useState<ProtocolAyurvedaAssessment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -54,6 +58,16 @@ export const VisitDetailPage: React.FC = () => {
       ]);
       setVisit(data);
       setVisitDeviations(devs);
+
+      if (data && data.protocolVersionId && data.protocolVisitDefinitionId) {
+        const ayur = await ayurvedaConfigurationService.getAyurvedaAssessmentsForVisit(
+          data.protocolVersionId,
+          data.protocolVisitDefinitionId
+        );
+        setAyurvedaAssessments(ayur);
+      } else {
+        setAyurvedaAssessments([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve visit details.');
     } finally {
@@ -252,6 +266,87 @@ export const VisitDetailPage: React.FC = () => {
                 activities={visit.activities}
                 onToggleStatus={handleToggleActivityStatus}
               />
+            </CardContent>
+          </Card>
+
+          {/* Configured Ayurveda Protocol Assessments (Stage 2B) */}
+          <Card>
+            <div className="px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-heading font-bold text-sm text-ink flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-800" />
+                  <span>Configured Ayurveda Protocol Assessments</span>
+                </h3>
+                <p className="text-xs text-ink-muted">
+                  Protocol-specified Ayurvedic phenotypic and clinical examinations for this visit
+                </p>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                Metadata Only &mdash; Digital response collection not configured (Stage 3)
+              </span>
+            </div>
+            <CardContent className="p-0">
+              {ayurvedaAssessments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-surface-alt border-b border-border font-semibold text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">Assessment Name / ID</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Instrument Identifier</th>
+                        <th className="px-4 py-3">Assessor Req.</th>
+                        <th className="px-4 py-3 text-right">Requirement</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {ayurvedaAssessments.map((a) => (
+                        <tr key={a.id} className="hover:bg-surface-hover">
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-ink block">{a.name}</span>
+                            <span className="font-mono text-[10px] text-ink-muted block">ID: {a.id} • Code: {a.assessmentCode}</span>
+                            {a.sourceReference && (
+                              <span className="text-[10px] text-ink-muted">{a.sourceReference}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-amber-950">{a.category}</td>
+                          <td className="px-4 py-3">
+                            <span className="font-mono text-[11px] text-primary block">{a.instrumentId}</span>
+                            <span className="text-[10px] text-ink-muted">v{a.instrumentVersion} • Metadata Only</span>
+                          </td>
+                          <td className="px-4 py-3 text-[11px] text-stone-700">
+                            {a.assessorRequirement?.trainingRequired ? (
+                              <span className="px-1.5 py-0.5 rounded-xs text-[10px] font-semibold bg-purple-100 text-purple-800">
+                                Training Required
+                              </span>
+                            ) : (
+                              <span>{a.assessorRequirement?.requiredRole || 'Investigator'}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {a.required ? (
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-xs text-[10px] font-semibold">
+                                MANDATORY
+                              </span>
+                            ) : (
+                              <span className="text-ink-muted text-[10px]">OPTIONAL</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-xs text-ink-muted">
+                  No Ayurveda clinical assessments configured for this protocol visit.
+                </div>
+              )}
+              <div className="p-3 bg-amber-50/40 border-t border-amber-200/60 text-[11px] text-amber-900 flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Clinical Governance Notice:</strong> In accordance with Stage 2B architecture, clinical scoring engines, digital questionnaire forms, and participant responses are deferred to Stage 3. This view renders protocol-authorized instrument metadata only.
+                </span>
+              </div>
             </CardContent>
           </Card>
         </div>

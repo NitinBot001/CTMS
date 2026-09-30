@@ -13,6 +13,7 @@
 import { IProtocolRepository, WorkflowActor } from '../repositories/interfaces';
 import { environmentService } from './environmentService';
 import { auditService } from './auditService';
+import { ayurvedaConfigurationService } from './ayurvedaConfigurationService';
 import {
   Protocol,
   ProtocolVersion,
@@ -319,6 +320,11 @@ export class ProtocolService {
         );
       }
     });
+
+    // 8. Ayurveda Configuration validation (Stage 2B)
+    const ayuValidation = await ayurvedaConfigurationService.validateAyurvedaConfiguration(versionId);
+    errors.push(...ayuValidation.errors);
+    warnings.push(...ayuValidation.warnings);
 
     return {
       valid: errors.length === 0,

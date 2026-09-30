@@ -33,6 +33,10 @@ import {
   ProtocolSafetyRequirement,
   ProtocolDeviationRequirement,
   ProtocolMilestone,
+  AyurvedaAssessmentCategory,
+  AyurvedaAssessmentInstrument,
+  AyurvedaTerminologyEntry,
+  ProtocolAyurvedaAssessment,
 } from '../types';
 import { MOCK_ROLES } from '../data/mockData';
 
@@ -68,6 +72,10 @@ export const EMPTY_TEST_KEYS = {
   PROTOCOL_SAFETY: `${EMPTY_TEST_PREFIX}protocol_safety`,
   PROTOCOL_DEVIATIONS: `${EMPTY_TEST_PREFIX}protocol_deviations`,
   PROTOCOL_MILESTONES: `${EMPTY_TEST_PREFIX}protocol_milestones`,
+  AYURVEDA_CATEGORIES: `${EMPTY_TEST_PREFIX}ayurveda_categories`,
+  AYURVEDA_INSTRUMENTS: `${EMPTY_TEST_PREFIX}ayurveda_instruments`,
+  AYURVEDA_TERMINOLOGY: `${EMPTY_TEST_PREFIX}ayurveda_terminology`,
+  PROTOCOL_AYURVEDA_ASSESSMENTS: `${EMPTY_TEST_PREFIX}protocol_ayurveda_assessments`,
 };
 
 export const EMPTY_TEST_STUDY: Study = {
@@ -364,6 +372,68 @@ export const EMPTY_PROTOCOL_MILESTONES: ProtocolMilestone[] = [
   },
 ];
 
+export const EMPTY_AYURVEDA_CATEGORIES: AyurvedaAssessmentCategory[] = [
+  {
+    id: 'AYU-CAT-EMPTY-01',
+    code: 'PRAKRITI',
+    name: 'Prakriti (Constitutional Assessment)',
+    description: 'Assessment of psychosomatic constitution for trial research.',
+    sourceAuthority: 'AIIA Empty Test Protocol',
+    status: 'PROTOCOL_DEFINED',
+    isActive: true,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+];
+
+export const EMPTY_AYURVEDA_INSTRUMENTS: AyurvedaAssessmentInstrument[] = [
+  {
+    id: 'AYU-INST-EMPTY-01',
+    code: 'AYU-EMPTY-PRAKRITI-001',
+    name: 'AIIA Empty Test Prakriti Placeholder',
+    category: 'PRAKRITI',
+    description: 'Clinical instrument content not configured.',
+    sourceAuthority: 'AIIA Research Directorate',
+    sourceReference: 'Empty Test Workspace Placeholder',
+    version: '1.0',
+    validationStatus: 'PROTOCOL_DEFINED',
+    usageStatus: 'ACTIVE',
+    trainingRequired: false,
+    languageSupport: ['en'],
+    languageSupportStatus: 'NOT_SPECIFIED',
+    scoringMethod: 'NONE',
+    scoringStatus: 'NOT_CONFIGURED',
+    contentStatus: 'METADATA_ONLY',
+    isActive: true,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+];
+
+export const EMPTY_PROTOCOL_AYURVEDA_ASSESSMENTS: ProtocolAyurvedaAssessment[] = [
+  {
+    id: 'AYU-ASSESS-EMPTY-01',
+    protocolVersionId: 'VER-EMPTY-001-v1',
+    assessmentCode: 'PRAK-EMPTY-BL',
+    name: 'Baseline Prakriti Assessment (Placeholder)',
+    category: 'PRAKRITI',
+    instrumentId: 'AYU-INST-EMPTY-01',
+    instrumentVersion: '1.0',
+    visitDefinitionId: 'VIS-DEF-EMPTY-02',
+    required: true,
+    participantVisible: false,
+    sourceReference: 'Empty Test Workspace Placeholder',
+    validationStatus: 'PROTOCOL_DEFINED',
+    contentStatus: 'METADATA_ONLY',
+    terminologyCode: null,
+    localConceptId: null,
+    displayOrder: 1,
+    status: 'ACTIVE',
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-01T00:00:00Z',
+  },
+];
+
 export interface EmptyWorkspaceMetadata {
   version: number;
   initializedAt: string;
@@ -428,6 +498,10 @@ export class EmptyTestStore {
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_SAFETY, EMPTY_PROTOCOL_SAFETY);
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_DEVIATIONS, EMPTY_PROTOCOL_DEVIATIONS);
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_MILESTONES, EMPTY_PROTOCOL_MILESTONES);
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_CATEGORIES, EMPTY_AYURVEDA_CATEGORIES);
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_INSTRUMENTS, EMPTY_AYURVEDA_INSTRUMENTS);
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_TERMINOLOGY, []);
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, EMPTY_PROTOCOL_AYURVEDA_ASSESSMENTS);
 
     return metadata;
   }
@@ -718,6 +792,48 @@ export class EmptyTestStore {
 
   saveMilestones(milestones: ProtocolMilestone[]): void {
     browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_MILESTONES, milestones);
+  }
+
+  // --- Ayurveda Domain Accessors ---
+
+  getAyurvedaCategories(): AyurvedaAssessmentCategory[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AyurvedaAssessmentCategory[]>(EMPTY_TEST_KEYS.AYURVEDA_CATEGORIES);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_AYURVEDA_CATEGORIES);
+  }
+
+  saveAyurvedaCategories(categories: AyurvedaAssessmentCategory[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_CATEGORIES, categories);
+  }
+
+  getAyurvedaInstruments(): AyurvedaAssessmentInstrument[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AyurvedaAssessmentInstrument[]>(EMPTY_TEST_KEYS.AYURVEDA_INSTRUMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_AYURVEDA_INSTRUMENTS);
+  }
+
+  saveAyurvedaInstruments(instruments: AyurvedaAssessmentInstrument[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_INSTRUMENTS, instruments);
+  }
+
+  getAyurvedaTerminology(): AyurvedaTerminologyEntry[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<AyurvedaTerminologyEntry[]>(EMPTY_TEST_KEYS.AYURVEDA_TERMINOLOGY);
+    return stored !== null && stored !== undefined ? stored : [];
+  }
+
+  saveAyurvedaTerminology(entries: AyurvedaTerminologyEntry[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.AYURVEDA_TERMINOLOGY, entries);
+  }
+
+  getProtocolAyurvedaAssessments(): ProtocolAyurvedaAssessment[] {
+    this.initWorkspace();
+    const stored = browserStorage.get<ProtocolAyurvedaAssessment[]>(EMPTY_TEST_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS);
+    return stored !== null && stored !== undefined ? stored : structuredClone(EMPTY_PROTOCOL_AYURVEDA_ASSESSMENTS);
+  }
+
+  saveProtocolAyurvedaAssessments(assessments: ProtocolAyurvedaAssessment[]): void {
+    browserStorage.set(EMPTY_TEST_KEYS.PROTOCOL_AYURVEDA_ASSESSMENTS, assessments);
   }
 }
 
