@@ -28,6 +28,14 @@
 
 ## 3. Task Log
 
+### 2026-10-05 16:35
+- **What**: Created comprehensive master `README.md` at root documenting the entire CTMS architecture, getting started guides, and living documentation protocol.
+- **Why**: User requested keeping code on `master` branch and adding a master README.md to be iteratively maintained as the codebase grows.
+- **How**: Authored `/root/ayu-back/ctms/README.md` including technology badges, institutional background (AIIA), architecture diagram, directory layout, 9 core domain descriptions, backend/frontend setup, database migration/seeding instructions, 21 CFR Part 11 cryptographic audit trail details, and test execution commands.
+- **Result**: Complete master documentation ready for developers, reviewers, and ongoing project maintenance.
+- **Verified by**: File created and reviewed, git status tracking confirmed.
+- **Follow-ups**: Update README sections as new CTMS operational domains (eCRF, monitoring visits, randomisation) are developed.
+
 ### 2026-10-05 16:00
 - **What**: Built the complete CRO/Sponsor backend foundation for AyuCTMS following strict DATA-MODEL-FIRST principles.
 - **Why**: User requested the senior backend architect design and implementation for the CRO/Sponsor platform encompassing 10+ business domains and 31 structural sections.
