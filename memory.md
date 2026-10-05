@@ -12,6 +12,7 @@
 - **Status**: 
   - Backend: 100% GREEN (10/10 pytest async tests passing, ruff check 0 errors).
   - Frontend: 100% GREEN (`npm run verify` passing, oxlint 0 warnings/errors, Vite production build passing).
+- **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
@@ -27,6 +28,20 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-05 16:48
+- **What**: Added `backend/requirements.txt`, created `backend/run.py` server runner, diagnosed and fixed Python SSL environment issue, and verified backend dev server execution.
+- **Why**: User reported that backend server was not running and `requirements.txt` was missing.
+- **How**:
+  1. Identified root cause: `which python` was resolving to Termux binary without `_ssl` support (`ModuleNotFoundError: No module named '_ssl'`), which prevented Uvicorn from starting.
+  2. Fixed system path resolution by symlinking `/usr/local/bin/python -> /usr/bin/python3` (which has full OpenSSL 3.5.5).
+  3. Created `backend/requirements.txt` pinned with core FastAPI, SQLAlchemy, Alembic, Pydantic, aiosqlite, asyncpg, and pytest dependencies.
+  4. Rebuilt `backend/.venv` using system `python3` and installed all requirements cleanly.
+  5. Built `backend/run.py` convenience script with auto-reload, path resolution, and console banner.
+  6. Verified backend runtime: `pytest` (10/10 passed in 21s), `curl http://127.0.0.1:8000/health` (HTTP 200 OK), `/api/v1/portfolio/overview` (valid derived JSON), and `/docs` (HTTP 200 OK).
+- **Result**: Backend server runs out of the box via `python run.py` or `python -m uvicorn app.main:app --reload`.
+- **Verified by**: curl tests against live local server, 10/10 pytest async tests green, and clean process termination.
+- **Follow-ups**: None.
 
 ### 2026-10-05 16:35
 - **What**: Created comprehensive master `README.md` at root documenting the entire CTMS architecture, getting started guides, and living documentation protocol.

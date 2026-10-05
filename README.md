@@ -173,7 +173,7 @@ ctms/
 3. **Install dependencies**:
    ```bash
    pip install --upgrade pip
-   pip install fastapi uvicorn sqlalchemy aiosqlite pydantic pydantic-settings alembic pytest pytest-asyncio httpx ruff
+   pip install -r requirements.txt
    ```
 
 4. **Initialize Database and Run Migrations**:
@@ -188,7 +188,8 @@ ctms/
 
 6. **Start the FastAPI Development Server**:
    ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   python run.py
+   # or: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
    The backend API will be available at `http://localhost:8000`. Interactive documentation is available at `http://localhost:8000/docs`.
 
