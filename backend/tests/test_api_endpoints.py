@@ -5,7 +5,8 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_full_api_workflow(client: AsyncClient):
+async def test_full_api_workflow(auth_client: AsyncClient):
+    client = auth_client
     # 1. Health check
     res = await client.get("/health")
     assert res.status_code == 200

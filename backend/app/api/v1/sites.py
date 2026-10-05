@@ -6,19 +6,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.enums import SiteStatus, SiteType
 from app.models.site import Site
+from app.models.user import User
 from app.schemas.site import SiteCreate, SiteRead, SiteUpdate
 from app.services.audit import AuditService
 
 router = APIRouter(prefix="/sites", tags=["Sites"])
-SYSTEM_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 @router.post("", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
 async def create_site(
     site_in: SiteCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     site = Site(**site_in.model_dump(), status=SiteStatus.active)
@@ -27,7 +29,7 @@ async def create_site(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="site.create",
         resource_type="site",
         resource_id=site.id,
@@ -45,6 +47,7 @@ async def list_sites(
     city: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Site)
@@ -62,6 +65,7 @@ async def list_sites(
 @router.get("/{site_id}", response_model=SiteRead)
 async def get_site(
     site_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     site = await db.get(Site, site_id)
@@ -74,6 +78,7 @@ async def get_site(
 async def update_site(
     site_id: uuid.UUID,
     site_in: SiteUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     site = await db.get(Site, site_id)
@@ -86,7 +91,7 @@ async def update_site(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="site.update",
         resource_type="site",
         resource_id=site.id,

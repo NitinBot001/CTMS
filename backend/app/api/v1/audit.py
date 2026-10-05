@@ -8,8 +8,11 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.audit import AuditLog
+from app.models.user import User
+from app.services.audit import AuditService
 
 router = APIRouter(prefix="/audit", tags=["Audit Trail"])
 
@@ -35,6 +38,7 @@ async def list_audit_logs(
     action: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(AuditLog).order_by(AuditLog.timestamp.desc())
@@ -55,7 +59,9 @@ async def verify_audit_chain(
 ) -> dict[str, Any]:
     """
     Verifies the cryptographic hash-chain integrity of all audit records.
-    Returns status: 'valid' if unbroken, or the index and ID where tampering was detected.
+    Validates both:
+    1. Chain Link Integrity: previous_hash matches the entry_hash of the preceding record.
+    2. Payload Integrity: entry_hash matches the SHA-256 digest of the canonical record payload.
     """
     stmt = select(AuditLog).order_by(AuditLog.timestamp.asc())
     result = await db.execute(stmt)
@@ -65,10 +71,32 @@ async def verify_audit_chain(
     verified_count = 0
 
     for idx, log in enumerate(logs):
+        # 1. Chain link integrity check
         if log.previous_hash != expected_previous_hash:
             return {
                 "valid": False,
-                "error": f"Chain broken at record {idx} (ID: {log.id}): previous_hash mismatch",
+                "failure_type": "broken_link",
+                "index": idx,
+                "record_id": str(log.id),
+                "error": f"Chain broken at record {idx} (ID: {log.id}): expected previous_hash '{expected_previous_hash}' but found '{log.previous_hash}'",
+                "verified_records": verified_count,
+            }
+
+        # 2. Payload tamper check
+        expected_entry_hash = AuditService.compute_entry_hash(
+            previous_hash=log.previous_hash,
+            action=log.action,
+            resource_type=log.resource_type,
+            resource_id=log.resource_id,
+            timestamp=log.timestamp,
+        )
+        if log.entry_hash != expected_entry_hash:
+            return {
+                "valid": False,
+                "failure_type": "payload_tampered",
+                "index": idx,
+                "record_id": str(log.id),
+                "error": f"Payload tampered at record {idx} (ID: {log.id}): expected entry_hash '{expected_entry_hash}' but found '{log.entry_hash}'",
                 "verified_records": verified_count,
             }
 

@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 from app.models.enums import DocumentStatus, DocumentType
+
+if TYPE_CHECKING:
+    from app.models.organization import Organization
+    from app.models.site import Site
+    from app.models.study import Study
+    from app.models.user import User
 
 
 class Document(BaseModel):

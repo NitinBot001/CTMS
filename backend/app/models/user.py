@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 from app.models.enums import ScopeLevel, UserStatus
+
+if TYPE_CHECKING:
+    from app.models.audit import AuditLog
+    from app.models.compliance import CAPARecord
+    from app.models.document import Document
+    from app.models.organization import OnboardingApplication, OrganizationMember
+    from app.models.safety import AdverseEvent
+    from app.models.study import StudyTeamMember
 
 
 class User(BaseModel):

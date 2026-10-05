@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 from app.models.enums import MilestoneStatus
+
+if TYPE_CHECKING:
+    from app.models.study import Study
 
 
 class StudyMilestone(BaseModel):

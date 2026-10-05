@@ -7,33 +7,35 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.document import Document
 from app.models.enums import DocumentStatus, DocumentType
+from app.models.user import User
 from app.schemas.common import StatusTransitionRequest
 from app.schemas.document import DocumentCreate, DocumentRead
 from app.services.audit import AuditService
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
-SYSTEM_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 @router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
 async def create_document(
     doc_in: DocumentCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     doc = Document(
         **doc_in.model_dump(),
         status=DocumentStatus.draft,
-        uploaded_by=SYSTEM_USER_ID,
+        uploaded_by=current_user.id,
     )
     db.add(doc)
     await db.flush()
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="document.create",
         resource_type="document",
         resource_id=doc.id,
@@ -53,6 +55,7 @@ async def list_documents(
     status: DocumentStatus | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Document)
@@ -74,6 +77,7 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentRead)
 async def get_document(
     document_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     doc = await db.get(Document, document_id)
@@ -86,6 +90,7 @@ async def get_document(
 async def transition_document(
     document_id: uuid.UUID,
     transition_in: StatusTransitionRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     doc = await db.get(Document, document_id)
@@ -115,19 +120,19 @@ async def transition_document(
 
     if new_status not in allowed_transitions.get(doc.status, []):
         raise HTTPException(
-            status_code=400, detail=f"Invalid transition from {doc.status} to {new_status}"
+            status_code=400, detail=f"Invalid transition from {doc.status.value} to {new_status.value}"
         )
 
     old_status = doc.status
     doc.status = new_status
 
     if new_status == DocumentStatus.approved:
-        doc.approved_by = SYSTEM_USER_ID
+        doc.approved_by = current_user.id
         doc.approved_at = datetime.datetime.now(datetime.UTC)
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="document.transition",
         resource_type="document",
         resource_id=doc.id,

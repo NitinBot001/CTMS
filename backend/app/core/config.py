@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./ctms.db"
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "AyuCTMS"
-    SECRET_KEY: str = "change-me-in-production"
+    SECRET_KEY: str = "ayu-ctms-production-grade-jwt-secret-key-32bytes-secure"
 
 
 @lru_cache

@@ -14,7 +14,48 @@ from app.models.audit import AuditLog
 
 class AuditService:
     @staticmethod
+    def format_canonical_timestamp(ts: datetime.datetime | str) -> str:
+        """Standardizes timestamps to UTC ISO-8601 with microsecond precision and Z suffix."""
+        dt: datetime.datetime
+        if isinstance(ts, str):
+            clean_ts = ts.replace("Z", "+00:00")
+            try:
+                dt = datetime.datetime.fromisoformat(clean_ts)
+            except ValueError:
+                return ts
+        else:
+            dt = ts
+        dt = dt.replace(tzinfo=datetime.UTC) if dt.tzinfo is None else dt.astimezone(datetime.UTC)
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    @classmethod
+    def build_canonical_payload(
+        cls,
+        previous_hash: str | None,
+        action: str,
+        resource_type: str,
+        resource_id: uuid.UUID | str,
+        timestamp: datetime.datetime | str,
+    ) -> str:
+        prev = previous_hash if previous_hash else ("0" * 64)
+        ts_str = cls.format_canonical_timestamp(timestamp)
+        return f"{prev}{action}{resource_type}{str(resource_id)}{ts_str}"
+
+    @classmethod
+    def compute_entry_hash(
+        cls,
+        previous_hash: str | None,
+        action: str,
+        resource_type: str,
+        resource_id: uuid.UUID | str,
+        timestamp: datetime.datetime | str,
+    ) -> str:
+        payload = cls.build_canonical_payload(previous_hash, action, resource_type, resource_id, timestamp)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @classmethod
     async def create_audit_log(
+        cls,
         db: AsyncSession,
         user_id: uuid.UUID | None,
         action: str,
@@ -40,11 +81,14 @@ class AuditService:
             if last_ts >= now:
                 now = last_ts + datetime.timedelta(microseconds=10)
 
-        now_iso = now.isoformat()
-
-        # Calculate new hash
-        hash_input = f"{previous_hash}{action}{resource_type}{str(resource_id)}{now_iso}"
-        entry_hash = hashlib.sha256(hash_input.encode()).hexdigest()
+        # Calculate canonical entry hash
+        entry_hash = cls.compute_entry_hash(
+            previous_hash=previous_hash,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            timestamp=now,
+        )
 
         # Sanitize changes for JSON storage (convert UUIDs, dates, enums to serializable primitives)
         sanitized_changes: Any = None

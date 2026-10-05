@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,6 +14,13 @@ from app.models.enums import (
     OrganizationStatus,
     OrganizationType,
 )
+
+if TYPE_CHECKING:
+    from app.models.compliance import CAPARecord
+    from app.models.document import Document
+    from app.models.site import Site
+    from app.models.study import Study
+    from app.models.user import Role, User
 
 
 class Organization(BaseModel):

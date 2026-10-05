@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,6 +18,21 @@ from app.models.enums import (
     StudyStatus,
     StudyType,
 )
+
+if TYPE_CHECKING:
+    from app.models.compliance import (
+        CAPARecord,
+        EthicsApproval,
+        ProtocolDeviation,
+        RegulatorySubmission,
+    )
+    from app.models.document import Document
+    from app.models.organization import Organization
+    from app.models.participant import Participant
+    from app.models.progress import StudyMilestone
+    from app.models.safety import AdverseEvent
+    from app.models.site import Site, StudySite
+    from app.models.user import Role, User
 
 
 class Study(BaseModel):

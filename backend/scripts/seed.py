@@ -12,6 +12,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import AsyncSessionLocal, init_db
+from app.core.security import hash_password
 from app.models.compliance import (
     EthicsApproval,
 )
@@ -39,7 +40,7 @@ from app.models.enums import (
     StudyType,
     UserStatus,
 )
-from app.models.organization import OnboardingApplication, Organization
+from app.models.organization import OnboardingApplication, Organization, OrganizationMember
 from app.models.participant import Participant
 from app.models.safety import AdverseEvent
 from app.models.site import Site, StudySite
@@ -68,19 +69,25 @@ async def seed_data():
             email="admin@ayuctms.gov.in",
             full_name="AyuCTMS System Administrator",
             status=UserStatus.active,
-            hashed_password="demo_hashed_password",
+            hashed_password=hash_password("Admin@123"),
         )
         pi_user = User(
             email="pi.rajesh@aiia.gov.in",
             full_name="Dr. Rajesh Sharma",
             phone="+91-9876543210",
             status=UserStatus.active,
-            hashed_password="demo_hashed_password",
+            hashed_password=hash_password("Investigator@123"),
         )
         db.add_all([admin_user, pi_user])
         await db.flush()
 
         # 2. Roles & Permissions
+        role_admin = Role(
+            name="System Administrator",
+            description="Global system administration with full platform access",
+            scope_level=ScopeLevel.system,
+            is_system_role=True,
+        )
         role_pi = Role(
             name="Principal Investigator",
             description="Responsible for the conduct of clinical investigation at study site",
@@ -93,7 +100,7 @@ async def seed_data():
             scope_level=ScopeLevel.organization,
             is_system_role=True,
         )
-        db.add_all([role_pi, role_cro])
+        db.add_all([role_admin, role_pi, role_cro])
         await db.flush()
 
         # 3. Organizations (Sponsor + CRO)
@@ -119,6 +126,14 @@ async def seed_data():
         )
         db.add_all([sponsor, cro])
         await db.flush()
+
+        admin_member = OrganizationMember(
+            organization_id=sponsor.id,
+            user_id=admin_user.id,
+            role_id=role_admin.id,
+            status=AssignmentStatus.active,
+        )
+        db.add(admin_member)
 
         # Onboarding application for sponsor
         onboarding = OnboardingApplication(

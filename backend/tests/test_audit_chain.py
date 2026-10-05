@@ -71,3 +71,16 @@ async def test_audit_hash_chain_integrity(client: AsyncClient, db_session: Async
     tamper_data = tamper_res.json()
     assert tamper_data["valid"] is False
     assert "Chain broken" in tamper_data["error"]
+    assert tamper_data["failure_type"] == "broken_link"
+
+    # 6. Simulate malicious payload tampering (changing action while hashes appear unchanged)
+    log2.previous_hash = log1.entry_hash
+    log2.action = "malicious.tampered.action"
+    await db_session.commit()
+
+    tamper_payload_res = await client.get("/api/v1/audit/verify")
+    assert tamper_payload_res.status_code == 200
+    tamper_payload_data = tamper_payload_res.json()
+    assert tamper_payload_data["valid"] is False
+    assert tamper_payload_data["failure_type"] == "payload_tampered"
+    assert "Payload tampered" in tamper_payload_data["error"]

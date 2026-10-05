@@ -7,20 +7,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.enums import ParticipantStatus
 from app.models.participant import Participant
+from app.models.user import User
 from app.schemas.common import StatusTransitionRequest
 from app.schemas.participant import ParticipantCreate, ParticipantRead
 from app.services.audit import AuditService
 
 router = APIRouter(prefix="/participants", tags=["Participants"])
-SYSTEM_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 @router.post("", response_model=ParticipantRead, status_code=status.HTTP_201_CREATED)
 async def create_participant(
     participant_in: ParticipantCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     existing = await db.execute(
@@ -41,7 +43,7 @@ async def create_participant(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="participant.create",
         resource_type="participant",
         resource_id=participant.id,
@@ -59,6 +61,7 @@ async def list_participants(
     status: ParticipantStatus | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Participant)
@@ -76,6 +79,7 @@ async def list_participants(
 @router.get("/{participant_id}", response_model=ParticipantRead)
 async def get_participant(
     participant_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     participant = await db.get(Participant, participant_id)
@@ -88,6 +92,7 @@ async def get_participant(
 async def transition_participant(
     participant_id: uuid.UUID,
     transition_in: StatusTransitionRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     participant = await db.get(Participant, participant_id)
@@ -116,7 +121,7 @@ async def transition_participant(
     if new_status not in allowed_transitions.get(participant.status, []):
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid transition from {participant.status} to {new_status}",
+            detail=f"Invalid transition from {participant.status.value} to {new_status.value}",
         )
 
     old_status = participant.status
@@ -135,7 +140,7 @@ async def transition_participant(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="participant.transition",
         resource_type="participant",
         resource_id=participant.id,

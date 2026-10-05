@@ -24,7 +24,8 @@ from app.models.study import Study
 
 
 @pytest.mark.asyncio
-async def test_portfolio_derived_kpis(client: AsyncClient, db_session: AsyncSession):
+async def test_portfolio_derived_kpis(auth_client: AsyncClient, db_session: AsyncSession):
+    client = auth_client
     # Setup Sponsor
     sponsor = Organization(
         name="Global Ayush Research",

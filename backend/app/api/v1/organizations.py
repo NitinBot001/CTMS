@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.enums import OnboardingStatus, OrganizationStatus, OrganizationType
 from app.models.organization import OnboardingApplication, Organization, OrganizationMember
+from app.models.user import User
 from app.schemas.common import StatusTransitionRequest
 from app.schemas.organization import (
     OnboardingApplicationRead,
@@ -22,17 +24,15 @@ from app.services.organization import OrganizationService
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
-# Fixed system admin user ID for default/unauthenticated audits in MVP
-SYSTEM_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 async def create_organization(
     org_in: OrganizationCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = OrganizationService(db)
-    return await service.create_organization(org_in, user_id=SYSTEM_USER_ID)
+    return await service.create_organization(org_in, user_id=current_user.id)
 
 
 @router.get("", response_model=list[OrganizationRead])
@@ -41,6 +41,7 @@ async def list_organizations(
     org_status: OrganizationStatus | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Organization)
@@ -56,6 +57,7 @@ async def list_organizations(
 @router.get("/{org_id}", response_model=OrganizationRead)
 async def get_organization(
     org_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = OrganizationService(db)
@@ -69,6 +71,7 @@ async def get_organization(
 async def update_organization(
     org_id: uuid.UUID,
     org_in: OrganizationUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = OrganizationService(db)
@@ -82,7 +85,7 @@ async def update_organization(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="organization.update",
         resource_type="organization",
         resource_id=org.id,
@@ -105,6 +108,7 @@ async def update_organization(
 )
 async def submit_onboarding_application(
     org_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = OrganizationService(db)
@@ -121,7 +125,7 @@ async def submit_onboarding_application(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="onboarding.create",
         resource_type="onboarding_application",
         resource_id=app.id,
@@ -139,6 +143,7 @@ async def submit_onboarding_application(
 async def transition_onboarding_status(
     app_id: uuid.UUID,
     transition_in: StatusTransitionRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     service = OrganizationService(db)
@@ -153,7 +158,7 @@ async def transition_onboarding_status(
         return await service.transition_onboarding(
             application_id=app_id,
             new_status=new_status,
-            user_id=SYSTEM_USER_ID,
+            user_id=current_user.id,
             notes=transition_in.reason,
         )
     except ValueError as e:
@@ -168,6 +173,7 @@ async def transition_onboarding_status(
 @router.get("/{org_id}/members", response_model=list[OrganizationMemberRead])
 async def list_organization_members(
     org_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(OrganizationMember).where(OrganizationMember.organization_id == org_id)
@@ -183,6 +189,7 @@ async def list_organization_members(
 async def add_organization_member(
     org_id: uuid.UUID,
     member_in: OrganizationMemberCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     member = OrganizationMember(
@@ -195,7 +202,7 @@ async def add_organization_member(
 
     await AuditService.create_audit_log(
         db=db,
-        user_id=SYSTEM_USER_ID,
+        user_id=current_user.id,
         action="organization.member_add",
         resource_type="organization_member",
         resource_id=member.id,
