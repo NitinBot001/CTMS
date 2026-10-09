@@ -22,6 +22,7 @@ class UserRead(UserBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     status: UserStatus
+    must_change_password: bool = False
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -54,7 +55,6 @@ class PermissionRead(BaseModel):
 
 class OrganizationMemberBase(BaseModel):
     user_id: uuid.UUID
-    organization_id: uuid.UUID
     role_id: uuid.UUID
 
 
@@ -65,6 +65,7 @@ class OrganizationMemberCreate(OrganizationMemberBase):
 class OrganizationMemberRead(OrganizationMemberBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    organization_id: uuid.UUID
     status: AssignmentStatus
     joined_at: datetime.datetime
     created_at: datetime.datetime

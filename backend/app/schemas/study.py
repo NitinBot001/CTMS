@@ -10,6 +10,7 @@ from app.models.enums import (
     AssignmentStatus,
     BlindingType,
     CTRIStatus,
+    MilestoneStatus,
     RegulatoryStatus,
     StudyPhase,
     StudyStatus,
@@ -74,7 +75,6 @@ class StudyRead(StudyBase):
 
 
 class StudyTeamMemberBase(BaseModel):
-    study_id: uuid.UUID
     user_id: uuid.UUID
     role_id: uuid.UUID
     site_id: uuid.UUID | None = None
@@ -89,6 +89,24 @@ class StudyTeamMemberCreate(StudyTeamMemberBase):
 class StudyTeamMemberRead(StudyTeamMemberBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    study_id: uuid.UUID
     assignment_status: AssignmentStatus
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+
+class StudyMilestoneBase(BaseModel):
+    title: str
+    description: str | None = None
+    planned_date: datetime.date | None = None
+    actual_date: datetime.date | None = None
+    status: MilestoneStatus
+
+
+class StudyMilestoneRead(StudyMilestoneBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    study_id: uuid.UUID
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+

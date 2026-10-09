@@ -29,11 +29,20 @@ from app.models.safety import AdverseEvent
 from app.models.site import Site, StudySite
 from app.models.study import Study
 from app.models.user import User
+from app.schemas.portfolio import (
+    EnrollmentTrendPoint,
+    PortfolioAlertItem,
+    PortfolioHealthResponse,
+    PortfolioOverviewResponse,
+    SiteEnrollmentItem,
+    StudyMetricsResponse,
+    UpcomingMilestoneItem,
+)
 
 router = APIRouter(prefix="/portfolio", tags=["Portfolio / Derived Analytics"])
 
 
-@router.get("/overview")
+@router.get("/overview", response_model=PortfolioOverviewResponse)
 async def get_portfolio_overview(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -151,7 +160,7 @@ async def get_portfolio_overview(
     }
 
 
-@router.get("/health")
+@router.get("/health", response_model=PortfolioHealthResponse)
 async def get_portfolio_health(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -225,7 +234,7 @@ async def get_portfolio_health(
     }
 
 
-@router.get("/alerts")
+@router.get("/alerts", response_model=list[PortfolioAlertItem])
 async def get_portfolio_alerts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -320,7 +329,7 @@ async def get_portfolio_alerts(
     return alerts
 
 
-@router.get("/milestones/upcoming")
+@router.get("/milestones/upcoming", response_model=list[UpcomingMilestoneItem])
 async def get_upcoming_milestones(
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -355,7 +364,7 @@ async def get_upcoming_milestones(
     ]
 
 
-@router.get("/enrollment/trend")
+@router.get("/enrollment/trend", response_model=list[EnrollmentTrendPoint])
 async def get_enrollment_trend(
     study_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_user),
@@ -400,7 +409,7 @@ async def get_enrollment_trend(
     return trend
 
 
-@router.get("/studies/{study_id}/enrollment/by-site")
+@router.get("/studies/{study_id}/enrollment/by-site", response_model=list[SiteEnrollmentItem])
 async def get_enrollment_by_site(
     study_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -456,7 +465,7 @@ async def get_enrollment_by_site(
     return breakdown
 
 
-@router.get("/studies/{study_id}/metrics")
+@router.get("/studies/{study_id}/metrics", response_model=StudyMetricsResponse)
 async def get_study_metrics(
     study_id: uuid.UUID,
     current_user: User = Depends(get_current_user),

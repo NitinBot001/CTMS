@@ -10,7 +10,11 @@ from app.services.audit import AuditService
 
 
 @pytest.mark.asyncio
-async def test_audit_hash_chain_integrity(client: AsyncClient, db_session: AsyncSession):
+async def test_audit_hash_chain_integrity(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict[str, str],
+):
     user_id = uuid.uuid4()
     r_id1 = uuid.uuid4()
     r_id2 = uuid.uuid4()
@@ -54,8 +58,8 @@ async def test_audit_hash_chain_integrity(client: AsyncClient, db_session: Async
     # 3. Verify third entry links to second entry's hash
     assert log3.previous_hash == log2.entry_hash
 
-    # 4. Verify API verification endpoint returns valid
-    res = await client.get("/api/v1/audit/verify")
+    # 4. Verify API verification endpoint returns valid (authenticated)
+    res = await client.get("/api/v1/audit/verify", headers=auth_headers)
     assert res.status_code == 200
     data = res.json()
     assert data["valid"] is True
@@ -66,7 +70,7 @@ async def test_audit_hash_chain_integrity(client: AsyncClient, db_session: Async
     await db_session.commit()
 
     # Verification must detect the tampering!
-    tamper_res = await client.get("/api/v1/audit/verify")
+    tamper_res = await client.get("/api/v1/audit/verify", headers=auth_headers)
     assert tamper_res.status_code == 200
     tamper_data = tamper_res.json()
     assert tamper_data["valid"] is False
@@ -78,7 +82,7 @@ async def test_audit_hash_chain_integrity(client: AsyncClient, db_session: Async
     log2.action = "malicious.tampered.action"
     await db_session.commit()
 
-    tamper_payload_res = await client.get("/api/v1/audit/verify")
+    tamper_payload_res = await client.get("/api/v1/audit/verify", headers=auth_headers)
     assert tamper_payload_res.status_code == 200
     tamper_payload_data = tamper_payload_res.json()
     assert tamper_payload_data["valid"] is False

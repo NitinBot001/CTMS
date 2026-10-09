@@ -14,7 +14,8 @@ from app.models.progress import StudyMilestone
 from app.models.safety import AdverseEvent
 from app.models.site import Site, StudySite
 from app.models.study import Study, StudyTeamMember
-from app.models.user import Permission, Role, RolePermission, User
+from app.models.user import Permission, Role, RolePermission, User, SuperAdminProfile, InvitationToken
+from app.models.platform import OnboardingRequest
 
 __all__ = [
     "Base",
@@ -26,6 +27,8 @@ __all__ = [
     "Role",
     "Permission",
     "RolePermission",
+    "SuperAdminProfile",
+    "InvitationToken",
     "Site",
     "StudySite",
     "Study",
@@ -39,4 +42,5 @@ __all__ = [
     "CAPARecord",
     "Document",
     "AuditLog",
+    "OnboardingRequest",
 ]

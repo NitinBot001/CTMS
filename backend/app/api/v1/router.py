@@ -13,6 +13,7 @@ from app.api.v1.safety import router as safety_router
 from app.api.v1.sites import router as sites_router
 from app.api.v1.studies import router as studies_router
 from app.api.v1.users import router as users_router
+from app.api.v1.platform import router as platform_router
 
 api_router = APIRouter()
 
@@ -27,3 +28,4 @@ api_router.include_router(documents_router)
 api_router.include_router(portfolio_router)
 api_router.include_router(audit_router)
 api_router.include_router(users_router)
+api_router.include_router(platform_router)

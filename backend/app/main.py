@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.core.database import init_db
+from app.core.database import init_db, AsyncSessionLocal
+from app.services.platform import PlatformService
 
 settings = get_settings()
 
@@ -16,6 +17,11 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     await init_db()
+    
+    # Bootstrap super admin if configured
+    async with AsyncSessionLocal() as db:
+        await PlatformService.ensure_super_admin_bootstrapped(db, settings)
+        
     yield
 
 

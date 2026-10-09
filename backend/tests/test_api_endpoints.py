@@ -108,7 +108,6 @@ async def test_full_api_workflow(auth_client: AsyncClient):
     res = await client.post(
         f"/api/v1/studies/{study_id}/sites",
         json={
-            "study_id": study_id,
             "site_id": site_id,
             "recruitment_target": 50,
         },
@@ -140,7 +139,6 @@ async def test_full_api_workflow(auth_client: AsyncClient):
     res = await client.post(
         f"/api/v1/studies/{study_id}/team",
         json={
-            "study_id": study_id,
             "user_id": user_id,
             "role_id": role_id,
             "site_id": site_id,

@@ -18,6 +18,7 @@ from app.schemas.common import StatusTransitionRequest
 from app.schemas.site import StudySiteCreate, StudySiteRead
 from app.schemas.study import (
     StudyCreate,
+    StudyMilestoneRead,
     StudyRead,
     StudyTeamMemberCreate,
     StudyTeamMemberRead,
@@ -320,7 +321,7 @@ async def transition_study_site_status(
 # -------------------------------------------------------------
 
 
-@router.get("/{study_id}/milestones")
+@router.get("/{study_id}/milestones", response_model=list[StudyMilestoneRead])
 async def list_study_milestones(
     study_id: uuid.UUID,
     study: Study = Depends(require_study_access()),

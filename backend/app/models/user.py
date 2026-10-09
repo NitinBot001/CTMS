@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import uuid
 from typing import TYPE_CHECKING
 
@@ -28,6 +29,9 @@ class User(BaseModel):
         sa.Enum(UserStatus, name="user_status", create_constraint=True)
     )
     hashed_password: Mapped[str] = mapped_column(sa.String(255))
+    must_change_password: Mapped[bool] = mapped_column(sa.Boolean, default=False)
+    password_changed_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime)
+    last_login_at: Mapped[datetime.datetime | None] = mapped_column(sa.DateTime)
 
     # Relationships
     memberships: Mapped[list[OrganizationMember]] = relationship(
@@ -48,6 +52,7 @@ class User(BaseModel):
         back_populates="reviewer"
     )
     capas_assigned: Mapped[list[CAPARecord]] = relationship(back_populates="assignee")
+    super_admin_profile: Mapped["SuperAdminProfile"] = relationship(back_populates="user", uselist=False)
 
 
 class Role(BaseModel):
@@ -94,3 +99,25 @@ class RolePermission(BaseModel):
     # Relationships
     role: Mapped[Role] = relationship(back_populates="permissions")
     permission: Mapped[Permission] = relationship(back_populates="roles")
+
+
+class SuperAdminProfile(BaseModel):
+    __tablename__ = "super_admin_profiles"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("users.id"), unique=True)
+    is_active: Mapped[bool] = mapped_column(sa.Boolean, default=True)
+    bootstrapped_at: Mapped[datetime.datetime] = mapped_column(sa.DateTime, default=sa.func.now())
+
+    user: Mapped[User] = relationship(back_populates="super_admin_profile")
+
+
+class InvitationToken(BaseModel):
+    __tablename__ = "invitation_tokens"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("users.id"))
+    token_hash: Mapped[str] = mapped_column(sa.String(255))
+    expires_at: Mapped[datetime.datetime] = mapped_column(sa.DateTime)
+    is_used: Mapped[bool] = mapped_column(sa.Boolean, default=False)
+
+    user: Mapped[User] = relationship()
+

@@ -254,3 +254,11 @@ class ScopeLevel(str, enum.Enum):
     organization = "organization"
     study = "study"
     site = "site"
+
+
+class OnboardingRequestStatus(str, enum.Enum):
+    pending = "pending"
+    under_review = "under_review"
+    approved = "approved"
+    rejected = "rejected"
+    changes_requested = "changes_requested"

@@ -4,12 +4,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, security_bearer
 from app.core.database import get_db
-from app.core.security import decode_access_token, hash_password
+from app.core.security import hash_password
 from app.models.enums import UserStatus
 from app.models.user import Permission, Role, User
 from app.schemas.user import PermissionRead, RoleCreate, RoleRead, UserCreate, UserRead
@@ -33,16 +33,24 @@ async def create_user(
     if existing.scalars().first():
         raise HTTPException(status_code=400, detail="User with this email already exists")
 
-    # Determine actor (authenticated user or self-registration/bootstrap)
+    # Check total users in system to enforce bootstrap vs normal access control
+    user_count_res = await db.execute(select(func.count(User.id)))
+    total_users = user_count_res.scalar() or 0
+
     actor_id: uuid.UUID | None = None
-    if credentials and credentials.credentials:
-        try:
-            payload = decode_access_token(credentials.credentials)
-            sub = payload.get("sub")
-            if sub:
-                actor_id = uuid.UUID(sub)
-        except Exception:
-            actor_id = None
+    if total_users == 0:
+        # Initial system bootstrap: allow unauthenticated creation of first administrator account
+        actor_id = None
+    else:
+        # Normal operation: anonymous creation is strictly rejected
+        if not credentials or not credentials.credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to create users. Bootstrap is closed.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        current_user = await get_current_user(credentials=credentials, db=db)
+        actor_id = current_user.id
 
     user = User(
         email=user_in.email,

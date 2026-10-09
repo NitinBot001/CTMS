@@ -58,7 +58,6 @@ class SiteRead(SiteBase):
 
 
 class StudySiteBase(BaseModel):
-    study_id: uuid.UUID
     site_id: uuid.UUID
     recruitment_target: int | None = None
     monitoring_status: MonitoringStatus | None = None
@@ -71,6 +70,7 @@ class StudySiteCreate(StudySiteBase):
 class StudySiteRead(StudySiteBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    study_id: uuid.UUID
     activation_status: StudySiteActivationStatus
     ec_status: ECStatus | None = None
     contract_status: ContractStatus | None = None

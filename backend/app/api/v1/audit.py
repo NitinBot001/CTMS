@@ -55,6 +55,7 @@ async def list_audit_logs(
 
 @router.get("/verify")
 async def verify_audit_chain(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """
