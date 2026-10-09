@@ -5,6 +5,7 @@ import { studiesApi } from '@/api/studies.api'
 import { sitesApi } from '@/api/sites.api'
 import { adminApi } from '@/api/admin.api'
 import { portfolioApi } from '@/api/portfolio.api'
+import { platformApi } from '@/api/platform.api'
 import { PageContainer, PageHeader } from '@/components/layout'
 import { Card } from '@/components/data-display/Card'
 import { Tabs, type TabItem } from '@/components/navigation/Tabs'
@@ -38,6 +39,12 @@ export const StudyDetailPage: React.FC = () => {
   const [selectedSiteId, setSelectedSiteId] = useState('')
   const [siteTarget, setSiteTarget] = useState<number>(25)
   const [submittingSite, setSubmittingSite] = useState(false)
+
+  // Clinical Site Participation state
+  const [isRequestParticipationOpen, setIsRequestParticipationOpen] = useState(false)
+  const [participationSiteId, setParticipationSiteId] = useState('')
+  const [participationNotes, setParticipationNotes] = useState('')
+  const [submittingParticipation, setSubmittingParticipation] = useState(false)
 
   // Queries
   const studyQuery = useQuery({
@@ -81,6 +88,12 @@ export const StudyDetailPage: React.FC = () => {
     queryFn: () => sitesApi.list(),
   })
 
+  const participationsQuery = useQuery({
+    queryKey: ['study', id, 'site-participations'],
+    queryFn: () => platformApi.listStudySiteParticipations(id!),
+    enabled: !!id,
+  })
+
   const rolesQuery = useQuery({
     queryKey: ['admin', 'roles'],
     queryFn: adminApi.listRoles,
@@ -90,6 +103,7 @@ export const StudyDetailPage: React.FC = () => {
   const milestones = milestonesQuery.data || []
   const team = teamQuery.data || []
   const studySites = sitesQuery.data || []
+  const siteParticipations = participationsQuery.data || []
   const metrics = metricsQuery.data
   const siteEnrollment = siteEnrollmentQuery.data || []
   const globalSites = globalSitesQuery.data || []
@@ -167,6 +181,31 @@ export const StudyDetailPage: React.FC = () => {
       toast.error('Site Assignment Failed', err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setSubmittingSite(false)
+    }
+  }
+
+  const handleRequestParticipation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!id || !participationSiteId) return
+    setSubmittingParticipation(true)
+    try {
+      await platformApi.requestSiteParticipation({
+        study_id: id,
+        site_id: participationSiteId,
+        notes: participationNotes.trim() || null,
+      })
+      toast.success(
+        'Participation Requested',
+        'Clinical site study participation request submitted for Government & Site PI dual-review.'
+      )
+      setIsRequestParticipationOpen(false)
+      setParticipationSiteId('')
+      setParticipationNotes('')
+      participationsQuery.refetch()
+    } catch (err: unknown) {
+      toast.error('Request Failed', err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setSubmittingParticipation(false)
     }
   }
 
@@ -393,64 +432,182 @@ export const StudyDetailPage: React.FC = () => {
         </Card>
       )}
 
-      {/* TAB 4: SITES */}
+      {/* TAB 4: SITES & DUAL-APPROVAL PARTICIPATION */}
       {activeTab === 'sites' && (
-        <Card className="p-5 bg-white border border-[#E4DED3]">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E4DED3]">
-            <h3 className="font-serif text-sm font-bold text-[#1C1A17]">
-              Assigned Trial Research Sites
-            </h3>
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={() => setIsAssignSiteOpen(true)}
-              leftIcon={<Icon name="plus" size="xs" />}
-            >
-              Assign Trial Site
-            </Button>
-          </div>
+        <div className="space-y-6">
+          {/* Section 1: Dual-Approval Site Participation Pipeline */}
+          <Card className="p-5 bg-white border border-[#E4DED3]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#E4DED3]">
+              <div>
+                <h3 className="font-serif text-sm font-bold text-[#1C1A17] flex items-center gap-2">
+                  <span>Site Study Participation Dual-Approval Pipeline</span>
+                  <span className="text-xs font-normal text-[#726B5C]">({siteParticipations.length})</span>
+                </h3>
+                <p className="text-[11px] text-[#726B5C] mt-0.5">
+                  Independent dual-approval workflow: requires both Government Verification Team approval and institutional Site PI confirmation before site activation.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="xs"
+                onClick={() => setIsRequestParticipationOpen(true)}
+                leftIcon={<Icon name="plus" size="xs" />}
+              >
+                Request Site Participation
+              </Button>
+            </div>
 
-          {studySites.length === 0 ? (
-            <div className="py-12 text-center text-xs text-[#726B5C]">
-              No research sites currently assigned to this clinical trial.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-[#E4DED3] text-[#726B5C] font-semibold">
-                    <th className="py-2">Site ID</th>
-                    <th className="py-2">Recruitment Target</th>
-                    <th className="py-2">Activation Status</th>
-                    <th className="py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F8F6F2]">
-                  {studySites.map((s) => (
-                    <tr key={s.id} className="hover:bg-[#F8F6F2]">
-                      <td className="py-2 font-mono text-[11px] text-[#1C1A17]">{s.site_id}</td>
-                      <td className="py-2 font-mono text-[#5A5347]">
-                        {s.recruitment_target ? formatNumber(s.recruitment_target) : '—'}
-                      </td>
-                      <td className="py-2">
-                        <StatusBadge status={s.activation_status} size="sm" />
-                      </td>
-                      <td className="py-2 text-right">
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          onClick={() => setSelectedSiteForTransition({ id: s.site_id, status: s.activation_status })}
-                        >
-                          Change Activation
-                        </Button>
-                      </td>
+            {siteParticipations.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#726B5C]">
+                No site participation requests submitted yet. Click &quot;Request Site Participation&quot; to invite a clinical institution into this protocol.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-[#E4DED3] text-[#726B5C] font-semibold">
+                      <th className="py-2">Research Site</th>
+                      <th className="py-2">Overall Status</th>
+                      <th className="py-2">Government Review</th>
+                      <th className="py-2">Site PI Confirmation</th>
+                      <th className="py-2">Protocol Link</th>
+                      <th className="py-2 text-right">Requested At</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#F8F6F2]">
+                    {siteParticipations.map((p) => {
+                      const matchedSite = globalSites.find((s) => s.id === p.site_id)
+                      return (
+                        <tr key={p.id} className="hover:bg-[#F8F6F2]">
+                          <td className="py-2.5">
+                            <span className="font-semibold text-[#1C1A17] block">
+                              {matchedSite?.name || 'Clinical Site'}
+                            </span>
+                            <span className="font-mono text-[11px] text-[#726B5C] block">
+                              {matchedSite?.site_code || p.site_id}
+                              {matchedSite?.city ? ` · ${matchedSite.city}` : ''}
+                            </span>
+                          </td>
+                          <td className="py-2.5">
+                            <StatusBadge status={p.status} size="sm" />
+                          </td>
+                          <td className="py-2.5">
+                            <div className="flex flex-col gap-0.5">
+                              <StatusBadge status={p.government_status} size="sm" />
+                              {p.government_notes && (
+                                <span className="text-[10px] text-[#726B5C] italic truncate max-w-[140px]" title={p.government_notes}>
+                                  {p.government_notes}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5">
+                            <div className="flex flex-col gap-0.5">
+                              <StatusBadge status={p.site_status} size="sm" />
+                              {p.site_notes && (
+                                <span className="text-[10px] text-[#726B5C] italic truncate max-w-[140px]" title={p.site_notes}>
+                                  {p.site_notes}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-2.5">
+                            {p.study_site_id ? (
+                              <span className="font-mono text-[10px] text-[#1F5C3F] bg-[#EDF6F1] px-1.5 py-0.5 rounded-xs border border-[#BDDCCB] inline-block font-semibold">
+                                Activated Site
+                              </span>
+                            ) : p.status === 'approved' ? (
+                              <span className="text-[10px] text-[#315A78]">Activating...</span>
+                            ) : (
+                              <span className="text-[10px] text-[#726B5C]">Pending Approvals</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-right font-mono text-[11px] text-[#726B5C]">
+                            {p.created_at ? p.created_at.slice(0, 10) : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          {/* Section 2: Activated Trial Sites */}
+          <Card className="p-5 bg-white border border-[#E4DED3]">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E4DED3]">
+              <div>
+                <h3 className="font-serif text-sm font-bold text-[#1C1A17] flex items-center gap-2">
+                  <span>Activated Trial Research Sites</span>
+                  <span className="text-xs font-normal text-[#726B5C]">({studySites.length})</span>
+                </h3>
+                <p className="text-[11px] text-[#726B5C] mt-0.5">
+                  Clinical institutions currently assigned to protocol with operational status.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setIsAssignSiteOpen(true)}
+                leftIcon={<Icon name="plus" size="xs" />}
+              >
+                Direct Assign Site
+              </Button>
             </div>
-          )}
-        </Card>
+
+            {studySites.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#726B5C]">
+                No operational research sites currently active on this clinical trial protocol.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-[#E4DED3] text-[#726B5C] font-semibold">
+                      <th className="py-2">Site / Facility</th>
+                      <th className="py-2">Recruitment Target</th>
+                      <th className="py-2">Activation Status</th>
+                      <th className="py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F8F6F2]">
+                    {studySites.map((s) => {
+                      const matchedSite = globalSites.find((gs) => gs.id === s.site_id)
+                      return (
+                        <tr key={s.id} className="hover:bg-[#F8F6F2]">
+                          <td className="py-2">
+                            <span className="font-semibold text-[#1C1A17] block">
+                              {matchedSite?.name || 'Clinical Site'}
+                            </span>
+                            <span className="font-mono text-[11px] text-[#726B5C] block">
+                              {matchedSite?.site_code || s.site_id}
+                            </span>
+                          </td>
+                          <td className="py-2 font-mono text-[#5A5347]">
+                            {s.recruitment_target ? formatNumber(s.recruitment_target) : '—'}
+                          </td>
+                          <td className="py-2">
+                            <StatusBadge status={s.activation_status} size="sm" />
+                          </td>
+                          <td className="py-2 text-right">
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              onClick={() => setSelectedSiteForTransition({ id: s.site_id, status: s.activation_status })}
+                            >
+                              Change Activation
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
       )}
 
       {/* TAB 5: ANALYTICS & OVERSIGHT */}
@@ -658,6 +815,74 @@ export const StudyDetailPage: React.FC = () => {
             </Button>
             <Button variant="primary" size="sm" type="submit" loading={submittingSite}>
               Assign Site
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* Request Clinical Site Participation Modal (Dual-Approval) */}
+      <Dialog
+        open={isRequestParticipationOpen}
+        onClose={() => setIsRequestParticipationOpen(false)}
+        size="md"
+      >
+        <DialogHeader
+          title="Request Clinical Site Participation"
+          description="Initiate independent dual-approval verification for a clinical research institution."
+        />
+        <form onSubmit={handleRequestParticipation}>
+          <DialogContent className="space-y-4">
+            <div className="p-3 bg-[#EFF5F9] border border-[#BFD7E7] rounded-xs text-xs text-[#315A78]">
+              <strong>Independent Dual-Approval Protocol:</strong> This request routes independently to the Government Verification Team and institutional Site PI. Activation occurs strictly when both authorities grant affirmative review.
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1A17] mb-1">Select Clinical Research Site *</label>
+              <Select
+                required
+                value={participationSiteId}
+                onChange={(e) => setParticipationSiteId(e.target.value)}
+                options={[
+                  { value: '', label: 'Select Trial Research Site...' },
+                  ...globalSites.map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.site_code}) - ${[s.city, s.state].filter(Boolean).join(', ')}`,
+                  })),
+                ]}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1A17] mb-1">
+                Participation Scope &amp; Protocol Rationale
+              </label>
+              <textarea
+                className="w-full border border-[#E4DED3] rounded-xs p-2.5 text-xs focus:ring-[#7A2A12] focus:border-[#7A2A12] bg-white text-[#1C1A17]"
+                rows={3}
+                placeholder="Specify recruitment target justification, facility investigator alignment, or trial justification..."
+                value={participationNotes}
+                onChange={(e) => setParticipationNotes(e.target.value)}
+              />
+            </div>
+          </DialogContent>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setIsRequestParticipationOpen(false)}
+              disabled={submittingParticipation}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              loading={submittingParticipation}
+              disabled={!participationSiteId}
+            >
+              Submit Participation Request
             </Button>
           </DialogFooter>
         </form>

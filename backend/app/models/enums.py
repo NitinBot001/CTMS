@@ -262,3 +262,25 @@ class OnboardingRequestStatus(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     changes_requested = "changes_requested"
+
+
+class AccessRequestType(str, enum.Enum):
+    research_pi = "research_pi"
+    cro_staff = "cro_staff"
+    site_pi = "site_pi"
+
+
+class ParticipationDecisionStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
+class SiteParticipationStatus(str, enum.Enum):
+    requested = "requested"
+    pending_government_verification = "pending_government_verification"
+    pending_site_confirmation = "pending_site_confirmation"
+    approved = "approved"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
+

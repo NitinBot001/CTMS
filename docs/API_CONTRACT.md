@@ -832,6 +832,74 @@ All portfolio metrics are **dynamically calculated** on the fly from canonical d
 
 ---
 
+### 5.12 Platform, Government Verification & Dual-Approval Onboarding (`/api/v1/platform`)
+
+This domain governs platform-level access, independent government verification across research roles, and the independent dual-approval clinical trial site onboarding workflow.
+
+#### Public Access Requests
+- **`POST /api/v1/platform/requests/research-pi`**
+  - **Payload:** `ResearchPIRequestCreate` (`applicant_name`, `email`, `organization_name`, `organization_type`, `requested_role`, `phone`, `designation`, `qualifications`, `country`, `state`, `city`, `declaration_accepted`)
+  - **Response:** `OnboardingRequestRead` (status: `"pending"`)
+- **`POST /api/v1/platform/requests/cro-staff`**
+  - **Payload:** `CROStaffRequestCreate`
+  - **Response:** `OnboardingRequestRead` (status: `"pending"`)
+- **`POST /api/v1/platform/requests/site-pi`**
+  - **Payload:** `SitePIRequestCreate` (`proposed_site_name`, institutional affiliation)
+  - **Response:** `OnboardingRequestRead` (status: `"pending"`)
+- **`POST /api/v1/platform/onboarding-requests`**
+  - Legacy intake endpoint. Supported for backward compatibility.
+
+#### Government Verification & Platform Administration
+- **`GET /api/v1/platform/onboarding-requests`** (query: `request_type`, `status` → `list[OnboardingRequestRead]`, requires Super Admin)
+- **`GET /api/v1/platform/onboarding-requests/{request_id}`** → `OnboardingRequestRead` (requires Super Admin)
+- **`PATCH /api/v1/platform/onboarding-requests/{request_id}/review`**
+  - **Payload:** `OnboardingRequestReview` (`status`, `review_notes`)
+  - **Allowed State Graph:**
+    - `pending` → `under_review`
+    - `under_review` → `approved`, `rejected`, `changes_requested`
+    - `changes_requested` → `under_review`, `rejected`
+  - **Self-Review Prevention:** Evaluator cannot review their own submitted request (`HTTP 400 Bad Request`).
+- **`POST /api/v1/platform/onboarding-requests/{request_id}/approve`**
+  - Atomic tenant provisioning: creates canonical `Organization`, initial `User` (`status="inactive"`, `must_change_password=True`), `OrganizationMember` with org-admin role, and single-use bcrypt-hashed `InvitationToken`. Dispatches activation email via Resend API (or safe dev logging). Idempotent on double-approval.
+
+#### Account Activation & Security Setup
+- **`POST /api/v1/platform/activate`**
+  - **Payload:** `ActivationRequest` (`token`, `new_password` min 8 chars)
+  - Validates bcrypt token hash, activates user (`status="active"`), marks token used.
+- **`POST /api/v1/platform/first-login-setup`**
+  - **Payload:** `FirstLoginSetupRequest` (`current_password`, `new_password`, `full_name`, `phone`)
+  - Authenticated. Resets `must_change_password=False`, updates profile, records `password_changed_at`.
+- **`POST /api/v1/platform/change-password`**
+  - Authenticated password change endpoint.
+
+#### Independent Dual-Approval Clinical Site Participation
+Neither Government approval alone nor institutional Site PI confirmation alone activates a `StudySite`. Both must be affirmative.
+- **`POST /api/v1/platform/site-participation/request`**
+  - Initiated by Research PI / CRO. Creates `SiteParticipationRequest` (`government_status="pending"`, `site_status="pending"`, `status="requested"`).
+- **`GET /api/v1/platform/site-participation`** → `list[SiteParticipationRequestRead]` (requires Super Admin)
+- **`GET /api/v1/platform/site-participation/by-study/{study_id}`** → `list[SiteParticipationRequestRead]`
+- **`GET /api/v1/platform/site-participation/by-site/{site_id}`** → `list[SiteParticipationRequestRead]`
+- **`POST /api/v1/platform/site-participation/{request_id}/government-review`**
+  - **Payload:** `SiteParticipationDecisionReview` (`decision: "approved" | "rejected"`, `notes`)
+  - Requires Government Super Admin. Cannot be self-reviewed by requester.
+  - If both decisions become `"approved"`, atomically activates `StudySite` (`activation_status="activated"`).
+- **`POST /api/v1/platform/site-participation/{request_id}/site-response`**
+  - **Payload:** `SiteParticipationDecisionReview` (`decision: "approved" | "rejected"`, `notes`)
+  - Requires authorized institutional respondent for `site_id`. Research PI requester receives `403 Forbidden`.
+  - If both decisions become `"approved"`, atomically activates `StudySite` (`activation_status="activated"`).
+
+#### Research Team Member Verification
+- **`POST /api/v1/platform/team-invitations`**
+  - Invites team member into an organization or study. Routes to government verification queue.
+- **`GET /api/v1/platform/team-verifications`** → `list[TeamMemberVerificationRequestRead]` (requires Super Admin)
+- **`POST /api/v1/platform/team-verifications/{request_id}/review`** (requires Super Admin)
+
+#### Government Verifier Provisioning
+- **`POST /api/v1/platform/super-admin/verifiers`** (creates platform government verifier profile, requires Super Admin)
+- **`GET /api/v1/platform/super-admin/verifiers`** → `list[SuperAdminProfileRead]` (requires Super Admin)
+
+---
+
 ## 6. Server-Controlled vs Client-Controlled Fields
 
 | Entity | Client-Controlled (Editable on Create/Update) | Server-Controlled (Read-Only / Managed by Backend) |
@@ -887,6 +955,10 @@ Every API-visible enum corresponds strictly to the following string literals:
 32. **`DocumentStatus`:** `"draft"`, `"under_review"`, `"approved"`, `"superseded"`, `"expired"`, `"archived"`
 33. **`UserStatus`:** `"active"`, `"inactive"`, `"suspended"`
 34. **`ScopeLevel`:** `"system"`, `"organization"`, `"study"`, `"site"`
+35. **`AccessRequestType`:** `"research_pi"`, `"cro_staff"`, `"site_pi"`
+36. **`OnboardingRequestStatus`:** `"pending"`, `"under_review"`, `"approved"`, `"rejected"`, `"changes_requested"`
+37. **`SiteParticipationStatus`:** `"requested"`, `"pending_government_verification"`, `"pending_site_confirmation"`, `"approved"`, `"rejected"`, `"withdrawn"`
+38. **`ParticipationDecisionStatus`:** `"pending"`, `"approved"`, `"rejected"`
 
 ---
 

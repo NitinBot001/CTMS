@@ -866,6 +866,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/requests/research-pi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Research Pi Request */
+        post: operations["submit_research_pi_request_api_v1_platform_requests_research_pi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/requests/cro-staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Cro Staff Request */
+        post: operations["submit_cro_staff_request_api_v1_platform_requests_cro_staff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/requests/site-pi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Site Pi Request */
+        post: operations["submit_site_pi_request_api_v1_platform_requests_site_pi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/onboarding-requests/{request_id}": {
         parameters: {
             query?: never;
@@ -968,6 +1019,194 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/first-login-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete First Login Setup */
+        post: operations["complete_first_login_setup_api_v1_platform_first_login_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request Site Participation */
+        post: operations["request_site_participation_api_v1_platform_site_participation_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Site Participation Requests */
+        get: operations["list_site_participation_requests_api_v1_platform_site_participation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation/by-study/{study_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Study Site Participations */
+        get: operations["list_study_site_participations_api_v1_platform_site_participation_by_study__study_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation/by-site/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Site Incoming Participations */
+        get: operations["list_site_incoming_participations_api_v1_platform_site_participation_by_site__site_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation/{request_id}/government-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Site Participation Government */
+        post: operations["review_site_participation_government_api_v1_platform_site_participation__request_id__government_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/site-participation/{request_id}/site-response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Respond Site Participation Site */
+        post: operations["respond_site_participation_site_api_v1_platform_site_participation__request_id__site_response_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/team-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Team Invitation */
+        post: operations["create_team_invitation_api_v1_platform_team_invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/team-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Team Verifications */
+        get: operations["list_team_verifications_api_v1_platform_team_verifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/team-verifications/{request_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Team Verification */
+        post: operations["review_team_verification_api_v1_platform_team_verifications__request_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/super-admin/verifiers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Verifiers */
+        get: operations["list_verifiers_api_v1_platform_super_admin_verifiers_get"];
+        put?: never;
+        /** Provision New Verifier */
+        post: operations["provision_new_verifier_api_v1_platform_super_admin_verifiers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1016,6 +1255,11 @@ export interface components {
          * @enum {string}
          */
         AEStatus: "open" | "under_review" | "closed";
+        /**
+         * AccessRequestType
+         * @enum {string}
+         */
+        AccessRequestType: "research_pi" | "cro_staff" | "site_pi";
         /** ActivationRequest */
         ActivationRequest: {
             /** Token */
@@ -1228,6 +1472,48 @@ export interface components {
          * @enum {string}
          */
         CAPAType: "corrective" | "preventive";
+        /** CROStaffRequestCreate */
+        CROStaffRequestCreate: {
+            /** Applicant Name */
+            applicant_name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Designation
+             * @default Clinical Research Associate
+             */
+            designation: string | null;
+            /** Organization Name */
+            organization_name: string;
+            /** @default cro */
+            organization_type: components["schemas"]["OrganizationType"];
+            /**
+             * Requested Role
+             * @default Clinical Research Associate
+             */
+            requested_role: string;
+            /** Qualifications */
+            qualifications?: string | null;
+            /**
+             * Declaration Accepted
+             * @default true
+             */
+            declaration_accepted: boolean;
+            /** Country */
+            country?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Description */
+            description?: string | null;
+        };
         /**
          * CTRIStatus
          * @enum {string}
@@ -1423,6 +1709,17 @@ export interface components {
          * @enum {string}
          */
         Expectedness: "expected" | "unexpected";
+        /** FirstLoginSetupRequest */
+        FirstLoginSetupRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+            /** Full Name */
+            full_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1479,10 +1776,13 @@ export interface components {
         };
         /** OnboardingRequestCreate */
         OnboardingRequestCreate: {
+            /** @default research_pi */
+            request_type: components["schemas"]["AccessRequestType"];
             /** Applicant Name */
             applicant_name: string;
             /** Organization Name */
             organization_name: string;
+            /** @default sponsor */
             organization_type: components["schemas"]["OrganizationType"];
             /** Email */
             email: string;
@@ -1492,6 +1792,23 @@ export interface components {
             website?: string | null;
             /** Description */
             description?: string | null;
+            /** Designation */
+            designation?: string | null;
+            /** Qualifications */
+            qualifications?: string | null;
+            /** Requested Role */
+            requested_role?: string | null;
+            /**
+             * Declaration Accepted
+             * @default true
+             */
+            declaration_accepted: boolean;
+            /** Proposed Site Name */
+            proposed_site_name?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
             /** Country */
             country?: string | null;
             /** State */
@@ -1501,10 +1818,13 @@ export interface components {
         };
         /** OnboardingRequestRead */
         OnboardingRequestRead: {
+            /** @default research_pi */
+            request_type: components["schemas"]["AccessRequestType"];
             /** Applicant Name */
             applicant_name: string;
             /** Organization Name */
             organization_name: string;
+            /** @default sponsor */
             organization_type: components["schemas"]["OrganizationType"];
             /** Email */
             email: string;
@@ -1514,6 +1834,23 @@ export interface components {
             website?: string | null;
             /** Description */
             description?: string | null;
+            /** Designation */
+            designation?: string | null;
+            /** Qualifications */
+            qualifications?: string | null;
+            /** Requested Role */
+            requested_role?: string | null;
+            /**
+             * Declaration Accepted
+             * @default true
+             */
+            declaration_accepted: boolean;
+            /** Proposed Site Name */
+            proposed_site_name?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
             /** Country */
             country?: string | null;
             /** State */
@@ -1536,6 +1873,8 @@ export interface components {
             provisioned_organization_id?: string | null;
             /** Provisioned User Id */
             provisioned_user_id?: string | null;
+            /** Provisioned Site Id */
+            provisioned_site_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1777,6 +2116,11 @@ export interface components {
          * @enum {string}
          */
         ParticipantStatus: "screened" | "eligible" | "screen_failed" | "randomized" | "enrolled" | "active" | "completed" | "withdrawn" | "discontinued";
+        /**
+         * ParticipationDecisionStatus
+         * @enum {string}
+         */
+        ParticipationDecisionStatus: "pending" | "approved" | "rejected";
         /** PermissionRead */
         PermissionRead: {
             /**
@@ -2015,6 +2359,48 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ResearchPIRequestCreate */
+        ResearchPIRequestCreate: {
+            /** Applicant Name */
+            applicant_name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Designation
+             * @default Principal Investigator
+             */
+            designation: string | null;
+            /** Organization Name */
+            organization_name: string;
+            /** @default sponsor */
+            organization_type: components["schemas"]["OrganizationType"];
+            /**
+             * Requested Role
+             * @default Principal Investigator
+             */
+            requested_role: string;
+            /** Qualifications */
+            qualifications?: string | null;
+            /**
+             * Declaration Accepted
+             * @default true
+             */
+            declaration_accepted: boolean;
+            /** Country */
+            country?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Description */
+            description?: string | null;
+        };
         /** RoleCreate */
         RoleCreate: {
             /** Name */
@@ -2101,6 +2487,129 @@ export interface components {
             /** Activation Status */
             activation_status: string;
         };
+        /** SitePIRequestCreate */
+        SitePIRequestCreate: {
+            /** Applicant Name */
+            applicant_name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Designation
+             * @default Site Principal Investigator
+             */
+            designation: string | null;
+            /**
+             * Organization Name
+             * @default Clinical Site Institution
+             */
+            organization_name: string;
+            /** @default institution */
+            organization_type: components["schemas"]["OrganizationType"];
+            /**
+             * Requested Role
+             * @default Site Principal Investigator
+             */
+            requested_role: string;
+            /** Proposed Site Name */
+            proposed_site_name?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Qualifications */
+            qualifications?: string | null;
+            /**
+             * Declaration Accepted
+             * @default true
+             */
+            declaration_accepted: boolean;
+            /** Country */
+            country?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Description */
+            description?: string | null;
+        };
+        /** SiteParticipationDecisionReview */
+        SiteParticipationDecisionReview: {
+            decision: components["schemas"]["ParticipationDecisionStatus"];
+            /** Notes */
+            notes?: string | null;
+        };
+        /** SiteParticipationRequestCreate */
+        SiteParticipationRequestCreate: {
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** SiteParticipationRequestRead */
+        SiteParticipationRequestRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /**
+             * Requested By Id
+             * Format: uuid
+             */
+            requested_by_id: string;
+            government_status: components["schemas"]["ParticipationDecisionStatus"];
+            /** Government Reviewer Id */
+            government_reviewer_id?: string | null;
+            /** Government Reviewed At */
+            government_reviewed_at?: string | null;
+            /** Government Notes */
+            government_notes?: string | null;
+            site_status: components["schemas"]["ParticipationDecisionStatus"];
+            /** Site Reviewer Id */
+            site_reviewer_id?: string | null;
+            /** Site Reviewed At */
+            site_reviewed_at?: string | null;
+            /** Site Notes */
+            site_notes?: string | null;
+            status: components["schemas"]["SiteParticipationStatus"];
+            /** Study Site Id */
+            study_site_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SiteParticipationStatus
+         * @enum {string}
+         */
+        SiteParticipationStatus: "requested" | "pending_government_verification" | "pending_site_confirmation" | "approved" | "rejected" | "withdrawn";
         /** SiteRead */
         SiteRead: {
             /** Site Code */
@@ -2547,6 +3056,79 @@ export interface components {
             bootstrapped_at: string;
             user: components["schemas"]["UserRead"];
         };
+        /** TeamMemberInviteCreate */
+        TeamMemberInviteCreate: {
+            /** Full Name */
+            full_name: string;
+            /** Email */
+            email: string;
+            /** Requested Role */
+            requested_role: string;
+            /** Phone */
+            phone?: string | null;
+            /** Designation */
+            designation?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
+            /** Study Id */
+            study_id?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+        };
+        /** TeamMemberVerificationRequestRead */
+        TeamMemberVerificationRequestRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Invited By Id
+             * Format: uuid
+             */
+            invited_by_id: string;
+            /** Full Name */
+            full_name: string;
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /** Designation */
+            designation?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
+            /** Study Id */
+            study_id?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Requested Role */
+            requested_role: string;
+            status: components["schemas"]["OnboardingRequestStatus"];
+            /** Review Notes */
+            review_notes?: string | null;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Provisioned User Id */
+            provisioned_user_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TeamMemberVerificationReview */
+        TeamMemberVerificationReview: {
+            status: components["schemas"]["OnboardingRequestStatus"];
+            /** Review Notes */
+            review_notes?: string | null;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -2666,6 +3248,13 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerifierCreateRequest */
+        VerifierCreateRequest: {
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
         };
     };
     responses: never;
@@ -4723,7 +5312,10 @@ export interface operations {
     };
     list_onboarding_requests_api_v1_platform_onboarding_requests_get: {
         parameters: {
-            query?: never;
+            query?: {
+                request_type?: components["schemas"]["AccessRequestType"] | null;
+                status?: components["schemas"]["OnboardingRequestStatus"] | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4739,6 +5331,15 @@ export interface operations {
                     "application/json": components["schemas"]["OnboardingRequestRead"][];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     submit_onboarding_request_api_v1_platform_onboarding_requests_post: {
@@ -4751,6 +5352,105 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OnboardingRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_research_pi_request_api_v1_platform_requests_research_pi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchPIRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_cro_staff_request_api_v1_platform_requests_cro_staff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CROStaffRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_site_pi_request_api_v1_platform_requests_site_pi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SitePIRequestCreate"];
             };
         };
         responses: {
@@ -4934,6 +5634,365 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_first_login_setup_api_v1_platform_first_login_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirstLoginSetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_site_participation_api_v1_platform_site_participation_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteParticipationRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_site_participation_requests_api_v1_platform_site_participation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"][];
+                };
+            };
+        };
+    };
+    list_study_site_participations_api_v1_platform_site_participation_by_study__study_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_site_incoming_participations_api_v1_platform_site_participation_by_site__site_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_site_participation_government_api_v1_platform_site_participation__request_id__government_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteParticipationDecisionReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    respond_site_participation_site_api_v1_platform_site_participation__request_id__site_response_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteParticipationDecisionReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteParticipationRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_team_invitation_api_v1_platform_team_invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamMemberInviteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberVerificationRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_team_verifications_api_v1_platform_team_verifications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberVerificationRequestRead"][];
+                };
+            };
+        };
+    };
+    review_team_verification_api_v1_platform_team_verifications__request_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamMemberVerificationReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemberVerificationRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_verifiers_api_v1_platform_super_admin_verifiers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuperAdminProfileRead"][];
+                };
+            };
+        };
+    };
+    provision_new_verifier_api_v1_platform_super_admin_verifiers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifierCreateRequest"];
             };
         };
         responses: {

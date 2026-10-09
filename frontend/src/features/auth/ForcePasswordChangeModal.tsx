@@ -13,6 +13,8 @@ export const ForcePasswordChangeModal: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [fullName, setFullName] = useState(auth.user?.user.full_name || '')
+  const [phone, setPhone] = useState(auth.user?.user.phone || '')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -21,7 +23,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
     setError(null)
 
     if (!currentPassword) {
-      setError('Please provide your current temporary password.')
+      setError('Please provide your current temporary or bootstrap password.')
       return
     }
 
@@ -42,18 +44,20 @@ export const ForcePasswordChangeModal: React.FC = () => {
 
     setIsSubmitting(true)
     try {
-      await platformApi.changePassword({
+      await platformApi.firstLoginSetup({
         current_password: currentPassword,
         new_password: newPassword,
+        full_name: fullName.trim() || undefined,
+        phone: phone.trim() || undefined,
       })
       addToast({
         type: 'success',
-        title: 'Password Updated',
-        message: 'Your permanent password has been set successfully.',
+        title: 'Security Setup Complete',
+        message: 'Your permanent password and profile have been established.',
       })
       await auth.refreshProfile()
-    } catch (err: any) {
-      setError(err?.message || 'Failed to update password. Please check your credentials.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to complete setup. Please check your current password.')
     } finally {
       setIsSubmitting(false)
     }
@@ -68,15 +72,15 @@ export const ForcePasswordChangeModal: React.FC = () => {
               <Icon name="lock" size="sm" className="text-white" />
             </div>
             <div>
-              <h2 className="font-serif font-bold text-base leading-tight">Password Change Required</h2>
-              <p className="text-[11px] text-white/80 font-sans">First-time access credential update</p>
+              <h2 className="font-serif font-bold text-base leading-tight">First-Login Setup Required</h2>
+              <p className="text-[11px] text-white/80 font-sans">Mandatory platform security credential update</p>
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <Alert type="warning" title="Security Protocol">
-            Your account was initialized with a temporary or bootstrap credential. Platform security requires you to establish a secure permanent password before continuing.
+            Your account requires establishing a secure personal password and profile verification before accessing clinical workspaces.
           </Alert>
 
           {error && (
@@ -88,11 +92,40 @@ export const ForcePasswordChangeModal: React.FC = () => {
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-[#1C1A17] mb-1">
+                Full Name
+              </label>
+              <Input
+                name="fullName"
+                type="text"
+                placeholder="Your full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1A17] mb-1">
+                Mobile Number
+              </label>
+              <Input
+                name="phone"
+                type="text"
+                placeholder="+91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1C1A17] mb-1">
                 Current Temporary Password
               </label>
               <Input
+                name="currentPassword"
                 type="password"
-                placeholder="Enter temporary password"
+                placeholder="Enter current password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
@@ -105,6 +138,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 New Permanent Password
               </label>
               <Input
+                name="newPassword"
                 type="password"
                 placeholder="Minimum 8 characters"
                 value={newPassword}
@@ -112,9 +146,6 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 required
                 disabled={isSubmitting}
               />
-              <span className="text-[11px] text-[#726B5C] mt-0.5 block">
-                Must be at least 8 characters long.
-              </span>
             </div>
 
             <div>
@@ -122,8 +153,9 @@ export const ForcePasswordChangeModal: React.FC = () => {
                 Confirm New Password
               </label>
               <Input
+                name="confirmPassword"
                 type="password"
-                placeholder="Re-enter new password"
+                placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -132,24 +164,15 @@ export const ForcePasswordChangeModal: React.FC = () => {
             </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={auth.logout}
-              disabled={isSubmitting}
-            >
-              Sign Out
-            </Button>
+          <div className="pt-2">
             <Button
               type="submit"
               variant="primary"
-              size="sm"
+              className="w-full justify-center"
               loading={isSubmitting}
               disabled={isSubmitting}
             >
-              Set Permanent Password
+              Complete Setup & Enter Platform
             </Button>
           </div>
         </form>
@@ -157,3 +180,4 @@ export const ForcePasswordChangeModal: React.FC = () => {
     </div>
   )
 }
+export default ForcePasswordChangeModal

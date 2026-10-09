@@ -9,17 +9,22 @@
   - Formal Field Data Dictionary: `docs/CRO_SPONSOR_DATA_DICTIONARY.md` (mapping all 15 business sections & 70+ source fields)
   - ER Model & Conceptual Architecture: `docs/ER_MODEL.md`
   - Authoritative API Contract: `docs/API_CONTRACT.md` & `docs/openapi.json`
-- **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
+- **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
-  - Backend: 100% GREEN (66/66 pytest async tests passing in 147s, ruff check 0 errors, mypy 0 errors across 52 source files).
-  - API Contract: 74 total operations across 55 unique paths synchronized in `docs/openapi.json` and verified by `test_api_contract.py`.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 10s with optimized assets).
-  - Super Admin & Controlled Onboarding: Fully implemented across backend models, atomic provisioning service, security tokens, public intake form (`/request-access`), token activation view (`/activate`), mandatory password change enforcement (`ForcePasswordChangeModal`), and Super Admin Review Dashboard (`/super-admin`).
+  - Backend: 100% GREEN (86/86 pytest async tests passing in 201s, ruff check 0 errors, mypy 0 errors across 53 source files).
+  - API Contract: 69 paths synchronized in `docs/openapi.json` and verified by regression test suite.
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 24s with optimized assets).
+  - Government Verification & Dual-Approval Onboarding: Fully implemented across Layer A (Government Verifiers / Super Admin), Layer B (Research PI / CRO Staff), and Layer C (Site PI / Clinical Sites). Independent dual-approval site participation pipeline with government approval + site PI confirmation gating study site activation. Public intake (`/request-access`), token activation (`/activate`), mandatory first-login profile setup (`ForcePasswordChangeModal`), Government Verification Dashboard (`/super-admin`), Study Detail participation pipeline (`/studies/:id`), and Site Detail incoming requests queue (`/sites/:id`).
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Three-Tier Institutional Governance Model**: Separates platform authority into Layer A (Government Verification Team / Platform Super Admin), Layer B (Research PI / CRO-Side Research Team), and Layer C (Site PI / Institution and Site Personnel).
+- **Independent Dual-Approval Site Study Participation**: Neither Government approval alone nor Site PI confirmation alone activates `StudySite`. Both must be affirmative (`status="approved"`). Atomically provisions/activates `StudySite` with `activation_status="activated"` only when both decisions are recorded.
+- **Strict Authorization & Self-Review Prevention**: Reviewers cannot evaluate their own onboarding requests. Research PIs cannot confirm site study participation requests; site responses are strictly gated by site institution authorization (`403 Forbidden` for non-site personnel).
+- **Single-Use Cryptographic Invitation Tokens with Email Delivery**: Tokens generated via `secrets.token_urlsafe(32)`, stored exclusively as bcrypt hashes (work factor 12) in `invitation_tokens`, with HTTP email delivery through Resend API (`EmailService`) and safe dev fallback when `RESEND_API_KEY` is not set.
+- **Mandatory First-Login Profile & Credential Setup**: First-time login for provisioned administrators and super admins enforces password change and profile completion (`full_name`, `phone`) via `FirstLoginSetupRequest`.
 - **Platform Super Admin & Controlled Onboarding Gate**: Public organizations do not automatically gain access. New applicants submit through `/request-access`. Super Admin reviews applicants through a multi-stage state machine (`pending` -> `under_review` -> `changes_requested` / `rejected` / `approved`). Approval triggers an atomic transaction creating the organization, initial admin user, organization membership, and cryptographic invitation token.
 - **Strict Token & Password Security**: Raw invitation tokens are never stored in the database. Instead, only bcrypt hashes (work factor 12) are persisted. First-time login enforces mandatory password reset (`must_change_password: bool`) via `ForcePasswordChangeModal` before user can interact with the app.
 - **Idempotent Super Admin Bootstrap**: Initial super admin is provisioned on FastAPI startup via `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_BOOTSTRAP_PASSWORD` environment variables without duplicate records or persistent plaintext passwords.
@@ -41,6 +46,29 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-09 19:15 — AyuCTMS Government Verification, Super Admin & Research/Site Onboarding Workflow
+
+- **What**: Architected, implemented, verified, and documented the complete three-layer platform access verification and research/site onboarding system with independent dual-approval clinical site study participation.
+- **Why**: Clinical research under national governance (AIIA/SIH26046) requires independent verification of research PIs, CRO personnel, and site investigators, with clinical sites activated in studies strictly upon affirmative review by both the Government Verification Team and institutional Site PIs.
+- **How**:
+  1. **Domain Models & Migrations**: Extended `OnboardingRequest` with entry point classifications (`research_pi`, `cro_staff`, `site_pi`); created `SiteParticipationRequest` with independent `government_status` and `site_status` lifecycle columns; created `TeamMemberVerificationRequest`. Applied and verified Alembic migration `e4a1b2c3d5e6`.
+  2. **Email Delivery & Security Abstraction**: Implemented `EmailService` utilizing `httpx` to deliver transactional activation emails through Resend API (`POST https://api.resend.com/emails`) with safe dev logging fallback. Persisted only bcrypt hashes of activation tokens.
+  3. **Platform Service & REST Endpoints**: Built `PlatformService` logic for multi-entry tenant provisioning, dual-decision review transitions, atomic `_activate_study_site` execution on dual approval, team member invitation routing, verifier management, and mandatory `first_login_setup`.
+  4. **Frontend Architecture & UX**:
+     - `RequestAccessPage` (`/request-access`): Tabbed institutional entry point for Research PI, CRO Staff, and Site PI with mandatory declaration consent.
+     - `SuperAdminPage` (`/super-admin`): Multi-tab Government Verification dashboard with queues for Access Requests, Team Verifications, Site Study Participations, and Government Verifiers.
+     - `StudyDetailPage` (`/studies/:id`): Sites tab updated with dual-approval participation pipeline tracking table and "Request Clinical Site Participation" modal dialog.
+     - `SiteDetailPage` (`/sites/:id`): Incoming study participation requests table with Site PI "Review & Respond" modal allowing confirmation or rejection with recorded rationale.
+     - `ForcePasswordChangeModal`: First-login profile setup dialog.
+  5. **Type Generation & Contract Sync**: Synchronized `docs/openapi.json` (69 paths), generated TypeScript definitions in `schema.d.ts`, updated `docs/API_CONTRACT.md`, and added `.env.example`.
+- **Result**: Fully functional, secure, and strongly-typed Government Verification and Dual-Approval Site Participation workflow verified across backend and frontend with zero errors.
+- **Verified by**:
+  - `pytest tests/ -v` (backend) → `86 passed, 3 warnings in 201s` (20/20 government onboarding tests green, 12/12 contract tests green, 12/12 platform tests green, 42/42 canonical domain tests green).
+  - `ruff check app/ tests/` → `All checks passed!` (0 errors).
+  - `mypy app/` → `Success: no issues found in 53 source files`.
+  - `npm run verify` (frontend) → `0 errors, built in 23.95s` (`oxlint` 0 errors, `tsc -b` 0 errors, Vite production build clean).
+- **Files added/modified**: `backend/app/models/enums.py`, `backend/app/models/platform.py`, `backend/app/models/__init__.py`, `backend/alembic/versions/e4a1b2c3d5e6_add_government_verification_and_site_participation.py`, `backend/app/core/config.py`, `backend/app/services/email.py`, `backend/app/services/platform.py`, `backend/app/schemas/platform.py`, `backend/app/api/v1/platform.py`, `backend/tests/test_government_onboarding.py`, `docs/openapi.json`, `docs/API_CONTRACT.md`, `.env.example`, `frontend/src/api/generated/schema.d.ts`, `frontend/src/types/api.ts`, `frontend/src/api/platform.api.ts`, `frontend/src/components/status/statusUtils.ts`, `frontend/src/pages/auth/RequestAccessPage.tsx`, `frontend/src/pages/admin/SuperAdminPage.tsx`, `frontend/src/pages/studies/StudyDetailPage.tsx`, `frontend/src/pages/sites/SiteDetailPage.tsx`, `frontend/src/features/auth/ForcePasswordChangeModal.tsx`, `memory.md`.
 
 ### 2026-10-09 17:15 — Super Admin & Controlled Organization Onboarding System
 

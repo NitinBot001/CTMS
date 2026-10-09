@@ -3838,34 +3838,6 @@
       }
     },
     "/api/v1/platform/onboarding-requests": {
-      "get": {
-        "tags": [
-          "Platform & Super Admin"
-        ],
-        "summary": "List Onboarding Requests",
-        "operationId": "list_onboarding_requests_api_v1_platform_onboarding_requests_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/OnboardingRequestRead"
-                  },
-                  "type": "array",
-                  "title": "Response List Onboarding Requests Api V1 Platform Onboarding Requests Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
       "post": {
         "tags": [
           "Platform & Super Admin"
@@ -3873,10 +3845,205 @@
         "summary": "Submit Onboarding Request",
         "operationId": "submit_onboarding_request_api_v1_platform_onboarding_requests_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/OnboardingRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Onboarding Requests",
+        "operationId": "list_onboarding_requests_api_v1_platform_onboarding_requests_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AccessRequestType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Request Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OnboardingRequestStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OnboardingRequestRead"
+                  },
+                  "title": "Response List Onboarding Requests Api V1 Platform Onboarding Requests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/requests/research-pi": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Submit Research Pi Request",
+        "operationId": "submit_research_pi_request_api_v1_platform_requests_research_pi_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchPIRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/requests/cro-staff": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Submit Cro Staff Request",
+        "operationId": "submit_cro_staff_request_api_v1_platform_requests_cro_staff_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CROStaffRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/requests/site-pi": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Submit Site Pi Request",
+        "operationId": "submit_site_pi_request_api_v1_platform_requests_site_pi_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SitePIRequestCreate"
               }
             }
           },
@@ -4171,6 +4338,552 @@
         ]
       }
     },
+    "/api/v1/platform/first-login-setup": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Complete First Login Setup",
+        "operationId": "complete_first_login_setup_api_v1_platform_first_login_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirstLoginSetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/site-participation/request": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Request Site Participation",
+        "operationId": "request_site_participation_api_v1_platform_site_participation_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteParticipationRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/site-participation": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Site Participation Requests",
+        "operationId": "list_site_participation_requests_api_v1_platform_site_participation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Site Participation Requests Api V1 Platform Site Participation Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/site-participation/by-study/{study_id}": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Study Site Participations",
+        "operationId": "list_study_site_participations_api_v1_platform_site_participation_by_study__study_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                  },
+                  "title": "Response List Study Site Participations Api V1 Platform Site Participation By Study  Study Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/site-participation/by-site/{site_id}": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Site Incoming Participations",
+        "operationId": "list_site_incoming_participations_api_v1_platform_site_participation_by_site__site_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Site Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                  },
+                  "title": "Response List Site Incoming Participations Api V1 Platform Site Participation By Site  Site Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/site-participation/{request_id}/government-review": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Review Site Participation Government",
+        "operationId": "review_site_participation_government_api_v1_platform_site_participation__request_id__government_review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteParticipationDecisionReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/site-participation/{request_id}/site-response": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Respond Site Participation Site",
+        "operationId": "respond_site_participation_site_api_v1_platform_site_participation__request_id__site_response_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteParticipationDecisionReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteParticipationRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/team-invitations": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Create Team Invitation",
+        "operationId": "create_team_invitation_api_v1_platform_team_invitations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamMemberInviteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMemberVerificationRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/team-verifications": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Team Verifications",
+        "operationId": "list_team_verifications_api_v1_platform_team_verifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TeamMemberVerificationRequestRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Team Verifications Api V1 Platform Team Verifications Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/team-verifications/{request_id}/review": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Review Team Verification",
+        "operationId": "review_team_verification_api_v1_platform_team_verifications__request_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamMemberVerificationReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMemberVerificationRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/super-admin/verifiers": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Verifiers",
+        "operationId": "list_verifiers_api_v1_platform_super_admin_verifiers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuperAdminProfileRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Verifiers Api V1 Platform Super Admin Verifiers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Provision New Verifier",
+        "operationId": "provision_new_verifier_api_v1_platform_super_admin_verifiers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifierCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -4231,6 +4944,15 @@
           "closed"
         ],
         "title": "AEStatus"
+      },
+      "AccessRequestType": {
+        "type": "string",
+        "enum": [
+          "research_pi",
+          "cro_staff",
+          "site_pi"
+        ],
+        "title": "AccessRequestType"
       },
       "ActivationRequest": {
         "properties": {
@@ -4886,6 +5608,144 @@
         ],
         "title": "CAPAType"
       },
+      "CROStaffRequestCreate": {
+        "properties": {
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation",
+            "default": "Clinical Research Associate"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType",
+            "default": "cro"
+          },
+          "requested_role": {
+            "type": "string",
+            "title": "Requested Role",
+            "default": "Clinical Research Associate"
+          },
+          "qualifications": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifications"
+          },
+          "declaration_accepted": {
+            "type": "boolean",
+            "title": "Declaration Accepted",
+            "default": true
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicant_name",
+          "email",
+          "organization_name"
+        ],
+        "title": "CROStaffRequestCreate"
+      },
       "CTRIStatus": {
         "type": "string",
         "enum": [
@@ -5489,6 +6349,47 @@
         ],
         "title": "Expectedness"
       },
+      "FirstLoginSetupRequest": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "New Password"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "FirstLoginSetupRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5625,6 +6526,10 @@
       },
       "OnboardingRequestCreate": {
         "properties": {
+          "request_type": {
+            "$ref": "#/components/schemas/AccessRequestType",
+            "default": "research_pi"
+          },
           "applicant_name": {
             "type": "string",
             "title": "Applicant Name"
@@ -5634,7 +6539,8 @@
             "title": "Organization Name"
           },
           "organization_type": {
-            "$ref": "#/components/schemas/OrganizationType"
+            "$ref": "#/components/schemas/OrganizationType",
+            "default": "sponsor"
           },
           "email": {
             "type": "string",
@@ -5672,6 +6578,79 @@
               }
             ],
             "title": "Description"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation"
+          },
+          "qualifications": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifications"
+          },
+          "requested_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Role"
+          },
+          "declaration_accepted": {
+            "type": "boolean",
+            "title": "Declaration Accepted",
+            "default": true
+          },
+          "proposed_site_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Site Name"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
           },
           "country": {
             "anyOf": [
@@ -5711,13 +6690,16 @@
         "required": [
           "applicant_name",
           "organization_name",
-          "organization_type",
           "email"
         ],
         "title": "OnboardingRequestCreate"
       },
       "OnboardingRequestRead": {
         "properties": {
+          "request_type": {
+            "$ref": "#/components/schemas/AccessRequestType",
+            "default": "research_pi"
+          },
           "applicant_name": {
             "type": "string",
             "title": "Applicant Name"
@@ -5727,7 +6709,8 @@
             "title": "Organization Name"
           },
           "organization_type": {
-            "$ref": "#/components/schemas/OrganizationType"
+            "$ref": "#/components/schemas/OrganizationType",
+            "default": "sponsor"
           },
           "email": {
             "type": "string",
@@ -5765,6 +6748,79 @@
               }
             ],
             "title": "Description"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation"
+          },
+          "qualifications": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifications"
+          },
+          "requested_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Role"
+          },
+          "declaration_accepted": {
+            "type": "boolean",
+            "title": "Declaration Accepted",
+            "default": true
+          },
+          "proposed_site_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Site Name"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
           },
           "country": {
             "anyOf": [
@@ -5866,6 +6922,18 @@
             ],
             "title": "Provisioned User Id"
           },
+          "provisioned_site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned Site Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -5881,7 +6949,6 @@
         "required": [
           "applicant_name",
           "organization_name",
-          "organization_type",
           "email",
           "id",
           "status",
@@ -6616,6 +7683,15 @@
         ],
         "title": "ParticipantStatus"
       },
+      "ParticipationDecisionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "title": "ParticipationDecisionStatus"
+      },
       "PermissionRead": {
         "properties": {
           "id": {
@@ -7242,6 +8318,144 @@
         ],
         "title": "RegulatorySubmissionRead"
       },
+      "ResearchPIRequestCreate": {
+        "properties": {
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation",
+            "default": "Principal Investigator"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType",
+            "default": "sponsor"
+          },
+          "requested_role": {
+            "type": "string",
+            "title": "Requested Role",
+            "default": "Principal Investigator"
+          },
+          "qualifications": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifications"
+          },
+          "declaration_accepted": {
+            "type": "boolean",
+            "title": "Declaration Accepted",
+            "default": true
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicant_name",
+          "email",
+          "organization_name"
+        ],
+        "title": "ResearchPIRequestCreate"
+      },
       "RoleCreate": {
         "properties": {
           "name": {
@@ -7520,6 +8734,359 @@
           "activation_status"
         ],
         "title": "SiteEnrollmentItem"
+      },
+      "SitePIRequestCreate": {
+        "properties": {
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation",
+            "default": "Site Principal Investigator"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name",
+            "default": "Clinical Site Institution"
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType",
+            "default": "institution"
+          },
+          "requested_role": {
+            "type": "string",
+            "title": "Requested Role",
+            "default": "Site Principal Investigator"
+          },
+          "proposed_site_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Site Name"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "qualifications": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifications"
+          },
+          "declaration_accepted": {
+            "type": "boolean",
+            "title": "Declaration Accepted",
+            "default": true
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicant_name",
+          "email"
+        ],
+        "title": "SitePIRequestCreate"
+      },
+      "SiteParticipationDecisionReview": {
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ParticipationDecisionStatus"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "SiteParticipationDecisionReview"
+      },
+      "SiteParticipationRequestCreate": {
+        "properties": {
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Site Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "study_id",
+          "site_id"
+        ],
+        "title": "SiteParticipationRequestCreate"
+      },
+      "SiteParticipationRequestRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Site Id"
+          },
+          "requested_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By Id"
+          },
+          "government_status": {
+            "$ref": "#/components/schemas/ParticipationDecisionStatus"
+          },
+          "government_reviewer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Government Reviewer Id"
+          },
+          "government_reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Government Reviewed At"
+          },
+          "government_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Government Notes"
+          },
+          "site_status": {
+            "$ref": "#/components/schemas/ParticipationDecisionStatus"
+          },
+          "site_reviewer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Reviewer Id"
+          },
+          "site_reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Reviewed At"
+          },
+          "site_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Notes"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SiteParticipationStatus"
+          },
+          "study_site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Site Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_id",
+          "site_id",
+          "requested_by_id",
+          "government_status",
+          "site_status",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SiteParticipationRequestRead"
+      },
+      "SiteParticipationStatus": {
+        "type": "string",
+        "enum": [
+          "requested",
+          "pending_government_verification",
+          "pending_site_confirmation",
+          "approved",
+          "rejected",
+          "withdrawn"
+        ],
+        "title": "SiteParticipationStatus"
       },
       "SiteRead": {
         "properties": {
@@ -9014,6 +10581,266 @@
         ],
         "title": "SuperAdminProfileRead"
       },
+      "TeamMemberInviteCreate": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "requested_role": {
+            "type": "string",
+            "title": "Requested Role"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "full_name",
+          "email",
+          "requested_role"
+        ],
+        "title": "TeamMemberInviteCreate"
+      },
+      "TeamMemberVerificationRequestRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "invited_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Invited By Id"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "designation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Designation"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "requested_role": {
+            "type": "string",
+            "title": "Requested Role"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OnboardingRequestStatus"
+          },
+          "review_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Notes"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "provisioned_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "invited_by_id",
+          "full_name",
+          "email",
+          "requested_role",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TeamMemberVerificationRequestRead"
+      },
+      "TeamMemberVerificationReview": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OnboardingRequestStatus"
+          },
+          "review_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "TeamMemberVerificationReview"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -9336,6 +11163,24 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerifierCreateRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "full_name"
+        ],
+        "title": "VerifierCreateRequest"
       }
     },
     "securitySchemes": {

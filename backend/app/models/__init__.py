@@ -10,7 +10,11 @@ from app.models.document import Document
 from app.models.enums import *
 from app.models.organization import OnboardingApplication, Organization, OrganizationMember
 from app.models.participant import Participant
-from app.models.platform import OnboardingRequest
+from app.models.platform import (
+    OnboardingRequest,
+    SiteParticipationRequest,
+    TeamMemberVerificationRequest,
+)
 from app.models.progress import StudyMilestone
 from app.models.safety import AdverseEvent
 from app.models.site import Site, StudySite
@@ -50,4 +54,6 @@ __all__ = [
     "Document",
     "AuditLog",
     "OnboardingRequest",
+    "SiteParticipationRequest",
+    "TeamMemberVerificationRequest",
 ]

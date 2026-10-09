@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     SUPER_ADMIN_EMAIL: str = ""
     SUPER_ADMIN_BOOTSTRAP_PASSWORD: str = ""
     SUPER_ADMIN_ACTIVATION_MODE: str = "bootstrap_password"
-    # Email
+    # Email & Resend
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "onboarding@resend.dev"
+    APP_BASE_URL: str = "http://localhost:5173"
     MAIL_ENABLED: bool = False
     MAIL_FROM: str = "noreply@ayuctms.example"
     SMTP_HOST: str = "localhost"
