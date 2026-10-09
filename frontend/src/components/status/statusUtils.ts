@@ -7,7 +7,7 @@ export function getStatusCategory(status: string | null | undefined): StatusCate
   if (['active', 'approved', 'activated', 'completed', 'verified', 'resolved', 'enrolled', 'eligible', 'registered'].includes(s)) {
     return 'success'
   }
-  if (['pending', 'under_review', 'in_progress', 'conditional', 'initiated', 'submitted', 'reported', 'randomized'].includes(s)) {
+  if (['pending', 'under_review', 'in_progress', 'conditional', 'initiated', 'submitted', 'reported', 'randomized', 'changes_requested'].includes(s)) {
     return 'warning'
   }
   if (['suspended', 'terminated', 'rejected', 'expired', 'screen_failed', 'discontinued', 'withdrawn'].includes(s)) {

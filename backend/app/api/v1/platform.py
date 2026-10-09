@@ -134,12 +134,17 @@ async def approve_onboarding_request(
         raise HTTPException(status_code=404, detail="Request not found")
         
     if request.status == OnboardingRequestStatus.approved:
+        if not request.provisioned_organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Request marked approved but provisioned_organization_id is missing",
+            )
         # Already approved, idempotent response
         return ProvisionResult(
             organization_id=request.provisioned_organization_id,
             user_email=request.email,
             invitation_sent=False,
-            raw_token=None
+            raw_token=None,
         )
         
     if request.status != OnboardingRequestStatus.under_review:

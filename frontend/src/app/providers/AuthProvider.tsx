@@ -95,6 +95,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isAuthenticated: !!user && !!token,
         isLoading,
+        isSuperAdmin: Boolean(user?.is_super_admin),
+        mustChangePassword: Boolean(user?.user?.must_change_password),
         login,
         logout,
         refreshProfile,

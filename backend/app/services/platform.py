@@ -4,17 +4,21 @@ import datetime
 import logging
 import secrets
 import smtplib
-from email.message import EmailMessage
 import uuid
-import bcrypt
+from email.message import EmailMessage
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.core.security import hash_password, verify_password
-from app.models.enums import AssignmentStatus, OnboardingRequestStatus, OrganizationStatus, ScopeLevel, UserStatus
+from app.models.enums import (
+    AssignmentStatus,
+    OnboardingRequestStatus,
+    OrganizationStatus,
+    ScopeLevel,
+    UserStatus,
+)
 from app.models.organization import Organization, OrganizationMember
 from app.models.platform import OnboardingRequest
 from app.models.user import InvitationToken, Role, SuperAdminProfile, User
@@ -62,7 +66,7 @@ class PlatformService:
     async def is_super_admin(user: User, db: AsyncSession) -> bool:
         stmt = select(SuperAdminProfile).where(
             SuperAdminProfile.user_id == user.id,
-            SuperAdminProfile.is_active == True
+            SuperAdminProfile.is_active.is_(True)
         )
         res = await db.execute(stmt)
         return res.scalars().first() is not None
@@ -89,7 +93,7 @@ class PlatformService:
     async def verify_and_consume_invitation_token(raw_token: str, db: AsyncSession) -> InvitationToken | None:
         now = datetime.datetime.now(datetime.UTC)
         stmt = select(InvitationToken).where(
-            InvitationToken.is_used == False,
+            InvitationToken.is_used.is_(False),
             InvitationToken.expires_at > now
         ).order_by(InvitationToken.created_at.desc()).limit(10)
         

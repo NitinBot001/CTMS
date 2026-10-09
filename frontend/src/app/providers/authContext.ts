@@ -6,6 +6,8 @@ export interface AuthContextType {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  isSuperAdmin: boolean
+  mustChangePassword: boolean
   login: (credentials: LoginRequest) => Promise<void>
   logout: () => void
   refreshProfile: () => Promise<void>

@@ -52,7 +52,7 @@ class User(BaseModel):
         back_populates="reviewer"
     )
     capas_assigned: Mapped[list[CAPARecord]] = relationship(back_populates="assignee")
-    super_admin_profile: Mapped["SuperAdminProfile"] = relationship(back_populates="user", uselist=False)
+    super_admin_profile: Mapped[SuperAdminProfile] = relationship(back_populates="user", uselist=False)
 
 
 class Role(BaseModel):

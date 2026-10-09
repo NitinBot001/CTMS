@@ -95,5 +95,6 @@ class UserProfileRead(BaseModel):
     user: UserRead
     permissions: list[str]
     is_system_admin: bool
+    is_super_admin: bool = False
     memberships: list[UserMembershipDetail]
 

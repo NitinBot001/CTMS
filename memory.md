@@ -9,17 +9,20 @@
   - Formal Field Data Dictionary: `docs/CRO_SPONSOR_DATA_DICTIONARY.md` (mapping all 15 business sections & 70+ source fields)
   - ER Model & Conceptual Architecture: `docs/ER_MODEL.md`
   - Authoritative API Contract: `docs/API_CONTRACT.md` & `docs/openapi.json`
-- **Database**: Async SQLite / PostgreSQL compatible. Alembic initial schema migration `35f75b6f0684` fully verified for reproducibility from empty DB. Benchmark seed data in `backend/scripts/seed.py`.
+- **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
-  - Backend: 100% GREEN (54/54 pytest async tests passing in 132s, ruff check 0 errors, mypy 0 errors across 48 source files).
-  - API Contract: FROZEN & HARDENED (66 total endpoints mapped with strongly typed schemas).
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean with optimized assets).
-  - Component Hierarchy: Design Tokens → UI Primitives → Feedback/Status → Layout/Navigation → Data Display → Domain Components → Feature Modals → Page Views → App Shell & Protected Router.
+  - Backend: 100% GREEN (66/66 pytest async tests passing in 147s, ruff check 0 errors, mypy 0 errors across 52 source files).
+  - API Contract: 74 total operations across 55 unique paths synchronized in `docs/openapi.json` and verified by `test_api_contract.py`.
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 10s with optimized assets).
+  - Super Admin & Controlled Onboarding: Fully implemented across backend models, atomic provisioning service, security tokens, public intake form (`/request-access`), token activation view (`/activate`), mandatory password change enforcement (`ForcePasswordChangeModal`), and Super Admin Review Dashboard (`/super-admin`).
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Platform Super Admin & Controlled Onboarding Gate**: Public organizations do not automatically gain access. New applicants submit through `/request-access`. Super Admin reviews applicants through a multi-stage state machine (`pending` -> `under_review` -> `changes_requested` / `rejected` / `approved`). Approval triggers an atomic transaction creating the organization, initial admin user, organization membership, and cryptographic invitation token.
+- **Strict Token & Password Security**: Raw invitation tokens are never stored in the database. Instead, only bcrypt hashes (work factor 12) are persisted. First-time login enforces mandatory password reset (`must_change_password: bool`) via `ForcePasswordChangeModal` before user can interact with the app.
+- **Idempotent Super Admin Bootstrap**: Initial super admin is provisioned on FastAPI startup via `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_BOOTSTRAP_PASSWORD` environment variables without duplicate records or persistent plaintext passwords.
 - **Strict Implementation Fidelity to Backend API Contract**: Frontend consumes exact `/api/v1` routes and schemas derived from `docs/openapi.json`. Zero invented endpoints, parameters, or synthetic envelopes. Direct array collections consumed without artificial wrapping. State transitions use `POST .../transition` with `{ new_status: string, reason?: string | null }`.
 - **Clinical Design System Tokens (Academic/Editorial Warm Palette)**: Standardized on Paper Tint (`#F8F6F2`), Card Ivory (`#FFFFFF`), Border Parchment (`#E4DED3`), Header Deep Rust (`#7A2A12`), Accent Ochre (`#B8862E`), Text Charcoal (`#1C1A17`), and Muted Slate (`#726B5C`), with standard status colors for clinical workflows.
 - **Full Separation of Concerns & Deep Componentization**: Zero monolithic files. Features structured into Primitives (`Button`, `Icon`, `Typography`, `Surface`, `Layout`), Feedback (`Alert`, `EmptyState`, `ErrorState`, `LoadingState`, `ProgressBar`, `Skeleton`, `Spinner`, `StatusBadge`, `TransitionDialog`), Overlays (`Dialog`, `ConfirmDialog`), Data Display (`Card`, `Table`, `DataTable`), Navigation (`Breadcrumb`, `Tabs`, `Sidebar`, `Topbar`), Domain Modals (`OrganizationModal`, `SiteModal`, `ParticipantModal`, `AdverseEventModal`), and Domain Pages.
@@ -38,6 +41,30 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-09 17:15 — Super Admin & Controlled Organization Onboarding System
+
+- **What**: Engineered end-to-end Platform Super Admin system and controlled organization onboarding workflow across backend models, services, security boundaries, and React 19 frontend views.
+- **Why**: Deliver a platform-governed onboarding architecture where new trial organizations require verification and approval by Platform Super Admins before obtaining workspace access, with zero credentials emailed in plaintext.
+- **How**:
+  1. **Backend Models & Enums**: Created `SuperAdminProfile`, `InvitationToken`, `OnboardingRequest` models; added `OnboardingRequestStatus` enum and `must_change_password`, `password_changed_at`, `last_login_at` fields to `User`. Added Alembic migration `dd212c6996cd`.
+  2. **Platform Service & Security**: Built `PlatformService` with idempotent startup bootstrap (`ensure_super_admin_bootstrapped`), secure bcrypt-hashed activation token generation (rounds=12), atomic multi-record tenant provisioning (`provision_organization_from_request`), and email simulation.
+  3. **Platform API Router (`/api/v1/platform`)**: Implemented 8 REST endpoints covering anonymous intake (`POST /platform/onboarding-requests`), Super Admin request directory (`GET /platform/onboarding-requests`), status review state machine (`PATCH .../review`), atomic tenant provisioning (`POST .../approve`), account activation (`POST /platform/activate`), password update (`POST /platform/change-password`), and profile check (`GET /platform/super-admin/me`).
+  4. **OpenAPI & Types**: Synchronized `docs/openapi.json` (74 operations across 55 paths) and regenerated frontend types in `src/api/generated/schema.d.ts`.
+  5. **Frontend API Client & Context**: Created `platform.api.ts` module; augmented `AuthContext` with `isSuperAdmin` and `mustChangePassword` helpers.
+  6. **Security Modals & Public Pages**:
+     - `ForcePasswordChangeModal`: Mandatory, undismissable credential update dialog for first-login users.
+     - `RequestAccessPage` (`/request-access`): Clean institutional intake form with organizational classifications and contact details. Added entry link on `LoginPage`.
+     - `AccountActivationPage` (`/activate`): Token validation, password establishment, and direct link to sign in.
+     - `SuperAdminPage` (`/super-admin`): Metrics cards, filter tabs by status, search, interactive review drawer, state transitions, atomic approval trigger, and dev-mode activation link generator with copy button.
+     - `Sidebar`: Dynamic Platform Control section for Super Admins.
+- **Result**: Fully functioning, securely gated Super Admin & Controlled Onboarding system verified 100% green across both backend and frontend.
+- **Verified by**:
+  - `pytest tests/ -v` (backend) → `66 passed, 3 warnings in 147.99s` (12/12 platform tests green, 12/12 contract tests green).
+  - `ruff check app/ tests/` → `All checks passed!`
+  - `mypy app/` → `Success: no issues found in 52 source files`.
+  - `npm run verify` (frontend) → `0 errors, built in 10.14s` (`oxlint` 0 errors, `tsc -b` 0 errors, Vite production build clean).
+- **Files added/modified**: `backend/app/models/platform.py`, `backend/app/models/user.py`, `backend/app/models/enums.py`, `backend/app/schemas/platform.py`, `backend/app/schemas/user.py`, `backend/app/services/platform.py`, `backend/app/api/v1/platform.py`, `backend/app/api/v1/auth.py`, `backend/tests/test_platform.py`, `backend/tests/test_api_contract.py`, `docs/openapi.json`, `frontend/src/api/platform.api.ts`, `frontend/src/features/auth/ForcePasswordChangeModal.tsx`, `frontend/src/pages/admin/SuperAdminPage.tsx`, `frontend/src/pages/auth/RequestAccessPage.tsx`, `frontend/src/pages/auth/AccountActivationPage.tsx`, `frontend/src/pages/auth/LoginPage.tsx`, `frontend/src/components/navigation/Sidebar.tsx`, `frontend/src/components/layout/AppShell.tsx`, `frontend/src/app/router/AppRouter.tsx`, `memory.md`.
 
 ### 2026-10-05 21:15 — Frontend Master Implementation (CRO / Sponsor Foundation)
 

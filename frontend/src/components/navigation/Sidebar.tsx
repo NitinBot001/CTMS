@@ -55,6 +55,7 @@ export interface SidebarProps {
   mobileOpen?: boolean
   onCloseMobile?: () => void
   userPermissions?: string[]
+  isSuperAdmin?: boolean
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -63,8 +64,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen = false,
   onCloseMobile,
   userPermissions = [],
+  isSuperAdmin = false,
 }) => {
   const location = useLocation()
+
+  const sections = React.useMemo(() => {
+    const list = [...navSections]
+    if (isSuperAdmin) {
+      list.push({
+        title: 'Platform Control',
+        items: [
+          { label: 'Super Admin', path: '/super-admin', icon: 'shieldCheck' },
+        ],
+      })
+    }
+    return list
+  }, [isSuperAdmin])
 
   const hasPermission = (permission?: string) => {
     if (!permission) return true
@@ -133,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Section Items */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-          {navSections.map((section) => {
+          {sections.map((section) => {
             const visibleItems = section.items.filter((item) => hasPermission(item.permission))
             if (visibleItems.length === 0) return null
 

@@ -34,7 +34,22 @@ export const LoginPage: React.FC = () => {
 
           <LoginForm />
 
-          <div className="mt-6 pt-4 border-t border-[#E4DED3] text-center">
+          <div className="mt-5 pt-4 border-t border-[#E4DED3] space-y-2 text-center text-xs">
+            <p className="text-[#726B5C]">
+              New clinical organization or sponsor?{' '}
+              <a href="/request-access" className="font-semibold text-[#7A2A12] hover:underline">
+                Request Platform Access
+              </a>
+            </p>
+            <p className="text-[11px] text-[#726B5C]">
+              Received an invitation?{' '}
+              <a href="/activate" className="font-medium text-[#B8862E] hover:underline">
+                Activate Account
+              </a>
+            </p>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[#E4DED3] text-center">
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#726B5C]">
               <Icon name="shield" size="xs" className="text-[#1F5C3F]" />
               <span>21 CFR Part 11 &amp; CDSCO Schedule Y Compliant Audit</span>

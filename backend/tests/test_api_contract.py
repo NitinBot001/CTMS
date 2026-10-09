@@ -102,11 +102,20 @@ EXPECTED_ENDPOINTS = [
     ("POST", "/api/v1/roles"),
     ("GET", "/api/v1/roles"),
     ("GET", "/api/v1/permissions"),
+    # Platform & Super Admin (8)
+    ("POST", "/api/v1/platform/onboarding-requests"),
+    ("GET", "/api/v1/platform/onboarding-requests"),
+    ("GET", "/api/v1/platform/onboarding-requests/{request_id}"),
+    ("PATCH", "/api/v1/platform/onboarding-requests/{request_id}/review"),
+    ("POST", "/api/v1/platform/onboarding-requests/{request_id}/approve"),
+    ("POST", "/api/v1/platform/activate"),
+    ("GET", "/api/v1/platform/super-admin/me"),
+    ("POST", "/api/v1/platform/change-password"),
 ]
 
 
 def test_openapi_schema_matches_exact_endpoint_count():
-    """Validates that FastAPI's OpenAPI document exports all 48 unique route paths and 66 operations."""
+    """Validates that FastAPI's OpenAPI document exports all 55 unique route paths and 74 operations."""
     schema = app.openapi()
     assert schema["openapi"].startswith("3.")
     assert schema["info"]["title"] == "AyuCTMS"

@@ -2,11 +2,12 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+
+from app.core.security import create_access_token, hash_password
 from app.models.enums import OnboardingRequestStatus, UserStatus
 from app.models.platform import OnboardingRequest
-from app.models.user import User, SuperAdminProfile
-from app.core.security import hash_password, create_access_token
+from app.models.user import SuperAdminProfile, User
+
 
 @pytest_asyncio.fixture
 async def super_admin_user(db_session: AsyncSession) -> User:

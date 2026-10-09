@@ -5,6 +5,8 @@ import { AppShell } from '@/components/layout/AppShell'
 
 // Pages
 import { LoginPage } from '@/pages/auth/LoginPage'
+import { RequestAccessPage } from '@/pages/auth/RequestAccessPage'
+import { AccountActivationPage } from '@/pages/auth/AccountActivationPage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { OrganizationListPage } from '@/pages/organizations/OrganizationListPage'
 import { OrganizationDetailPage } from '@/pages/organizations/OrganizationDetailPage'
@@ -21,6 +23,7 @@ import { CompliancePage } from '@/pages/compliance/CompliancePage'
 import { DocumentListPage } from '@/pages/documents/DocumentListPage'
 import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 import { AdminPage } from '@/pages/admin/AdminPage'
+import { SuperAdminPage } from '@/pages/admin/SuperAdminPage'
 import { NotFoundPage } from '@/pages/error/NotFoundPage'
 
 export const AppRouter: React.FC = () => {
@@ -29,6 +32,8 @@ export const AppRouter: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/request-access" element={<RequestAccessPage />} />
+        <Route path="/activate" element={<AccountActivationPage />} />
 
         {/* Protected Application Routes */}
         <Route element={<ProtectedRoute />}>
@@ -64,6 +69,7 @@ export const AppRouter: React.FC = () => {
             {/* Audit & Administration */}
             <Route path="/audit" element={<AuditLogPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/super-admin" element={<SuperAdminPage />} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFoundPage />} />

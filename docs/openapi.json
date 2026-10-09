@@ -3837,6 +3837,340 @@
         ]
       }
     },
+    "/api/v1/platform/onboarding-requests": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "List Onboarding Requests",
+        "operationId": "list_onboarding_requests_api_v1_platform_onboarding_requests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OnboardingRequestRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Onboarding Requests Api V1 Platform Onboarding Requests Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Submit Onboarding Request",
+        "operationId": "submit_onboarding_request_api_v1_platform_onboarding_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/onboarding-requests/{request_id}": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Get Onboarding Request",
+        "operationId": "get_onboarding_request_api_v1_platform_onboarding_requests__request_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/onboarding-requests/{request_id}/review": {
+      "patch": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Review Onboarding Request",
+        "operationId": "review_onboarding_request_api_v1_platform_onboarding_requests__request_id__review_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRequestReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRequestRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/onboarding-requests/{request_id}/approve": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Approve Onboarding Request",
+        "operationId": "approve_onboarding_request_api_v1_platform_onboarding_requests__request_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/activate": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Activate Account",
+        "operationId": "activate_account_api_v1_platform_activate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/super-admin/me": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Get Super Admin Profile",
+        "operationId": "get_super_admin_profile_api_v1_platform_super_admin_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminProfileRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/change-password": {
+      "post": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_v1_platform_change_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3897,6 +4231,43 @@
           "closed"
         ],
         "title": "AEStatus"
+      },
+      "ActivationRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "ActivationRequest"
+      },
+      "ActivationResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "email"
+        ],
+        "title": "ActivationResponse"
       },
       "AdverseEventCreate": {
         "properties": {
@@ -4534,6 +4905,25 @@
           "definite"
         ],
         "title": "Causality"
+      },
+      "ChangePasswordRequest": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest"
       },
       "ContractStatus": {
         "type": "string",
@@ -5232,6 +5622,307 @@
           "updated_at"
         ],
         "title": "OnboardingApplicationRead"
+      },
+      "OnboardingRequestCreate": {
+        "properties": {
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicant_name",
+          "organization_name",
+          "organization_type",
+          "email"
+        ],
+        "title": "OnboardingRequestCreate"
+      },
+      "OnboardingRequestRead": {
+        "properties": {
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "organization_name": {
+            "type": "string",
+            "title": "Organization Name"
+          },
+          "organization_type": {
+            "$ref": "#/components/schemas/OrganizationType"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OnboardingRequestStatus"
+          },
+          "review_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Notes"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "provisioned_organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned Organization Id"
+          },
+          "provisioned_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applicant_name",
+          "organization_name",
+          "organization_type",
+          "email",
+          "id",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "OnboardingRequestRead"
+      },
+      "OnboardingRequestReview": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OnboardingRequestStatus"
+          },
+          "review_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "OnboardingRequestReview"
+      },
+      "OnboardingRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "under_review",
+          "approved",
+          "rejected",
+          "changes_requested"
+        ],
+        "title": "OnboardingRequestStatus"
       },
       "OnboardingStatus": {
         "type": "string",
@@ -6360,6 +7051,41 @@
           "updated_at"
         ],
         "title": "ProtocolDeviationRead"
+      },
+      "ProvisionResult": {
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Organization Id"
+          },
+          "user_email": {
+            "type": "string",
+            "title": "User Email"
+          },
+          "invitation_sent": {
+            "type": "boolean",
+            "title": "Invitation Sent"
+          },
+          "raw_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "user_email",
+          "invitation_sent"
+        ],
+        "title": "ProvisionResult"
       },
       "RegulatoryStatus": {
         "type": "string",
@@ -8259,6 +8985,35 @@
         "type": "object",
         "title": "StudyUpdate"
       },
+      "SuperAdminProfileRead": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "bootstrapped_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bootstrapped At"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "is_active",
+          "bootstrapped_at",
+          "user"
+        ],
+        "title": "SuperAdminProfileRead"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -8455,6 +9210,11 @@
             "type": "boolean",
             "title": "Is System Admin"
           },
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin",
+            "default": false
+          },
           "memberships": {
             "items": {
               "$ref": "#/components/schemas/UserMembershipDetail"
@@ -8500,6 +9260,11 @@
           },
           "status": {
             "$ref": "#/components/schemas/UserStatus"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           },
           "created_at": {
             "type": "string",

@@ -10,12 +10,19 @@ from app.models.document import Document
 from app.models.enums import *
 from app.models.organization import OnboardingApplication, Organization, OrganizationMember
 from app.models.participant import Participant
+from app.models.platform import OnboardingRequest
 from app.models.progress import StudyMilestone
 from app.models.safety import AdverseEvent
 from app.models.site import Site, StudySite
 from app.models.study import Study, StudyTeamMember
-from app.models.user import Permission, Role, RolePermission, User, SuperAdminProfile, InvitationToken
-from app.models.platform import OnboardingRequest
+from app.models.user import (
+    InvitationToken,
+    Permission,
+    Role,
+    RolePermission,
+    SuperAdminProfile,
+    User,
+)
 
 __all__ = [
     "Base",

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '@/components/navigation/Sidebar'
 import { Topbar } from '@/components/navigation/Topbar'
+import { ForcePasswordChangeModal } from '@/features/auth/ForcePasswordChangeModal'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { UserProfileRead } from '@/types/api'
@@ -29,6 +30,9 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   return (
     <div className="min-h-screen bg-[#F8F6F2] flex flex-col font-sans">
+      {/* Forced Password Change Modal for first-time / bootstrap credentials */}
+      {auth.mustChangePassword && <ForcePasswordChangeModal />}
+
       {/* Sidebar */}
       <Sidebar
         collapsed={collapsed}
@@ -36,6 +40,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
         userPermissions={currentPermissions}
+        isSuperAdmin={auth.isSuperAdmin}
       />
 
       {/* Main Content Area */}
@@ -60,3 +65,4 @@ export const AppShell: React.FC<AppShellProps> = ({
     </div>
   )
 }
+

@@ -95,9 +95,13 @@ async def get_my_profile(
     perms = sorted(get_user_permissions(current_user))
     sys_admin = is_system_admin(current_user)
 
+    from app.services.platform import PlatformService
+    super_admin = await PlatformService.is_super_admin(current_user, db)
+
     return UserProfileRead(
         user=UserRead.model_validate(current_user),
         permissions=perms,
         is_system_admin=sys_admin,
+        is_super_admin=super_admin,
         memberships=membership_details,
     )

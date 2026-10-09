@@ -848,6 +848,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/onboarding-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Onboarding Requests */
+        get: operations["list_onboarding_requests_api_v1_platform_onboarding_requests_get"];
+        put?: never;
+        /** Submit Onboarding Request */
+        post: operations["submit_onboarding_request_api_v1_platform_onboarding_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/onboarding-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Onboarding Request */
+        get: operations["get_onboarding_request_api_v1_platform_onboarding_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/onboarding-requests/{request_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Review Onboarding Request */
+        patch: operations["review_onboarding_request_api_v1_platform_onboarding_requests__request_id__review_patch"];
+        trace?: never;
+    };
+    "/api/v1/platform/onboarding-requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Onboarding Request */
+        post: operations["approve_onboarding_request_api_v1_platform_onboarding_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Account */
+        post: operations["activate_account_api_v1_platform_activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/super-admin/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Super Admin Profile */
+        get: operations["get_super_admin_profile_api_v1_platform_super_admin_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_api_v1_platform_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -896,6 +1016,20 @@ export interface components {
          * @enum {string}
          */
         AEStatus: "open" | "under_review" | "closed";
+        /** ActivationRequest */
+        ActivationRequest: {
+            /** Token */
+            token: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** ActivationResponse */
+        ActivationResponse: {
+            /** Message */
+            message: string;
+            /** Email */
+            email: string;
+        };
         /** AdverseEventCreate */
         AdverseEventCreate: {
             /**
@@ -1104,6 +1238,13 @@ export interface components {
          * @enum {string}
          */
         Causality: "unrelated" | "unlikely" | "possible" | "probable" | "definite";
+        /** ChangePasswordRequest */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
         /**
          * ContractStatus
          * @enum {string}
@@ -1336,6 +1477,87 @@ export interface components {
              */
             updated_at: string;
         };
+        /** OnboardingRequestCreate */
+        OnboardingRequestCreate: {
+            /** Applicant Name */
+            applicant_name: string;
+            /** Organization Name */
+            organization_name: string;
+            organization_type: components["schemas"]["OrganizationType"];
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Country */
+            country?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+        };
+        /** OnboardingRequestRead */
+        OnboardingRequestRead: {
+            /** Applicant Name */
+            applicant_name: string;
+            /** Organization Name */
+            organization_name: string;
+            organization_type: components["schemas"]["OrganizationType"];
+            /** Email */
+            email: string;
+            /** Phone */
+            phone?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Country */
+            country?: string | null;
+            /** State */
+            state?: string | null;
+            /** City */
+            city?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["OnboardingRequestStatus"];
+            /** Review Notes */
+            review_notes?: string | null;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Provisioned Organization Id */
+            provisioned_organization_id?: string | null;
+            /** Provisioned User Id */
+            provisioned_user_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OnboardingRequestReview */
+        OnboardingRequestReview: {
+            status: components["schemas"]["OnboardingRequestStatus"];
+            /** Review Notes */
+            review_notes?: string | null;
+        };
+        /**
+         * OnboardingRequestStatus
+         * @enum {string}
+         */
+        OnboardingRequestStatus: "pending" | "under_review" | "approved" | "rejected" | "changes_requested";
         /**
          * OnboardingStatus
          * @enum {string}
@@ -1720,6 +1942,20 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ProvisionResult */
+        ProvisionResult: {
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** User Email */
+            user_email: string;
+            /** Invitation Sent */
+            invitation_sent: boolean;
+            /** Raw Token */
+            raw_token?: string | null;
         };
         /**
          * RegulatoryStatus
@@ -2295,6 +2531,22 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** SuperAdminProfileRead */
+        SuperAdminProfileRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Bootstrapped At
+             * Format: date-time
+             */
+            bootstrapped_at: string;
+            user: components["schemas"]["UserRead"];
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -2359,6 +2611,11 @@ export interface components {
             permissions: string[];
             /** Is System Admin */
             is_system_admin: boolean;
+            /**
+             * Is Super Admin
+             * @default false
+             */
+            is_super_admin: boolean;
             /** Memberships */
             memberships: components["schemas"]["UserMembershipDetail"][];
         };
@@ -2376,6 +2633,11 @@ export interface components {
              */
             id: string;
             status: components["schemas"]["UserStatus"];
+            /**
+             * Must Change Password
+             * @default false
+             */
+            must_change_password: boolean;
             /**
              * Created At
              * Format: date-time
@@ -4455,6 +4717,242 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionRead"][];
+                };
+            };
+        };
+    };
+    list_onboarding_requests_api_v1_platform_onboarding_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"][];
+                };
+            };
+        };
+    };
+    submit_onboarding_request_api_v1_platform_onboarding_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_onboarding_request_api_v1_platform_onboarding_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_onboarding_request_api_v1_platform_onboarding_requests__request_id__review_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingRequestReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRequestRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_onboarding_request_api_v1_platform_onboarding_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_account_api_v1_platform_activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_super_admin_profile_api_v1_platform_super_admin_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuperAdminProfileRead"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_platform_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -90,3 +90,15 @@ export type LoginRequest = Schemas['LoginRequest']
 
 // Transitions
 export type StatusTransitionRequest = Schemas['StatusTransitionRequest']
+
+// Platform & Super Admin Onboarding
+export type OnboardingRequestRead = Schemas['OnboardingRequestRead']
+export type OnboardingRequestCreate = Schemas['OnboardingRequestCreate']
+export type OnboardingRequestReview = Schemas['OnboardingRequestReview']
+export type OnboardingRequestStatus = Schemas['OnboardingRequestStatus']
+export type ActivationRequest = Schemas['ActivationRequest']
+export type ActivationResponse = Schemas['ActivationResponse']
+export type ChangePasswordRequest = Schemas['ChangePasswordRequest']
+export type SuperAdminProfileRead = Schemas['SuperAdminProfileRead']
+export type ProvisionResult = Schemas['ProvisionResult']
+

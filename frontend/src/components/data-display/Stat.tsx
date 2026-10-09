@@ -68,3 +68,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     </div>
   )
 }
+
+export const Stat = MetricCard
+
