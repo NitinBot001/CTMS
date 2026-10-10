@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password
@@ -730,3 +733,598 @@ async def test_authorized_document_lifecycle_and_audit_integrity(
     chain_result = verify_res.json()
     assert chain_result["valid"] is True, f"Hash chain invalid: {chain_result}"
     assert chain_result["verified_records"] >= 3
+
+
+# ==============================================================================
+# 9. F03B: Granular Document Lifecycle Transitions & Role Policy
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_document_lifecycle_transitions_individually(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+):
+    """
+    Verifies every supported state transition individually:
+    - draft -> under_review (submission)
+    - under_review -> draft (rejection / revision request)
+    - draft -> under_review (resubmission)
+    - under_review -> approved (approval)
+    - approved -> superseded (superseded)
+    - under_review -> archived, draft -> archived, approved -> archived
+    - approved -> expired
+    """
+    tokens = document_rbac_setup["tokens"]
+    study_a = document_rbac_setup["study_a"]
+    org_a = document_rbac_setup["org_a"]
+
+    # 1. Create a draft document
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "organization_id": str(org_a.id),
+            "document_type": "regulatory",
+            "title": "Clinical Trial Agreement v1.0",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/cta_v1.pdf",
+            "file_name": "cta_v1.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id = res.json()["id"]
+    assert res.json()["status"] == "draft"
+
+    # 2. Submission: draft -> under_review
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "under_review", "reason": "Submit for legal review"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "under_review"
+
+    # 3. Rejection / Revision requested: under_review -> draft
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['cro_a']}"},
+        json={"new_status": "draft", "reason": "Indemnity clause needs amendment"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "draft"
+    assert res.json()["approved_by"] is None
+    assert res.json()["approved_at"] is None
+
+    # 4. Resubmission: draft -> under_review
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "under_review", "reason": "Resubmitting amended CTA"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "under_review"
+
+    # 5. Approval: under_review -> approved
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "approved", "reason": "Legal and regulatory sign-off complete"},
+    )
+    assert res.status_code == 200
+    approved_data = res.json()
+    assert approved_data["status"] == "approved"
+    assert approved_data["approved_by"] is not None
+    assert approved_data["approved_at"] is not None
+
+    # 6. Terminal status: approved -> superseded
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "superseded", "reason": "Superseded by CTA v2.0"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "superseded"
+
+    # 7. Create another doc to test approved -> expired
+    res2 = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "training",
+            "title": "GCP Training Certificate",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/gcp_cert.pdf",
+            "file_name": "gcp_cert.pdf",
+        },
+    )
+    assert res2.status_code == 201
+    doc_id2 = res2.json()["id"]
+
+    await client.post(
+        f"/api/v1/documents/{doc_id2}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "under_review", "reason": "Review cert"},
+    )
+    await client.post(
+        f"/api/v1/documents/{doc_id2}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "approved", "reason": "Approve cert"},
+    )
+    res_exp = await client.post(
+        f"/api/v1/documents/{doc_id2}/transition",
+        headers={"Authorization": f"Bearer {tokens['cro_a']}"},
+        json={"new_status": "expired", "reason": "Certificate expired after 2-year validity"},
+    )
+    assert res_exp.status_code == 200
+    assert res_exp.json()["status"] == "expired"
+
+    # 8. Create another doc to test draft -> archived
+    res3 = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "other",
+            "title": "Discarded Draft Protocol",
+            "version": "0.1",
+            "storage_key": "s3://ctms-docs/studies/A/discarded.pdf",
+            "file_name": "discarded.pdf",
+        },
+    )
+    assert res3.status_code == 201
+    doc_id3 = res3.json()["id"]
+    res_arch = await client.post(
+        f"/api/v1/documents/{doc_id3}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "archived", "reason": "Obsolete working draft archived"},
+    )
+    assert res_arch.status_code == 200
+    assert res_arch.json()["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_uploader_without_approval_authority_cannot_approve_reject_or_archive(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+    db_session: AsyncSession,
+):
+    """
+    Enforces that upload permission (documents:upload) does NOT implicitly authorize
+    approval, rejection, or archival. A site staff member holding upload permissions
+    cannot approve, reject, or archive without separate approval authority (e.g. Site PI).
+    """
+    study_a = document_rbac_setup["study_a"]
+    site_a1 = document_rbac_setup["site_a1"]
+
+    # Create a site uploader role with documents:upload and documents:read (non-investigator)
+    perm_doc_read = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:read")
+    )).scalars().first()
+    perm_doc_upload = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:upload")
+    )).scalars().first()
+    assert perm_doc_read and perm_doc_upload
+
+    role_uploader = Role(name="Site Document Clerk", scope_level=ScopeLevel.site, is_system_role=False)
+    db_session.add(role_uploader)
+    await db_session.flush()
+
+    db_session.add_all([
+        RolePermission(role_id=role_uploader.id, permission_id=perm_doc_read.id),
+        RolePermission(role_id=role_uploader.id, permission_id=perm_doc_upload.id),
+    ])
+    await db_session.flush()
+
+    user_uploader = User(
+        email="uploader@haridwar.org",
+        full_name="Site A1 Uploader",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(user_uploader)
+    await db_session.flush()
+
+    db_session.add(
+        StudyTeamMember(
+            study_id=study_a.id,
+            site_id=site_a1.id,
+            user_id=user_uploader.id,
+            role_id=role_uploader.id,
+            assignment_status=AssignmentStatus.active,
+        )
+    )
+    await db_session.commit()
+
+    token_uploader = create_access_token({"sub": str(user_uploader.id), "email": user_uploader.email})
+    token_site_pi = document_rbac_setup["tokens"]["site_pi_a1"]
+
+    # 1. Uploader can create draft for their site
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={
+            "study_id": str(study_a.id),
+            "site_id": str(site_a1.id),
+            "document_type": "essential",
+            "title": "Site A1 Source Document Worksheet",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/sites/A1/worksheet.pdf",
+            "file_name": "worksheet.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id = res.json()["id"]
+
+    # 2. Uploader can submit draft for review
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "under_review", "reason": "Ready for Site PI review"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "under_review"
+
+    # 3. Uploader CANNOT approve (under_review -> approved) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "approved", "reason": "Self-approving draft"},
+    )
+    assert res.status_code == 403
+    assert "approve" in res.json()["detail"].lower()
+
+    # 4. Uploader CANNOT reject (under_review -> draft) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "draft", "reason": "Unauthorized rejection"},
+    )
+    assert res.status_code == 403
+    assert "reject" in res.json()["detail"].lower()
+
+    # 5. Uploader CANNOT archive (under_review -> archived) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "archived", "reason": "Unauthorized archival"},
+    )
+    assert res.status_code == 403
+    assert "archive" in res.json()["detail"].lower()
+
+    # 6. Site PI (with approval authority) CAN approve
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_site_pi}"},
+        json={"new_status": "approved", "reason": "Site PI formal approval"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "approved"
+
+    # 7. Uploader CANNOT supersede or expire approved document -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "superseded", "reason": "Unauthorized supersede"},
+    )
+    assert res.status_code == 403
+
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "expired", "reason": "Unauthorized expiry"},
+    )
+    assert res.status_code == 403
+
+    # 8. Uploader CANNOT archive approved document -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_uploader}"},
+        json={"new_status": "archived", "reason": "Unauthorized archive approved"},
+    )
+    assert res.status_code == 403
+
+    # 9. Site PI CAN archive approved site document
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_site_pi}"},
+        json={"new_status": "archived", "reason": "Site PI archives retired worksheet"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "archived"
+
+
+@pytest.mark.asyncio
+async def test_site_pi_cannot_govern_or_mutate_study_wide_documents(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+):
+    """
+    Confirms that Site PI has zero mutation or governance authority over study-wide documents.
+    Site PI cannot submit, reject, approve, archive, supersede, or expire study-wide documents.
+    """
+    tokens = document_rbac_setup["tokens"]
+    doc_proto = document_rbac_setup["docs"]["a_protocol"]
+
+    # 1. In draft: Site PI cannot transition draft -> under_review on study-wide doc
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "under_review", "reason": "Site PI submitting global protocol"},
+    )
+    assert res.status_code == 403
+
+    # Sponsor transitions doc to under_review
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "under_review", "reason": "Sponsor submitted for IEC review"},
+    )
+    assert res.status_code == 200
+
+    # 2. In under_review: Site PI cannot reject (under_review -> draft)
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "draft", "reason": "Site PI attempting rejection on global protocol"},
+    )
+    assert res.status_code == 403
+
+    # 3. In under_review: Site PI cannot archive (under_review -> archived)
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "archived", "reason": "Site PI attempting archive on global protocol"},
+    )
+    assert res.status_code == 403
+
+    # 4. In under_review: Site PI cannot approve (under_review -> approved)
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "approved", "reason": "Site PI attempting approval on global protocol"},
+    )
+    assert res.status_code == 403
+
+    # Sponsor approves doc
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "approved", "reason": "Sponsor signs off protocol"},
+    )
+    assert res.status_code == 200
+
+    # 5. In approved: Site PI cannot supersede, expire, or archive
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "superseded", "reason": "Site PI attempting supersede"},
+    )
+    assert res.status_code == 403
+
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "expired", "reason": "Site PI attempting expiry"},
+    )
+    assert res.status_code == 403
+
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto.id}/transition",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+        json={"new_status": "archived", "reason": "Site PI attempting archive approved protocol"},
+    )
+    assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_invalid_and_out_of_sequence_transitions_rejected(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+):
+    """
+    Confirms state-machine integrity: invalid or out-of-sequence transitions and
+    unrecognized status strings are rejected with HTTP 400 Bad Request.
+    """
+    tokens = document_rbac_setup["tokens"]
+    study_a = document_rbac_setup["study_a"]
+
+    # Create a draft document
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "protocol",
+            "title": "State Machine Validation Doc",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/sm_test.pdf",
+            "file_name": "sm_test.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id = res.json()["id"]
+
+    # 1. draft -> approved (skipping review) -> 400 Bad Request
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "approved", "reason": "Bypassing review"},
+    )
+    assert res.status_code == 400
+    assert "invalid transition" in res.json()["detail"].lower()
+
+    # 2. draft -> superseded -> 400 Bad Request
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "superseded", "reason": "Direct supersede"},
+    )
+    assert res.status_code == 400
+
+    # 3. Unrecognized status string -> 400 Bad Request
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "deleted", "reason": "Delete attempt"},
+    )
+    assert res.status_code == 400
+    assert "invalid document status" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_cross_scope_manipulated_ids_during_creation(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+):
+    """
+    Tests creation with manipulated IDs:
+    - Valid study_id with non-existent site_id -> 404
+    - Valid study_id with site_id belonging to an unrelated study -> 400
+    - Valid study_id with organization_id belonging to an unrelated tenant -> 403
+    - Non-existent study_id -> 404
+    """
+    tokens = document_rbac_setup["tokens"]
+    study_a = document_rbac_setup["study_a"]
+    org_b = document_rbac_setup["org_b"]
+    site_b1 = document_rbac_setup["site_b1"]
+    fake_id = uuid.uuid4()
+
+    # 1. Valid study_a with non-existent site_id -> 404 Site not found
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "site_id": str(fake_id),
+            "document_type": "essential",
+            "title": "Manipulated Site Doc",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/tamper1.pdf",
+            "file_name": "tamper1.pdf",
+        },
+    )
+    assert res.status_code == 404
+    assert "site not found" in res.json()["detail"].lower()
+
+    # 2. Valid study_a with site_b1 (associated with Study B, NOT Study A) -> 400 Bad Request
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "site_id": str(site_b1.id),
+            "document_type": "essential",
+            "title": "Cross-Study Site Doc",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/tamper2.pdf",
+            "file_name": "tamper2.pdf",
+        },
+    )
+    assert res.status_code == 400
+    assert "not associated" in res.json()["detail"].lower()
+
+    # 3. Valid study_a with org_b (unrelated tenant) -> 403 Forbidden
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "organization_id": str(org_b.id),
+            "document_type": "essential",
+            "title": "Cross-Tenant Org Doc",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/tamper3.pdf",
+            "file_name": "tamper3.pdf",
+        },
+    )
+    assert res.status_code == 403
+    assert "access denied" in res.json()["detail"].lower()
+
+    # 4. Non-existent study_id -> 404 Study not found
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(fake_id),
+            "document_type": "protocol",
+            "title": "Non-existent Study Doc",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/tamper4.pdf",
+            "file_name": "tamper4.pdf",
+        },
+    )
+    assert res.status_code == 404
+    assert "study not found" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_direct_lookup_by_id_enforces_exact_same_boundaries_as_listing(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+):
+    """
+    Confirms GET /documents/{document_id} strictly enforces tenant, study, site,
+    and role boundaries, identical to GET /documents listing.
+    """
+    tokens = document_rbac_setup["tokens"]
+    doc_proto_a = document_rbac_setup["docs"]["a_protocol"]
+    doc_site_a2 = document_rbac_setup["docs"]["a_site2"]
+    doc_proto_b = document_rbac_setup["docs"]["b_protocol"]
+
+    # 1. Site A1 PI querying Site A2 document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_site_a2.id}",
+        headers={"Authorization": f"Bearer {tokens['site_pi_a1']}"},
+    )
+    assert res.status_code == 403
+
+    # 2. Sponsor A querying Study B document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_b.id}",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+    )
+    assert res.status_code == 403
+
+    # 3. CRO A querying Study B document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_b.id}",
+        headers={"Authorization": f"Bearer {tokens['cro_a']}"},
+    )
+    assert res.status_code == 403
+
+    # 4. Inactive membership user querying Study A document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_a.id}",
+        headers={"Authorization": f"Bearer {tokens['pending']}"},
+    )
+    assert res.status_code == 403
+
+    # 5. Revoked assignment querying Study A document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_a.id}",
+        headers={"Authorization": f"Bearer {tokens['revoked']}"},
+    )
+    assert res.status_code == 403
+
+    # 6. Gov Super Admin querying Study A document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_a.id}",
+        headers={"Authorization": f"Bearer {tokens['gov_superadmin']}"},
+    )
+    assert res.status_code == 403
+
+    # 7. Unassigned user querying Study A document by exact ID -> 403 Forbidden
+    res = await client.get(
+        f"/api/v1/documents/{doc_proto_a.id}",
+        headers={"Authorization": f"Bearer {tokens['unassigned']}"},
+    )
+    assert res.status_code == 403
+
+    # 8. Non-existent document ID -> 404 Not Found
+    res = await client.get(
+        f"/api/v1/documents/{uuid.uuid4()}",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+    )
+    assert res.status_code == 404

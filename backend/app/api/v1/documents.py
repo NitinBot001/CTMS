@@ -525,6 +525,26 @@ async def transition_document(
             )
         doc.approved_by = current_user.id
         doc.approved_at = datetime.datetime.now(datetime.UTC)
+    elif doc.status == DocumentStatus.under_review and new_status == DocumentStatus.draft:
+        if not await can_user_approve_document(current_user, doc, db):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Access denied: user is not authorized to reject this document",
+            )
+        doc.approved_by = None
+        doc.approved_at = None
+    elif new_status == DocumentStatus.archived:
+        if not await can_user_approve_document(current_user, doc, db):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Access denied: user is not authorized to archive this document",
+            )
+    elif new_status in (DocumentStatus.superseded, DocumentStatus.expired):
+        if not await can_user_approve_document(current_user, doc, db):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Access denied: user is not authorized to update document lifecycle status",
+            )
 
     old_status = doc.status
     doc.status = new_status

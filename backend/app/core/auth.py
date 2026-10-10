@@ -624,11 +624,19 @@ async def can_user_approve_document(
                     )
                     if has_perm:
                         if a.site_id is None:
-                            # Study-level Principal Investigator
-                            return True
-                        # Site staff can only approve documents for their own site
+                            # Study-level team member (must hold an investigator, monitor, director, or lead role)
+                            role_name = (a.role.name or "").lower()
+                            return bool(
+                                "investigator" in role_name
+                                or "pi" in role_name
+                                or "director" in role_name
+                                or "lead" in role_name
+                                or "monitor" in role_name
+                            )
+                        # Site staff can only approve documents for their own site if they hold an investigator/PI role
                         if doc.site_id is not None and doc.site_id == a.site_id:
-                            return True
+                            role_name = (a.role.name or "").lower()
+                            return bool("investigator" in role_name or "pi" in role_name)
         return False
 
     if doc.site_id is not None:

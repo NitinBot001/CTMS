@@ -13,16 +13,26 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Local commits committed locally (ahead of `origin/master`). Remote `origin/master` at `7f9e63d`.
-  - Backend: 100% GREEN (171/171 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
+  - Backend: 100% GREEN (177/177 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 15.1s with optimized assets).
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 20.7s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C, F03: Fully remediated and verified with 79 dedicated RBAC and adversarial regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B: Fully remediated and verified with 85 dedicated RBAC and adversarial regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Granular Document Lifecycle Governance & Separation of Powers (F03B)**:
+  - Enforced strict separation between document upload rights and lifecycle governance authority. `documents:upload` authorizes draft creation (`POST /documents`) and submission for review (`draft -> under_review`).
+  - All review, governance, and terminal transitions strictly require approval authority (`can_user_approve_document`):
+    - Approval (`under_review -> approved`): sets `approved_by` and `approved_at`.
+    - Rejection / revision request (`under_review -> draft`): clears approval stamps and rejects unauthorized uploader self-rejections.
+    - Archival (`* -> archived`): prevents unauthorized retirement of drafts or approved TMF assets.
+    - Superseding (`approved -> superseded`) and Expiry (`approved -> expired`): requires formal governance sign-off.
+  - Role policy enforcement: ordinary site staff (e.g. data coordinators, uploaders) with `documents:upload` CANNOT approve, reject, archive, supersede, or expire documents. Only Principal Investigators (`Site Principal Investigator`, `Principal Investigator`), CRO lead monitors, Sponsor monitors, and Technical System Administrators possess approval/governance authority.
+  - Site PIs are strictly confined to their assigned site: they CANNOT reject, archive, supersede, or expire study-wide trial documents (`site_id=None`).
+  - Storage security: the REST API strictly governs TMF metadata, integrity checksums, and lifecycle states. Raw filesystem paths, storage credentials, and unauthenticated download routes are not exposed, and out-of-band storage connectors are treated as unsupported by the REST API.
 - **Document & TMF Multi-Tiered Authorization and Scoping (F03)**:
   - Enforced strict canonical permissions (`documents:read` for read/list and `documents:upload` for create/mutate/transition).
   - Strictly excluded Government Verification Super Admin from document wildcard bypass; technical System Administrator retains platform-wide access.
@@ -41,6 +51,32 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-10 20:15 — F03B: Document Lifecycle Authorization Adversarial Review
+
+- **What**: Performed targeted security review and adversarial remediation of document lifecycle state transitions and multi-scope resource boundaries in `POST /documents/{document_id}/transition`, `GET /documents/{document_id}`, and `POST /documents`. Added 6 comprehensive adversarial regression tests (bringing `test_documents_rbac.py` to 18 tests and backend suite to 177 tests).
+- **Why**: Prevent privilege escalation during document lifecycle operations: upload permission (`documents:upload`) must not implicitly authorize document approval, rejection, or archival; site staff with upload rights must not unilaterally approve, reject, or archive site documents without Principal Investigator authority; site staff must never mutate or govern study-wide trial assets; manipulated cross-tenant or unassociated IDs during document creation must fail-closed; storage endpoints must not expose raw file bytes or unauthenticated routes.
+- **How**:
+  1. In `backend/app/api/v1/documents.py`:
+     - Hardened `transition_document`: individually validated every transition. Enforced `can_user_approve_document` for `under_review -> approved` (approval), `under_review -> draft` (rejection), `* -> archived` (archival), and `approved -> (superseded | expired)` (lifecycle retirement). Cleared approval audit stamps when transitioning `under_review -> draft`.
+     - Validated that `draft -> under_review` remains the sole submission pathway for authorized uploaders.
+  2. In `backend/app/core/auth.py`:
+     - Hardened `can_user_approve_document`: strictly enforced that site team members must hold an investigator/PI role (`Site Principal Investigator`) to approve, reject, or archive their site's documents. Ordinary site uploaders without investigator authority are denied governance actions. Study team members must hold an investigator, monitor, lead, or director role.
+  3. In `backend/tests/test_documents_rbac.py`:
+     - Added 6 adversarial regression tests: (1) `test_document_lifecycle_transitions_individually` (testing submission, rejection, resubmission, approval, supersede, expiry, and archival), (2) `test_uploader_without_approval_authority_cannot_approve_reject_or_archive` (verifying site uploader is rejected for approval, rejection, archival, supersede, expiry, while Site PI succeeds), (3) `test_site_pi_cannot_govern_or_mutate_study_wide_documents` (Site PI denied submission, rejection, archival, supersede, and expiry on study-wide documents), (4) `test_invalid_and_out_of_sequence_transitions_rejected` (out-of-sequence transitions and invalid status strings return 400), (5) `test_cross_scope_manipulated_ids_during_creation` (non-existent site -> 404, cross-study site -> 400, cross-tenant org -> 403, non-existent study -> 404), and (6) `test_direct_lookup_by_id_enforces_exact_same_boundaries_as_listing` (direct ID lookups enforce identical tenant/study/site/status boundaries).
+  4. Verified storage boundaries: confirmed the REST API manages TMF metadata, integrity checksums, and lifecycle states only; raw filesystem paths and unauthenticated download routes are absent; external storage connectors are treated as unsupported by design.
+- **Result**: Watertight lifecycle authorization across all document states and scopes. Zero contract drift (`docs/API_CONTRACT.md` and `docs/openapi.json` frozen). All 177 backend tests passing (100% green across all 16 suites). Static analysis clean (ruff 0 errors, mypy 0 errors). Frontend verification passing clean (20.7s).
+- **Verified by**:
+  - Full backend test suite (`pytest tests/ -q`): 177/177 passed in 478s (100% green across all 16 suites).
+  - Targeted document RBAC suite (`pytest tests/test_documents_rbac.py tests/test_audit_chain.py -q`): 19/19 passed in 66s.
+  - Granular document RBAC tests (`pytest tests/test_documents_rbac.py -v`): 18/18 passed in 68s.
+  - Contract & endpoint regression tests (`pytest tests/test_api_contract.py tests/test_api_endpoints.py -q`): 13/13 passed in 39s.
+  - Static analysis: `ruff check` (0 errors), `mypy` (0 errors).
+  - Frontend verification (`npm run verify`): passed in 20.7s (oxlint clean, TypeScript clean, Vite production build clean).
+  - Secret scan on git diff: clean (0 leaks).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to checkpoint F03B changes in git.
 
 ### 2026-10-10 19:25 — F03: Document/TMF Authorization and Scoping
 
