@@ -116,3 +116,22 @@ export type TeamMemberVerificationReview = Schemas['TeamMemberVerificationReview
 export type VerifierCreateRequest = Schemas['VerifierCreateRequest']
 export type FirstLoginSetupRequest = Schemas['FirstLoginSetupRequest']
 
+// Role-Specific Dashboards & Scoped Workflows
+export type DashboardSummaryResponse = Schemas['DashboardSummaryResponse']
+export type SuperAdminOverviewResponse = Schemas['SuperAdminOverviewResponse']
+export type SuperAdminOrgItem = Schemas['SuperAdminOrgItem']
+export type SuperAdminStudyItem = Schemas['SuperAdminStudyItem']
+export type ResearchPIDashboardResponse = Schemas['ResearchPIDashboardResponse']
+export type ResearchPIStudyItem = Schemas['ResearchPIStudyItem']
+export type CRODashboardResponse = Schemas['CRODashboardResponse']
+export type CROStudyItem = Schemas['CROStudyItem']
+export type CROSiteRequestItem = Schemas['CROSiteRequestItem']
+export type SitePIDashboardResponse = Schemas['SitePIDashboardResponse']
+export type SiteIncomingRequestItem = Schemas['SiteIncomingRequestItem']
+export type EligibleSiteItem = Schemas['EligibleSiteItem']
+export type ParticipantBulkImportRequest = Schemas['ParticipantBulkImportRequest']
+export type ParticipantImportItem = Schemas['ParticipantImportItem']
+export type ParticipantBulkImportResponse = Schemas['ParticipantBulkImportResponse']
+export type ParticipantImportError = Schemas['ParticipantImportError']
+
+

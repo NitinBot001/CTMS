@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.compliance import router as compliance_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.participants import router as participants_router
@@ -18,6 +19,7 @@ from app.api.v1.users import router as users_router
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
+api_router.include_router(dashboard_router)
 api_router.include_router(organizations_router)
 api_router.include_router(studies_router)
 api_router.include_router(sites_router)

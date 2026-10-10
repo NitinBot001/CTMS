@@ -15,7 +15,7 @@ from app.models.site import StudySite
 from app.models.study import Study, StudyTeamMember
 from app.models.user import User
 from app.schemas.common import StatusTransitionRequest
-from app.schemas.site import StudySiteCreate, StudySiteRead
+from app.schemas.site import EligibleSiteItem, StudySiteCreate, StudySiteRead
 from app.schemas.study import (
     StudyCreate,
     StudyMilestoneRead,
@@ -64,7 +64,13 @@ async def list_studies(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.core.rbac import get_user_accessible_study_ids
+
+    accessible_ids = await get_user_accessible_study_ids(current_user, db)
+
     stmt = select(Study)
+    if accessible_ids is not None:
+        stmt = stmt.where(Study.id.in_(accessible_ids))
     if status:
         stmt = stmt.where(Study.status == status)
     if phase:
@@ -226,6 +232,15 @@ async def add_study_site(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.core.rbac import resolve_user_role
+
+    user_role = await resolve_user_role(current_user, db)
+    if user_role == "cro":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CRO personnel cannot directly assign sites. Please submit a site participation request via POST /platform/site-participation/request for government and site PI review.",
+        )
+
     existing = await db.execute(
         select(StudySite).where(
             StudySite.study_id == study_id,
@@ -256,6 +271,66 @@ async def add_study_site(
     await db.commit()
     await db.refresh(study_site)
     return study_site
+
+
+@router.get("/{study_id}/eligible-sites", response_model=list[EligibleSiteItem])
+async def list_eligible_sites(
+    study_id: uuid.UUID,
+    q: str | None = None,
+    study: Study = Depends(require_study_access()),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns registered clinical trial sites for site discovery.
+    Includes active assignment status and pending participation request status for this study.
+    """
+    from app.models.platform import SiteParticipationRequest
+    from app.models.site import Site
+
+    study_sites_stmt = select(StudySite).where(StudySite.study_id == study_id)
+    study_sites_map = {ss.site_id: ss for ss in (await db.execute(study_sites_stmt)).scalars().all()}
+
+    part_stmt = select(SiteParticipationRequest).where(SiteParticipationRequest.study_id == study_id)
+    part_requests = (await db.execute(part_stmt)).scalars().all()
+    part_map: dict[uuid.UUID, SiteParticipationRequest] = {}
+    for pr in part_requests:
+        if pr.site_id not in part_map or pr.created_at > part_map[pr.site_id].created_at:
+            part_map[pr.site_id] = pr
+
+    stmt = select(Site)
+    if q:
+        search_pattern = f"%{q}%"
+        stmt = stmt.where(
+            (Site.name.ilike(search_pattern))
+            | (Site.site_code.ilike(search_pattern))
+            | (Site.city.ilike(search_pattern))
+        )
+    sites = (await db.execute(stmt)).scalars().all()
+
+    items: list[EligibleSiteItem] = []
+    for s in sites:
+        ss = study_sites_map.get(s.id)
+        part_req = part_map.get(s.id)
+        items.append(
+            EligibleSiteItem(
+                id=s.id,
+                site_code=s.site_code,
+                name=s.name,
+                site_type=s.site_type,
+                city=s.city,
+                state=s.state,
+                country=s.country,
+                status=s.status,
+                is_assigned=ss is not None,
+                activation_status=ss.activation_status.value if ss else None,
+                participation_request_id=part_req.id if part_req else None,
+                participation_status=part_req.status.value if part_req else None,
+                government_status=part_req.government_status.value if part_req else None,
+                site_status=part_req.site_status.value if part_req else None,
+            )
+        )
+    return items
 
 
 @router.post(

@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.security import create_access_token, verify_password
 from app.models.enums import UserStatus
 from app.models.organization import OrganizationMember
+from app.models.study import StudyTeamMember
 from app.models.user import Role, RolePermission, User
 from app.schemas.user import (
     LoginRequest,
@@ -17,6 +18,7 @@ from app.schemas.user import (
     UserMembershipDetail,
     UserProfileRead,
     UserRead,
+    UserStudyAssignment,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication & Access"])
@@ -85,6 +87,9 @@ async def get_my_profile(
         UserMembershipDetail(
             organization_id=m.organization_id,
             organization_name=m.organization.name if m.organization else None,
+            organization_type=m.organization.organization_type.value
+            if (m.organization and m.organization.organization_type)
+            else None,
             role_name=m.role.name if m.role else None,
             scope_level=m.role.scope_level.value if m.role else None,
             status=m.status.value,
@@ -92,16 +97,40 @@ async def get_my_profile(
         for m in memberships
     ]
 
+    stmt_study = (
+        select(StudyTeamMember)
+        .options(
+            selectinload(StudyTeamMember.study),
+            selectinload(StudyTeamMember.role),
+        )
+        .where(StudyTeamMember.user_id == current_user.id)
+    )
+    study_assignments_raw = (await db.execute(stmt_study)).scalars().all()
+    study_assignments = [
+        UserStudyAssignment(
+            study_id=sa.study_id,
+            study_title=sa.study.title if sa.study else None,
+            role_name=sa.role.name if sa.role else None,
+            site_id=sa.site_id,
+            assignment_status=sa.assignment_status.value,
+        )
+        for sa in study_assignments_raw
+    ]
+
     perms = sorted(get_user_permissions(current_user))
     sys_admin = is_system_admin(current_user)
 
+    from app.core.rbac import resolve_user_role
     from app.services.platform import PlatformService
     super_admin = await PlatformService.is_super_admin(current_user, db)
+    assigned_role = await resolve_user_role(current_user, db)
 
     return UserProfileRead(
         user=UserRead.model_validate(current_user),
         permissions=perms,
         is_system_admin=sys_admin,
         is_super_admin=super_admin,
+        assigned_role=assigned_role,
         memberships=membership_details,
+        study_assignments=study_assignments,
     )

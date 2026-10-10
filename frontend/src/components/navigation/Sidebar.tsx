@@ -20,7 +20,7 @@ const navSections: NavSection[] = [
   {
     title: 'Overview',
     items: [
-      { label: 'Portfolio Dashboard', path: '/dashboard', icon: 'dashboard' },
+      { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     ],
   },
   {

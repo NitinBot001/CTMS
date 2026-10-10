@@ -77,3 +77,21 @@ class StudySiteRead(StudySiteBase):
     activation_date: datetime.date | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+
+class EligibleSiteItem(BaseModel):
+    id: uuid.UUID
+    site_code: str
+    name: str
+    site_type: SiteType
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
+    status: SiteStatus
+    is_assigned: bool
+    activation_status: str | None = None
+    participation_request_id: uuid.UUID | None = None
+    participation_status: str | None = None
+    government_status: str | None = None
+    site_status: str | None = None
+

@@ -40,15 +40,28 @@ class EmailService:
             "html": html_content,
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            if response.status_code >= 400:
-                logger.error(
-                    f"Resend API error ({response.status_code}): {response.text}"
-                )
-                raise RuntimeError(f"Email delivery failed with status {response.status_code}")
-            data: dict[str, Any] = response.json()
-            return data
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code >= 400:
+                    logger.error(
+                        f"Resend API error ({response.status_code}): {response.text}"
+                    )
+                    return {
+                        "status": "error",
+                        "statusCode": response.status_code,
+                        "error": response.text,
+                        "id": None,
+                    }
+                data: dict[str, Any] = response.json()
+                return data
+        except Exception as exc:
+            logger.error(f"Failed to communicate with Resend API: {exc}")
+            return {
+                "status": "error",
+                "error": str(exc),
+                "id": None,
+            }
 
     @staticmethod
     async def send_activation_email(

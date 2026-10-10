@@ -86,9 +86,18 @@ class TokenResponse(BaseModel):
 class UserMembershipDetail(BaseModel):
     organization_id: uuid.UUID
     organization_name: str | None = None
+    organization_type: str | None = None
     role_name: str | None = None
     scope_level: str | None = None
     status: str
+
+
+class UserStudyAssignment(BaseModel):
+    study_id: uuid.UUID
+    study_title: str | None = None
+    role_name: str | None = None
+    site_id: uuid.UUID | None = None
+    assignment_status: str
 
 
 class UserProfileRead(BaseModel):
@@ -96,5 +105,7 @@ class UserProfileRead(BaseModel):
     permissions: list[str]
     is_system_admin: bool
     is_super_admin: bool = False
+    assigned_role: str = "unassigned"
     memberships: list[UserMembershipDetail]
+    study_assignments: list[UserStudyAssignment] = []
 

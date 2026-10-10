@@ -104,7 +104,7 @@ async def test_full_api_workflow(auth_client: AsyncClient):
     assert res.status_code == 201
     site_id = res.json()["id"]
 
-    # 7. Assign Site to Study
+    # 7. Assign Site to Study and Activate
     res = await client.post(
         f"/api/v1/studies/{study_id}/sites",
         json={
@@ -113,6 +113,18 @@ async def test_full_api_workflow(auth_client: AsyncClient):
         },
     )
     assert res.status_code == 201
+
+    res = await client.post(
+        f"/api/v1/studies/{study_id}/sites/{site_id}/transition",
+        json={"new_status": "initiated"},
+    )
+    assert res.status_code == 200
+
+    res = await client.post(
+        f"/api/v1/studies/{study_id}/sites/{site_id}/transition",
+        json={"new_status": "activated"},
+    )
+    assert res.status_code == 200
 
     # 8. Create User & Assign as Study Team Member
     res = await client.post(

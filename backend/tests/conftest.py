@@ -41,6 +41,19 @@ def _fast_bcrypt():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _mock_email_service(monkeypatch):
+    async def mock_send_email(to_email: str, subject: str, html_content: str, settings):
+        return {
+            "id": "mock_resend_msg_001",
+            "status": "simulated",
+            "to": to_email,
+            "subject": subject,
+        }
+
+    monkeypatch.setattr("app.services.email.EmailService.send_email", mock_send_email)
+
+
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 TestAsyncSessionLocal = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
 

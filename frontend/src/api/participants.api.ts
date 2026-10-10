@@ -4,6 +4,8 @@ import type {
   ParticipantCreate,
   ParticipantStatus,
   StatusTransitionRequest,
+  ParticipantBulkImportRequest,
+  ParticipantBulkImportResponse,
 } from '@/types/api'
 
 export interface ParticipantListParams {
@@ -31,5 +33,9 @@ export const participantsApi = {
 
   transition: (id: string, transition: StatusTransitionRequest) => {
     return apiClient.post<ParticipantRead>(`/participants/${id}/transition`, transition)
+  },
+
+  bulkImport: (data: ParticipantBulkImportRequest) => {
+    return apiClient.post<ParticipantBulkImportResponse>('/participants/bulk-import', data)
   },
 }

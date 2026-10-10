@@ -23,27 +23,103 @@ security_bearer = HTTPBearer(auto_error=False)
 
 
 def is_system_admin(user: User) -> bool:
-    """Checks whether the user has a system-level administrator role."""
+    """Checks whether the user has a system-level administrator role or super admin profile."""
+    if hasattr(user, "super_admin_profile") and user.super_admin_profile and user.super_admin_profile.is_active:
+        return True
+
     for membership in user.memberships:
         if (
             membership.status == AssignmentStatus.active
             and membership.role
-            and (membership.role.is_system_role or membership.role.scope_level == ScopeLevel.system)
+            and (membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator")
         ):
             return True
+    return False
+
+
+def is_technical_system_admin(user: User) -> bool:
+    """
+    Checks whether the user has an active technical System Administrator role
+    (scope_level == ScopeLevel.system or name == 'System Administrator').
+    Strictly excludes Government Verification SuperAdminProfile.
+    """
+    for membership in user.memberships:
+        if (
+            membership.status == AssignmentStatus.active
+            and membership.role
+            and (membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator")
+        ):
+            return True
+    return False
+
+
+def has_user_manage_permission(user: User) -> bool:
+    """
+    Checks whether the user has explicit user:manage permission or is an active technical System Administrator.
+    Strictly excludes Government Verification SuperAdminProfile wildcard bypass.
+    """
+    if is_technical_system_admin(user):
+        return True
+
+    for membership in user.memberships:
+        if membership.status == AssignmentStatus.active and membership.role:
+            for rp in membership.role.permissions:
+                if rp.permission and rp.permission.codename in ("user:manage", "*"):
+                    return True
+
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename in ("user:manage", "*"):
+                        return True
+    return False
+
+
+def has_global_audit_permission(user: User) -> bool:
+    """
+    Checks whether the user has explicit global audit access (audit:read or technical System Administrator).
+    Strictly excludes Government Verification SuperAdminProfile wildcard bypass.
+    """
+    if is_technical_system_admin(user):
+        return True
+
+    for membership in user.memberships:
+        if membership.status == AssignmentStatus.active and membership.role:
+            for rp in membership.role.permissions:
+                if rp.permission and rp.permission.codename in ("audit:read", "*"):
+                    return True
+
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename in ("audit:read", "*"):
+                        return True
     return False
 
 
 def get_user_permissions(user: User) -> set[str]:
     """Aggregates all unique permission codenames assigned to the user across active roles."""
     permissions: set[str] = set()
+
+    if hasattr(user, "super_admin_profile") and user.super_admin_profile and user.super_admin_profile.is_active:
+        permissions.add("*")
+
     for membership in user.memberships:
         if membership.status == AssignmentStatus.active and membership.role:
-            if membership.role.is_system_role or membership.role.scope_level == ScopeLevel.system:
+            if membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator":
                 permissions.add("*")
             for rp in membership.role.permissions:
                 if rp.permission and rp.permission.codename:
                     permissions.add(rp.permission.codename)
+
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename:
+                        permissions.add(rp.permission.codename)
     return permissions
 
 
@@ -103,6 +179,7 @@ async def get_current_user(
             .selectinload(Role.permissions)
             .selectinload(RolePermission.permission),
             selectinload(User.study_team_assignments),
+            selectinload(User.super_admin_profile),
         )
         .where(User.id == user_id)
     )
@@ -143,6 +220,34 @@ def require_permission(codename: str) -> Callable[..., Any]:
         )
 
     return _permission_dependency
+
+
+async def require_user_management(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency requiring explicit user:manage permission or technical System Administrator role.
+    Government Verification Super Admin without technical admin role receives HTTP 403 Forbidden.
+    """
+    if has_user_manage_permission(current_user):
+        return current_user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission denied: missing required permission 'user:manage'",
+    )
+
+
+async def require_global_audit_access(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency requiring explicit audit:read permission or technical System Administrator role.
+    Government Verification Super Admin without technical admin role receives HTTP 403 Forbidden.
+    """
+    if has_global_audit_permission(current_user):
+        return current_user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission denied: missing required permission 'audit:read'",
+    )
 
 
 def require_organization_access(permission: str | None = None) -> Callable[..., Any]:

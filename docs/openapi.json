@@ -75,6 +75,33 @@
         ]
       }
     },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "tags": [
+          "Role Dashboards"
+        ],
+        "summary": "Get Dashboard Summary",
+        "description": "Returns role-tailored dashboard telemetry and data strictly scoped to the authenticated user.\nPrevents unauthorized global aggregate leakage by dispatching to role-specific builders.",
+        "operationId": "get_dashboard_summary_api_v1_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/organizations": {
       "post": {
         "tags": [
@@ -1087,6 +1114,75 @@
         }
       }
     },
+    "/api/v1/studies/{study_id}/eligible-sites": {
+      "get": {
+        "tags": [
+          "Studies"
+        ],
+        "summary": "List Eligible Sites",
+        "description": "Returns registered clinical trial sites for site discovery.\nIncludes active assignment status and pending participation request status for this study.",
+        "operationId": "list_eligible_sites_api_v1_studies__study_id__eligible_sites_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleSiteItem"
+                  },
+                  "title": "Response List Eligible Sites Api V1 Studies  Study Id  Eligible Sites Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/studies/{study_id}/sites/{site_id}/transition": {
       "post": {
         "tags": [
@@ -1625,6 +1721,53 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/participants/bulk-import": {
+      "post": {
+        "tags": [
+          "Participants"
+        ],
+        "summary": "Bulk Import Participants",
+        "description": "Bulk imports participants for a study protocol with strict row-level validation.\nVerifies study existence, activated StudySite association, and participant code uniqueness.",
+        "operationId": "bulk_import_participants_api_v1_participants_bulk_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantBulkImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantBulkImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/participants/{participant_id}": {
@@ -4884,6 +5027,109 @@
         ]
       }
     },
+    "/api/v1/platform/super-admin/overview": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Get Super Admin Overview",
+        "description": "Global read-only platform operations overview for Super Admin.",
+        "operationId": "get_super_admin_overview_api_v1_platform_super_admin_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/super-admin/studies/{study_id}/participants": {
+      "get": {
+        "tags": [
+          "Platform & Super Admin"
+        ],
+        "summary": "Inspect Study Participants",
+        "description": "Read-only study-scoped participant inspection for Super Admin.",
+        "operationId": "inspect_study_participants_api_v1_platform_super_admin_studies__study_id__participants_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ParticipantRead"
+                  },
+                  "title": "Response Inspect Study Participants Api V1 Platform Super Admin Studies  Study Id  Participants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -5608,6 +5854,107 @@
         ],
         "title": "CAPAType"
       },
+      "CRODashboardResponse": {
+        "properties": {
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/CROStudyItem"
+            },
+            "type": "array",
+            "title": "Studies"
+          },
+          "eligible_sites_count": {
+            "type": "integer",
+            "title": "Eligible Sites Count"
+          },
+          "pending_site_requests_count": {
+            "type": "integer",
+            "title": "Pending Site Requests Count"
+          },
+          "total_participants_in_scope": {
+            "type": "integer",
+            "title": "Total Participants In Scope"
+          },
+          "recent_site_requests": {
+            "items": {
+              "$ref": "#/components/schemas/CROSiteRequestItem"
+            },
+            "type": "array",
+            "title": "Recent Site Requests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studies",
+          "eligible_sites_count",
+          "pending_site_requests_count",
+          "total_participants_in_scope",
+          "recent_site_requests"
+        ],
+        "title": "CRODashboardResponse"
+      },
+      "CROSiteRequestItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "study_title": {
+            "type": "string",
+            "title": "Study Title"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Site Id"
+          },
+          "site_name": {
+            "type": "string",
+            "title": "Site Name"
+          },
+          "site_code": {
+            "type": "string",
+            "title": "Site Code"
+          },
+          "government_status": {
+            "type": "string",
+            "title": "Government Status"
+          },
+          "site_status": {
+            "type": "string",
+            "title": "Site Status"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_id",
+          "study_title",
+          "site_id",
+          "site_name",
+          "site_code",
+          "government_status",
+          "site_status",
+          "status",
+          "created_at"
+        ],
+        "title": "CROSiteRequestItem"
+      },
       "CROStaffRequestCreate": {
         "properties": {
           "applicant_name": {
@@ -5746,6 +6093,77 @@
         ],
         "title": "CROStaffRequestCreate"
       },
+      "CROStudyItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_code": {
+            "type": "string",
+            "title": "Study Code"
+          },
+          "protocol_number": {
+            "type": "string",
+            "title": "Protocol Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "sponsor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sponsor Name"
+          },
+          "active_sites_count": {
+            "type": "integer",
+            "title": "Active Sites Count"
+          },
+          "enrolled_participants": {
+            "type": "integer",
+            "title": "Enrolled Participants"
+          },
+          "planned_sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Sample Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_code",
+          "protocol_number",
+          "title",
+          "phase",
+          "status",
+          "active_sites_count",
+          "enrolled_participants"
+        ],
+        "title": "CROStudyItem"
+      },
       "CTRIStatus": {
         "type": "string",
         "enum": [
@@ -5794,6 +6212,59 @@
           "terminated"
         ],
         "title": "ContractStatus"
+      },
+      "DashboardSummaryResponse": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "super_admin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuperAdminOverviewResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "research_pi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchPIDashboardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cro": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CRODashboardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site_pi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SitePIDashboardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "DashboardSummaryResponse"
       },
       "DeviationSeverity": {
         "type": "string",
@@ -6129,6 +6600,132 @@
           "expired"
         ],
         "title": "ECStatus"
+      },
+      "EligibleSiteItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "site_code": {
+            "type": "string",
+            "title": "Site Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "site_type": {
+            "$ref": "#/components/schemas/SiteType"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SiteStatus"
+          },
+          "is_assigned": {
+            "type": "boolean",
+            "title": "Is Assigned"
+          },
+          "activation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Status"
+          },
+          "participation_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participation Request Id"
+          },
+          "participation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participation Status"
+          },
+          "government_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Government Status"
+          },
+          "site_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_code",
+          "name",
+          "site_type",
+          "status",
+          "is_assigned"
+        ],
+        "title": "EligibleSiteItem"
       },
       "EnrollmentTrendPoint": {
         "properties": {
@@ -7501,6 +8098,67 @@
         "type": "object",
         "title": "OrganizationUpdate"
       },
+      "ParticipantBulkImportRequest": {
+        "properties": {
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantImportItem"
+            },
+            "type": "array",
+            "title": "Participants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "study_id",
+          "participants"
+        ],
+        "title": "ParticipantBulkImportRequest"
+      },
+      "ParticipantBulkImportResponse": {
+        "properties": {
+          "total_processed": {
+            "type": "integer",
+            "title": "Total Processed"
+          },
+          "imported_count": {
+            "type": "integer",
+            "title": "Imported Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantImportError"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "imported_participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantRead"
+            },
+            "type": "array",
+            "title": "Imported Participants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_processed",
+          "imported_count",
+          "failed_count",
+          "errors",
+          "imported_participants"
+        ],
+        "title": "ParticipantBulkImportResponse"
+      },
       "ParticipantCreate": {
         "properties": {
           "participant_code": {
@@ -7543,6 +8201,76 @@
           "study_id"
         ],
         "title": "ParticipantCreate"
+      },
+      "ParticipantImportError": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "participant_code": {
+            "type": "string",
+            "title": "Participant Code"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "participant_code",
+          "error"
+        ],
+        "title": "ParticipantImportError"
+      },
+      "ParticipantImportItem": {
+        "properties": {
+          "participant_code": {
+            "type": "string",
+            "title": "Participant Code"
+          },
+          "site_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Site Id"
+          },
+          "screening_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screening Date"
+          },
+          "enrollment_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ParticipantStatus",
+            "default": "screened"
+          }
+        },
+        "type": "object",
+        "required": [
+          "participant_code",
+          "site_id"
+        ],
+        "title": "ParticipantImportItem"
       },
       "ParticipantRead": {
         "properties": {
@@ -8318,6 +9046,41 @@
         ],
         "title": "RegulatorySubmissionRead"
       },
+      "ResearchPIDashboardResponse": {
+        "properties": {
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPIStudyItem"
+            },
+            "type": "array",
+            "title": "Studies"
+          },
+          "active_sites_count": {
+            "type": "integer",
+            "title": "Active Sites Count"
+          },
+          "pending_team_invitations": {
+            "type": "integer",
+            "title": "Pending Team Invitations"
+          },
+          "upcoming_milestones": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Upcoming Milestones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "studies",
+          "active_sites_count",
+          "pending_team_invitations",
+          "upcoming_milestones"
+        ],
+        "title": "ResearchPIDashboardResponse"
+      },
       "ResearchPIRequestCreate": {
         "properties": {
           "applicant_name": {
@@ -8455,6 +9218,71 @@
           "organization_name"
         ],
         "title": "ResearchPIRequestCreate"
+      },
+      "ResearchPIStudyItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_code": {
+            "type": "string",
+            "title": "Study Code"
+          },
+          "protocol_number": {
+            "type": "string",
+            "title": "Protocol Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "active_sites_count": {
+            "type": "integer",
+            "title": "Active Sites Count"
+          },
+          "enrolled_participants": {
+            "type": "integer",
+            "title": "Enrolled Participants"
+          },
+          "planned_sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Sample Size"
+          },
+          "pending_milestones": {
+            "type": "integer",
+            "title": "Pending Milestones"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_code",
+          "protocol_number",
+          "title",
+          "phase",
+          "status",
+          "active_sites_count",
+          "enrolled_participants",
+          "pending_milestones"
+        ],
+        "title": "ResearchPIStudyItem"
       },
       "RoleCreate": {
         "properties": {
@@ -8734,6 +9562,143 @@
           "activation_status"
         ],
         "title": "SiteEnrollmentItem"
+      },
+      "SiteIncomingRequestItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "study_title": {
+            "type": "string",
+            "title": "Study Title"
+          },
+          "study_code": {
+            "type": "string",
+            "title": "Study Code"
+          },
+          "requester_name": {
+            "type": "string",
+            "title": "Requester Name"
+          },
+          "government_status": {
+            "type": "string",
+            "title": "Government Status"
+          },
+          "site_status": {
+            "type": "string",
+            "title": "Site Status"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_id",
+          "study_title",
+          "study_code",
+          "requester_name",
+          "government_status",
+          "site_status",
+          "status",
+          "created_at"
+        ],
+        "title": "SiteIncomingRequestItem"
+      },
+      "SitePIDashboardResponse": {
+        "properties": {
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "site_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Name"
+          },
+          "site_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Code"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "active_studies_count": {
+            "type": "integer",
+            "title": "Active Studies Count"
+          },
+          "pending_requests_count": {
+            "type": "integer",
+            "title": "Pending Requests Count"
+          },
+          "participants_count": {
+            "type": "integer",
+            "title": "Participants Count"
+          },
+          "open_safety_events": {
+            "type": "integer",
+            "title": "Open Safety Events"
+          },
+          "incoming_requests": {
+            "items": {
+              "$ref": "#/components/schemas/SiteIncomingRequestItem"
+            },
+            "type": "array",
+            "title": "Incoming Requests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active_studies_count",
+          "pending_requests_count",
+          "participants_count",
+          "open_safety_events",
+          "incoming_requests"
+        ],
+        "title": "SitePIDashboardResponse"
       },
       "SitePIRequestCreate": {
         "properties": {
@@ -10552,6 +11517,125 @@
         "type": "object",
         "title": "StudyUpdate"
       },
+      "SuperAdminOrgItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "organization_type": {
+            "type": "string",
+            "title": "Organization Type"
+          },
+          "registration_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "studies_count": {
+            "type": "integer",
+            "title": "Studies Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "organization_type",
+          "status",
+          "studies_count"
+        ],
+        "title": "SuperAdminOrgItem"
+      },
+      "SuperAdminOverviewResponse": {
+        "properties": {
+          "is_read_only": {
+            "type": "boolean",
+            "title": "Is Read Only",
+            "default": true
+          },
+          "total_sponsors": {
+            "type": "integer",
+            "title": "Total Sponsors"
+          },
+          "total_cros": {
+            "type": "integer",
+            "title": "Total Cros"
+          },
+          "total_studies": {
+            "type": "integer",
+            "title": "Total Studies"
+          },
+          "sponsors": {
+            "items": {
+              "$ref": "#/components/schemas/SuperAdminOrgItem"
+            },
+            "type": "array",
+            "title": "Sponsors"
+          },
+          "cros": {
+            "items": {
+              "$ref": "#/components/schemas/SuperAdminOrgItem"
+            },
+            "type": "array",
+            "title": "Cros"
+          },
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/SuperAdminStudyItem"
+            },
+            "type": "array",
+            "title": "Studies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_sponsors",
+          "total_cros",
+          "total_studies",
+          "sponsors",
+          "cros",
+          "studies"
+        ],
+        "title": "SuperAdminOverviewResponse"
+      },
       "SuperAdminProfileRead": {
         "properties": {
           "user_id": {
@@ -10580,6 +11664,95 @@
           "user"
         ],
         "title": "SuperAdminProfileRead"
+      },
+      "SuperAdminStudyItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "study_code": {
+            "type": "string",
+            "title": "Study Code"
+          },
+          "protocol_number": {
+            "type": "string",
+            "title": "Protocol Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "sponsor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sponsor Name"
+          },
+          "cro_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cro Name"
+          },
+          "participating_sites_count": {
+            "type": "integer",
+            "title": "Participating Sites Count"
+          },
+          "participant_count": {
+            "type": "integer",
+            "title": "Participant Count"
+          },
+          "participant_status_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Participant Status Distribution"
+          },
+          "pending_milestones_count": {
+            "type": "integer",
+            "title": "Pending Milestones Count"
+          },
+          "completed_milestones_count": {
+            "type": "integer",
+            "title": "Completed Milestones Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "study_code",
+          "protocol_number",
+          "title",
+          "phase",
+          "status",
+          "participating_sites_count",
+          "participant_count",
+          "participant_status_distribution",
+          "pending_milestones_count",
+          "completed_milestones_count"
+        ],
+        "title": "SuperAdminStudyItem"
       },
       "TeamMemberInviteCreate": {
         "properties": {
@@ -10987,6 +12160,17 @@
             ],
             "title": "Organization Name"
           },
+          "organization_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Type"
+          },
           "role_name": {
             "anyOf": [
               {
@@ -11042,12 +12226,25 @@
             "title": "Is Super Admin",
             "default": false
           },
+          "assigned_role": {
+            "type": "string",
+            "title": "Assigned Role",
+            "default": "unassigned"
+          },
           "memberships": {
             "items": {
               "$ref": "#/components/schemas/UserMembershipDetail"
             },
             "type": "array",
             "title": "Memberships"
+          },
+          "study_assignments": {
+            "items": {
+              "$ref": "#/components/schemas/UserStudyAssignment"
+            },
+            "type": "array",
+            "title": "Study Assignments",
+            "default": []
           }
         },
         "type": "object",
@@ -11123,6 +12320,59 @@
           "suspended"
         ],
         "title": "UserStatus"
+      },
+      "UserStudyAssignment": {
+        "properties": {
+          "study_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Study Id"
+          },
+          "study_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Title"
+          },
+          "role_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Name"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "assignment_status": {
+            "type": "string",
+            "title": "Assignment Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "study_id",
+          "assignment_status"
+        ],
+        "title": "UserStudyAssignment"
       },
       "ValidationError": {
         "properties": {

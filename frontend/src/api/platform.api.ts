@@ -19,6 +19,8 @@ import type {
   TeamMemberVerificationReview,
   VerifierCreateRequest,
   FirstLoginSetupRequest,
+  SuperAdminOverviewResponse,
+  ParticipantRead,
 } from '@/types/api'
 
 export const platformApi = {
@@ -99,4 +101,10 @@ export const platformApi = {
 
   listVerifiers: () =>
     apiClient.get<SuperAdminProfileRead[]>('/platform/super-admin/verifiers'),
+
+  getSuperAdminOverview: () =>
+    apiClient.get<SuperAdminOverviewResponse>('/platform/super-admin/overview'),
+
+  inspectStudyParticipants: (studyId: string) =>
+    apiClient.get<ParticipantRead[]>(`/platform/super-admin/studies/${studyId}/participants`),
 }

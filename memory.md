@@ -11,41 +11,154 @@
   - Authoritative API Contract: `docs/API_CONTRACT.md` & `docs/openapi.json`
 - **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
-  - Backend: 100% GREEN (86/86 pytest async tests passing in 201s, ruff check 0 errors, mypy 0 errors across 53 source files).
-  - API Contract: 69 paths synchronized in `docs/openapi.json` and verified by regression test suite.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 24s with optimized assets).
-  - Government Verification & Dual-Approval Onboarding: Fully implemented across Layer A (Government Verifiers / Super Admin), Layer B (Research PI / CRO Staff), and Layer C (Site PI / Clinical Sites). Independent dual-approval site participation pipeline with government approval + site PI confirmation gating study site activation. Public intake (`/request-access`), token activation (`/activate`), mandatory first-login profile setup (`ForcePasswordChangeModal`), Government Verification Dashboard (`/super-admin`), Study Detail participation pipeline (`/studies/:id`), and Site Detail incoming requests queue (`/sites/:id`).
+  - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
+  - Backend: 100% GREEN (97/97 pytest async tests passing, ruff check 0 errors, mypy 0 errors across 56 source files). Live Resend API delivery verified across all transactional templates.
+  - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 13.5s with optimized assets).
+  - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Replaced inappropriate generic telemetry cards with dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
-- **Three-Tier Institutional Governance Model**: Separates platform authority into Layer A (Government Verification Team / Platform Super Admin), Layer B (Research PI / CRO-Side Research Team), and Layer C (Site PI / Institution and Site Personnel).
-- **Independent Dual-Approval Site Study Participation**: Neither Government approval alone nor Site PI confirmation alone activates `StudySite`. Both must be affirmative (`status="approved"`). Atomically provisions/activates `StudySite` with `activation_status="activated"` only when both decisions are recorded.
-- **Strict Authorization & Self-Review Prevention**: Reviewers cannot evaluate their own onboarding requests. Research PIs cannot confirm site study participation requests; site responses are strictly gated by site institution authorization (`403 Forbidden` for non-site personnel).
-- **Single-Use Cryptographic Invitation Tokens with Email Delivery**: Tokens generated via `secrets.token_urlsafe(32)`, stored exclusively as bcrypt hashes (work factor 12) in `invitation_tokens`, with HTTP email delivery through Resend API (`EmailService`) and safe dev fallback when `RESEND_API_KEY` is not set.
-- **Mandatory First-Login Profile & Credential Setup**: First-time login for provisioned administrators and super admins enforces password change and profile completion (`full_name`, `phone`) via `FirstLoginSetupRequest`.
-- **Platform Super Admin & Controlled Onboarding Gate**: Public organizations do not automatically gain access. New applicants submit through `/request-access`. Super Admin reviews applicants through a multi-stage state machine (`pending` -> `under_review` -> `changes_requested` / `rejected` / `approved`). Approval triggers an atomic transaction creating the organization, initial admin user, organization membership, and cryptographic invitation token.
-- **Strict Token & Password Security**: Raw invitation tokens are never stored in the database. Instead, only bcrypt hashes (work factor 12) are persisted. First-time login enforces mandatory password reset (`must_change_password: bool`) via `ForcePasswordChangeModal` before user can interact with the app.
-- **Idempotent Super Admin Bootstrap**: Initial super admin is provisioned on FastAPI startup via `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_BOOTSTRAP_PASSWORD` environment variables without duplicate records or persistent plaintext passwords.
-- **Strict Implementation Fidelity to Backend API Contract**: Frontend consumes exact `/api/v1` routes and schemas derived from `docs/openapi.json`. Zero invented endpoints, parameters, or synthetic envelopes. Direct array collections consumed without artificial wrapping. State transitions use `POST .../transition` with `{ new_status: string, reason?: string | null }`.
-- **Clinical Design System Tokens (Academic/Editorial Warm Palette)**: Standardized on Paper Tint (`#F8F6F2`), Card Ivory (`#FFFFFF`), Border Parchment (`#E4DED3`), Header Deep Rust (`#7A2A12`), Accent Ochre (`#B8862E`), Text Charcoal (`#1C1A17`), and Muted Slate (`#726B5C`), with standard status colors for clinical workflows.
-- **Full Separation of Concerns & Deep Componentization**: Zero monolithic files. Features structured into Primitives (`Button`, `Icon`, `Typography`, `Surface`, `Layout`), Feedback (`Alert`, `EmptyState`, `ErrorState`, `LoadingState`, `ProgressBar`, `Skeleton`, `Spinner`, `StatusBadge`, `TransitionDialog`), Overlays (`Dialog`, `ConfirmDialog`), Data Display (`Card`, `Table`, `DataTable`), Navigation (`Breadcrumb`, `Tabs`, `Sidebar`, `Topbar`), Domain Modals (`OrganizationModal`, `SiteModal`, `ParticipantModal`, `AdverseEventModal`), and Domain Pages.
-- **Client-Side Cryptographic Verification UX**: Interactive dual-phase audit verification tool in `/audit` with live block-chain continuity and payload hash inspection.
-- **API Contract Hardening & Bootstrap Protection (Approach B)**: Hardened `POST /api/v1/users` to allow unauthenticated account creation strictly during initial platform initialization (`total_users == 0`). Once any user exists, anonymous requests are rejected with `HTTP 401 Unauthorized` (`WWW-Authenticate: Bearer`). Normal user provisioning requires authenticated context. Sensitive password hashes are guaranteed absent from all API schemas.
-- **Clean Nested Resource Derivation (GAP-01 Resolution)**: Eliminated redundant parent foreign keys from child create payloads (`OrganizationMemberCreate`, `StudyTeamMemberCreate`, `StudySiteCreate`). Parent IDs derive exclusively from URL path parameters.
-- **Deterministic Typed Analytics Schemas**: Added explicit Pydantic response models for milestone queries (`StudyMilestoneRead`) and all 7 portfolio analytics endpoints (`PortfolioOverviewResponse`, `PortfolioHealthResponse`, `PortfolioAlertItem`, etc.), eliminating untyped dictionaries and guaranteeing typed client generation.
-- **API Contract Freeze & Zero Guesswork Policy**: Created authoritative `docs/API_CONTRACT.md` and exported native `docs/openapi.json` from the live FastAPI app. Discrepancies between source dictionary and endpoint schemas documented in `docs/API_CONTRACT_GAPS.md`.
-- **Data-Model-First Foundation**: Designed full field-level data dictionary and entity-relationship models before building CRUD or APIs.
-- **Reproducible Migration Architecture**: `35f75b6f0684_initial_cro_sponsor_schema.py` defines all 20 canonical tables, foreign keys, unique constraints, and indexes. Verified via programmatic upgrade -> downgrade -> upgrade tests on blank databases.
-- **Production-Grade PyJWT & RBAC**: Real JWT bearer token authentication with role-based and multi-tenant scoping dependencies (`require_permission`, `require_organization_access`, `require_study_access`). Hardcoded system user IDs eliminated.
-- **Cryptographic Audit Trail with Canonical Payload Verification**: Dual-phase tamper detection in `/api/v1/audit/verify` verifying both hash-chain continuity and canonical payload digest integrity (ISO-8601 UTC microsecond normalization).
-- **Derived Portfolio Analytics**: Composite health indices (Green/Amber/Red risk levels), actionable alerts, milestone schedules, enrollment trends, and site breakdowns computed on the fly with zero stored redundant counters.
-- **Controlled Lifecycle State Machines**: Onboarding, Study, Study Site Activation, Ethics Approvals, Regulatory Submissions, Protocol Deviations, and CAPA Records strictly enforce allowed transition graphs and audit state changes.
-
----
+- **Real Application Context & Role Discovery**: Generated authoritative markdown context documentation and sanitized rendered HTML snapshots for downstream AI discussion without modifying application source code or permissions.
+- **Role-Dedicated Dashboards & Zero Fabricated Telemetry**: Eliminated shared/generic dashboards that exposed system-wide counts to ordinary users. Ordinary users see only data scoped to their assigned studies and sites. Unassigned or pending users see a safe access-pending state. Global `/portfolio` analytics endpoints protected by `analytics:global` returning `HTTP 403 Forbidden` to non-superadmins.
 
 ## 3. Task Log
+
+### 2026-10-10 10:35 — F02: Secure Audit Trail Authorization
+
+- **What**: Enforced global audit access authorization and multi-attribute study-scoping on `GET /api/v1/audit/logs` and `GET /api/v1/audit/verify`. Prevented cross-tenant data leakage across studies, sites, participants, documents, and system entities.
+- **Why**: `GET /api/v1/audit/logs` and `GET /api/v1/audit/verify` previously authenticated callers without authorization or study scoping, allowing ordinary authenticated users and Government Verification Super Admins to retrieve global audit records and probe cryptographic verification across unrelated studies and tenants.
+- **How**:
+  1. Registered canonical permission `audit:read` (`audit`, `read`) in `CANONICAL_PERMISSIONS` in `backend/app/core/rbac.py`.
+  2. Implemented `has_global_audit_permission(user: User) -> bool` and `require_global_audit_access(current_user: User)` in `backend/app/core/auth.py`, strictly requiring technical System Administrator status or explicit `audit:read` role assignment (excluding generic `SuperAdminProfile` bypass).
+  3. In `backend/app/api/v1/audit.py`:
+     - Applied `require_global_audit_access` to `GET /api/v1/audit/verify` (401 for anonymous, 403 for ordinary users and pure Government Super Admins).
+     - In `GET /api/v1/audit/logs`: allowed global queries only for callers with global audit access. For non-global callers, mandated `resource_type` and `resource_id` scoping; verified that requested study, participant, document, or site belongs strictly to the caller's authorized studies (`get_user_study_scope_ids`), returning `HTTP 403 Forbidden` for unrelated studies/participants/sites/system entities or omitted filters.
+  4. Created 18 regression tests in `backend/tests/test_audit_rbac.py` verifying anonymous 401s, ordinary user 403s, government super admin 403s, global auditor 200s, study-scoped isolation across dual studies/sites/participants, and scoping bypass protections.
+- **Result**: Audit logs are fully protected against unscoped enumeration and cross-study tampering while preserving 21 CFR Part 11 cryptographic hash-chain integrity.
+- **Verified by**: `pytest -v -k audit` (20/20 passed in 61.83s), `pytest tests/test_auth_rbac.py tests/test_role_dashboards_rbac.py tests/test_api_endpoints.py -v` (43/43 passed in 102.48s), `ruff check app/ tests/` (0 errors), `mypy app/` (0 errors across 56 files).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Address F03 (Document/TMF authorization) in subsequent task per user instruction.
+
+### 2026-10-10 10:00 — F01B Security Review and Admin-Role Separation
+
+- **What**: Enforced architectural separation between technical System Administrator and Government Verification Super Admin across `backend/app/core/auth.py` and `backend/app/api/v1/users.py`, eliminating unauthorized technical privilege inheritance for Government Verification Super Admins and defending against role creation payload bypasses.
+- **Why**: `is_system_admin()` and wildcard permissions (`*`) previously treated active `SuperAdminProfile` as technical administrators, inadvertently exposing technical user directory operations, permission registry enumeration, and role creation to government verification personnel whose mandate is platform verification rather than IT operations.
+- **How**:
+  1. Added `is_technical_system_admin(user: User) -> bool`, `has_user_manage_permission(user: User) -> bool`, and `require_user_management(current_user: User)` in `backend/app/core/auth.py` strictly checking system-scoped technical role memberships or explicit `user:manage` assignments, excluding `SuperAdminProfile`.
+  2. In `backend/app/api/v1/users.py`:
+     - Applied `require_user_management` to `GET /api/v1/users` and `GET /api/v1/permissions` (pure Government Super Admins receive `HTTP 403 Forbidden`).
+     - In `GET /api/v1/users/{user_id}`: preserved self-lookup for all authenticated users; gated third-party lookup with `has_user_manage_permission` (pure Government Super Admins receive `HTTP 403 Forbidden`).
+     - In `POST /api/v1/roles`: gated caller with `require_user_management` and rejected system-level role creation bypass attempts across `scope_level == ScopeLevel.system`, raw payload `is_system_role == True`, and reserved role names (`"System Administrator"`, `"System Admin"`, `"Super Admin"`, etc.) with `HTTP 403 Forbidden` unless the caller is an active technical System Administrator.
+     - In `GET /api/v1/roles`: maintained `get_current_user` to support UI role pickers.
+  3. Added 6 new regression tests and updated 1 test in `backend/tests/test_auth_rbac.py` (total 31 tests in `test_auth_rbac.py`).
+- **Result**: Technical IT administration is cleanly decoupled from Government Verification oversight with robust payload bypass protection.
+- **Verified by**: `pytest tests/test_auth_rbac.py tests/test_role_dashboards_rbac.py tests/test_api_endpoints.py -v` (43/43 passed in 110.12s), `ruff check app/ tests/` (0 errors), `mypy app/` (0 errors across 56 files).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Address F02 (Audit trail authorization) in subsequent task per user instruction.
+
+### 2026-10-10 09:35 — F01B: Secure User and Role Management Endpoints
+
+- **What**: Remediated adjacent authorization and privilege escalation vulnerabilities in `backend/app/api/v1/users.py` across `GET /users/{user_id}`, `POST /roles`, `GET /roles`, and `GET /permissions`.
+- **Why**: Prevent IDOR data leakage on individual user lookups, prevent unauthorized and privilege-escalating system role creation, and protect internal security permissions from enumeration by unprivileged callers.
+- **How**:
+  1. `GET /users/{user_id}`: Permitted self-lookup (`current_user.id == user_id`); required `user:manage` or administrative rights for third-party lookup, returning `HTTP 403 Forbidden` to unauthorized ordinary users.
+  2. `POST /roles`: Required `require_permission("user:manage")`, and explicitly blocked non-System-Administrators from creating `ScopeLevel.system` roles (preventing privilege escalation).
+  3. `GET /permissions`: Restricted to `require_permission("user:manage")`, preventing unauthorized capability enumeration.
+  4. `GET /roles`: Preserved authenticated role lookup (`get_current_user`) to support legitimate role selection dropdowns in Study and Organization pages without breaking frontend flows.
+  5. Added 15 comprehensive regression tests in `backend/tests/test_auth_rbac.py`.
+- **Result**: All user, role, and permission endpoints in `users.py` are strictly protected by least privilege with zero regressions.
+- **Verified by**: `pytest tests/test_auth_rbac.py -v` (25/25 passed), `pytest tests/test_auth_rbac.py tests/test_role_dashboards_rbac.py -v` (36/36 passed), `pytest tests/test_api_endpoints.py -v` (1/1 passed).
+- **Follow-ups**: Address F02 (Audit Trail authorization) in subsequent task.
+
+### 2026-10-10 09:15 — F01: Protect the User Directory API (GET /api/v1/users)
+
+- **What**: Enforced proper RBAC authorization on `GET /api/v1/users` by replacing the plain `get_current_user` dependency with `require_permission("user:manage")`, registered `user:manage` as a canonical permission in `app/core/rbac.py`, and added comprehensive regression tests.
+- **Why**: Prevent unauthorized enumeration of the platform user directory by ordinary authenticated users while preserving legitimate access for administrators and users explicitly granted user-management permissions.
+- **How**:
+  1. Updated `backend/app/api/v1/users.py` to import `require_permission` and set `current_user: User = Depends(require_permission("user:manage"))`.
+  2. Added `user:manage` to `CANONICAL_PERMISSIONS` in `backend/app/core/rbac.py`.
+  3. Added 4 focused regression tests and updated unauthenticated assertion in `backend/tests/test_auth_rbac.py` verifying: (1) anonymous request -> 401; (2) ordinary user without `user:manage` -> 403; (3) user with `user:manage` -> 200; (4) System Administrator -> 200; (5) Government Verification Super Admin -> 200.
+- **Result**: `GET /api/v1/users` is securely protected. Unauthorized callers receive `HTTP 403 Forbidden` with `"Permission denied: missing required permission 'user:manage'"`.
+- **Verified by**: `pytest tests/test_auth_rbac.py -v` (10/10 passed), `pytest tests/test_auth_rbac.py tests/test_role_dashboards_rbac.py -v` (21/21 passed).
+- **Follow-ups**: Address F02 (Audit Trail access control) and F03 (Document/TMF scoping) in subsequent tasks upon user instruction.
+
+### 2026-10-10 08:20 — Port Cleanup (8002 & 8003)
+
+- **What**: Identified and terminated processes holding ports 8002 and 8003 (`python -m http.server 8002`, `python -m http.server 8003`, and `nport 8003` tunnel proxy).
+- **Why**: User requested freeing ports 8002 and 8003.
+- **How**: Identified PIDs 12712, 15181, 23932, 23953, 23954, 23995 via `ps aux` and `/proc/*/cmdline`; sent SIGTERM followed by SIGKILL; verified with socket connection tests.
+- **Result**: Both ports 8002 and 8003 are verified closed and free for reuse.
+- **Verified by**: Python TCP socket connection test (`connect_ex` returns error 111 / ECONNREFUSED for both ports).
+
+### 2026-10-10 03:30 — Real Application Discovery, Role-by-Role Browser Audit & Context Generation
+
+- **What**: Executed a comprehensive, strictly non-destructive QA and security audit of the live running AyuCTMS application across all supported user roles, routes, and workflows; generated the master context report `AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 architectural sub-reports, 3 network reports, 23 page reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`.
+- **Why**: Provide another AI with an authoritative, grounded, evidence-based context report of the actual application behavior, identifying real UI states, role permissions, routing, and defect areas for strategic discussion without modifying code.
+- **How**:
+  1. Started backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) daemon processes; verified health with HTTP 200.
+  2. Inspected `ctms.db` and discovered 5 test accounts (`admin@ayuctms.example`, `admin@ayuctms.gov.in`, `pi.rajesh@aiia.gov.in`, `dr.patel.dbg@gah.edu.in`, `nitinbhujwa@gmail.com`) across 6 canonical roles.
+  3. Authenticated all 5 accounts against live REST API endpoints; captured JSON payloads into `network/api_audit_dump.json`.
+  4. Executed high-fidelity React 19 SSR DOM rendering engine with JSDOM and QueryClient to generate 32 sanitized HTML snapshots (stripping `<style>`, `<link rel="stylesheet">`, and inline styles while preserving semantic markup, forms, and ARIA labels).
+  5. Documented 23 detailed page reports in `pages/` citing exact routes, roles, API endpoints, interactive controls, and observed defects.
+  6. Documented network architecture (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`).
+  7. Formatted master report `AYUCTMS_REAL_APP_CONTEXT.md` strictly according to Sections A through O with evidence tier labels (`RUNTIME_CONFIRMED`, `API_CONFIRMED`, `SOURCE_CONFIRMED`, etc.).
+- **Result**: Complete audit artifact bundle assembled under `artifacts/ayuctms-context-audit/`. All live routes, role scoping, site onboarding, and participant ingestion workflows fully characterized with concrete evidence.
+- **Verified by**: `curl http://127.0.0.1:8000/health` (200), `curl http://127.0.0.1:5173/` (200), `python3 audit_network.py` (all endpoints tested across 5 accounts), and `npm run build` (production build verified clean).
+- **Not verified**: Live AWS S3 binary uploads (simulated storage keys used in local environment); live email transmission (Resend API key inactive in local dev, fallback logging verified).
+- **Follow-ups**: Present the generated context files to the user for downstream AI defect discussion and strategic roadmap planning.
+
+### 2026-10-09 23:15 — Role-Specific Dashboards, Scoped Permissions & Protocol-Driven Site Assignment
+
+- **What**: Eliminated the inappropriate generic dashboard and fabricated telemetry; implemented role-specific operational dashboards (Super Admin Read-Only Overview, Research PI Sponsor Hub, CRO Trial Workspace, Site PI Clinical Workspace, and Access-Pending Safe Restricted State); enforced backend role scoping (`analytics:global` gating `/portfolio`, CRO site assignment restriction); and enforced protocol-driven site-scoped participant validation.
+- **Why**: Clinical trial management requires strict role isolation where ordinary researchers and investigators must never view system-wide statistics or cross-tenant data. CROs must not directly activate clinical sites without institutional and government approval, and participants must strictly register only at verified, activated protocol sites.
+- **How**:
+  1. **Backend Role & Scope Enforcement (`backend/app/core/rbac.py`, `backend/app/api/v1/dashboard.py`, `portfolio.py`, `studies.py`, `participants.py`)**: Gated `/portfolio/*` analytics endpoints with `analytics:global` permission (returning HTTP 403 to non-superadmins). Restricted `POST /studies/{id}/sites` so CROs cannot directly bind sites (HTTP 403). Added `GET /studies/{id}/eligible-sites` for CRO discovery. Added `GET /api/v1/dashboard/summary` resolving the user's role and returning strictly scoped telemetry. Added row-level validated `POST /participants/bulk-import`. Added 11 automated pytest tests in `tests/test_role_dashboards_rbac.py`.
+  2. **TypeScript & API Contract Synchronization**: Synchronized OpenAPI specification (74 endpoints in `docs/openapi.json`), regenerated `schema.d.ts`, and updated `frontend/src/types/api.ts` with `SuperAdminOrgItem`, `ParticipantImportItem`, and `ParticipantImportError`.
+  3. **Role-Dedicated Frontend Dashboards (`frontend/src/features/dashboard/`, `frontend/src/pages/dashboard/DashboardPage.tsx`)**:
+     - `SuperAdminOverviewDashboard`: System-wide read-only oversight displaying registered Sponsors, CROs, study progression, site participation, and an interactive read-only participant inspector modal without any mutating clinical actions.
+     - `ResearchPIDashboard`: Focused protocol oversight showing assigned studies, activated sites, team invitation statuses, and upcoming protocol milestones.
+     - `CROWorkspaceDashboard`: Operational workspace showing managed trials, an eligible site discovery modal with participation request trigger, and a protocol-validated participant CSV bulk import modal.
+     - `SitePIDashboard`: Clinical facility workspace showing active trials at the site, tracked subjects, open adverse events, and an incoming study participation requests queue with independent confirm/decline action.
+     - `AccessPendingDashboard`: Safe restricted state rendered when an authenticated user has no assigned active role or pending memberships.
+- **Result**: Users now land on their dedicated, authenticated institutional role view with zero exposure to system-wide counts or fabricated cards. All 15 canonical permissions are strictly enforced.
+- **Verified by**:
+  - `pytest tests/ -v` (backend) → 97 passed in 267.77s (11/11 role dashboard tests, 12/12 contract tests, 20/20 government onboarding tests, 54/54 core domain tests).
+  - `ruff check app/ tests/` (backend) → 0 errors.
+  - `mypy app/` (backend) → Success: no issues found in 56 source files.
+  - `npm run verify` (`oxlint && tsc -b && vite build`) (frontend) → 0 errors, built in 13.51s.
+  - Secret scan on git diff → Clean (0 secrets exposed).
+- **Files added/modified**: `backend/app/core/rbac.py`, `backend/app/api/v1/dashboard.py`, `backend/app/schemas/dashboard.py`, `backend/tests/test_role_dashboards_rbac.py`, `backend/app/api/v1/portfolio.py`, `backend/app/api/v1/studies.py`, `backend/app/api/v1/participants.py`, `docs/openapi.json`, `frontend/src/api/generated/schema.d.ts`, `frontend/src/types/api.ts`, `frontend/src/api/dashboard.api.ts`, `frontend/src/api/studies.api.ts`, `frontend/src/api/participants.api.ts`, `frontend/src/api/platform.api.ts`, `frontend/src/pages/dashboard/DashboardPage.tsx`, `frontend/src/features/dashboard/index.ts`, `frontend/src/features/dashboard/SuperAdminOverviewDashboard.tsx`, `frontend/src/features/dashboard/ResearchPIDashboard.tsx`, `frontend/src/features/dashboard/CROWorkspaceDashboard.tsx`, `frontend/src/features/dashboard/SitePIDashboard.tsx`, `frontend/src/features/dashboard/AccessPendingDashboard.tsx`, `memory.md`.
+
+### 2026-10-09 20:05 — Concurrent Full-Stack Dev Runners (Bash & Windows) with Clean Lifecycle Management
+
+- **What**: Created unified, concurrent development runner scripts for Linux/macOS/Bash (`run_dev.sh`), Windows Batch (`run_dev.bat`), and Windows PowerShell (`run_dev.ps1`) that start both backend and frontend together and cleanly terminate both on Ctrl+C.
+- **Why**: Developer requested a single runner file to start both the FastAPI backend and Vite frontend together and stop both on interrupt without leaving orphan processes holding ports 8000 or 5173.
+- **How**:
+  1. Built `run_dev.sh` with automatic Python venv / system detection, npm verification, background execution of uvicorn and vite, and POSIX `trap cleanup SIGINT SIGTERM EXIT` killing parent and child worker process trees (`pkill -P`).
+  2. Built `run_dev.ps1` using native PowerShell `Start-Process` and `try...finally` with `taskkill /pid ... /f /t` to terminate all descendant processes on Ctrl+C.
+  3. Built `run_dev.bat` providing both PowerShell delegation and standalone Command Prompt window title / process tree termination.
+  4. Tested `run_dev.sh` live: verified both `http://127.0.0.1:8000/health` (HTTP 200) and `http://localhost:5173/` (HTTP 200) were healthy, followed by cancellation testing proving both ports closed immediately with zero orphan processes.
+- **Result**: Developer can start the entire stack with a single command (`./run_dev.sh` on Linux/Mac or `run_dev.bat` / `.\run_dev.ps1` on Windows) and press Ctrl+C to terminate everything cleanly.
+- **Verified by**: Live runtime test with curl health checks (200 OK) + kill signal test + process table verification (`ps aux | grep -E "uvicorn|vite"` returned 0 matching processes).
+
+### 2026-10-09 19:50 — Resend API Live Verification & Non-Blocking Delivery Hardening
+
+- **What**: Verified live Resend API email integration configured in root `.env`, hardened `EmailService` against third-party error crashes, and updated test suite isolation.
+- **Why**: User configured live `RESEND_API_KEY` in root `.env`. Trial tier restrictions (`onboarding@resend.dev` only sending to registered account owner or `delivered@resend.dev`) and external API failures previously threw unhandled `RuntimeError` (HTTP 500) during dummy email processing.
+- **How**:
+  1. Updated `Settings` in `backend/app/core/config.py` to automatically load credentials from root `ctms/.env` via `SettingsConfigDict`.
+  2. Hardened `EmailService.send_email` in `backend/app/services/email.py` to catch Resend API errors (e.g., 403 unverified recipients, 429 rate limits) and connection exceptions cleanly, returning structured error status instead of raising unhandled `RuntimeError`.
+  3. Hardened `PlatformService` provisioning to compute `invitation_sent` accurately from the email dispatch result and always provide `raw_token` upon initial creation.
+  4. Isolated automated unit tests in `tests/conftest.py` with `_mock_email_service` to eliminate external network latency and quota burn.
+  5. Verified live transactional delivery across all 3 templates (`send_activation_email`, `send_team_invitation_email`, `send_site_participation_request_email`) via Resend API to `delivered@resend.dev`.
+- **Result**: Resend integration is 100% active and functioning live. Live message IDs received from Resend: `01a12156-13d8-7b8b-a345-47d6216427f2`, `01a12156-16dc-72bb-a8d4-af84c70686f0`, and `01a12156-19f3-7582-9821-54917f0c4881`.
+- **Verified by**: Live Resend API invocation returning HTTP 200 message IDs; 86/86 pytest backend tests passing green; `ruff check app/ tests/` 0 errors; `mypy app/` 0 errors (53 files); diff secret scan clean.
+- **Follow-ups**: To send emails to external domains other than `nitinbhujwa@gmail.com` or `delivered@resend.dev`, user should verify a domain in their Resend dashboard and update `RESEND_FROM_EMAIL`.
 
 ### 2026-10-09 19:15 — AyuCTMS Government Verification, Super Admin & Research/Site Onboarding Workflow
 

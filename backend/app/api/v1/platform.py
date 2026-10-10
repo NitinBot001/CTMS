@@ -23,6 +23,8 @@ from app.models.platform import (
     TeamMemberVerificationRequest,
 )
 from app.models.user import SuperAdminProfile, User
+from app.schemas.dashboard import SuperAdminOverviewResponse
+from app.schemas.participant import ParticipantRead
 from app.schemas.platform import (
     ActivationRequest,
     ActivationResponse,
@@ -598,3 +600,36 @@ async def list_verifiers(
     )
     res = await db.execute(stmt)
     return [SuperAdminProfileRead.model_validate(p) for p in res.scalars().all()]
+
+
+@router.get("/super-admin/overview", response_model=SuperAdminOverviewResponse)
+async def get_super_admin_overview(
+    current_admin: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+) -> SuperAdminOverviewResponse:
+    """Global read-only platform operations overview for Super Admin."""
+    from app.api.v1.dashboard import _build_super_admin_overview
+
+    return await _build_super_admin_overview(db)
+
+
+@router.get("/super-admin/studies/{study_id}/participants", response_model=list[ParticipantRead])
+async def inspect_study_participants(
+    study_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_admin: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[ParticipantRead]:
+    """Read-only study-scoped participant inspection for Super Admin."""
+    from app.models.participant import Participant
+
+    stmt = (
+        select(Participant)
+        .where(Participant.study_id == study_id)
+        .offset(skip)
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    return [ParticipantRead.model_validate(p) for p in res.scalars().all()]
+

@@ -1,104 +1,109 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { portfolioApi } from '@/api/portfolio.api'
+import { dashboardApi } from '@/api/dashboard.api'
 import { PageContainer, PageHeader } from '@/components/layout'
 import {
-  OverviewKPIs,
-  HealthSummaryCard,
-  AlertsPanel,
-  UpcomingMilestones,
-  EnrollmentTrendChart,
+  SuperAdminOverviewDashboard,
+  ResearchPIDashboard,
+  CROWorkspaceDashboard,
+  SitePIDashboard,
+  AccessPendingDashboard,
 } from '@/features/dashboard'
 import { LoadingState, ErrorState } from '@/components/feedback'
 import { Button } from '@/components/primitives/Button'
 import { Icon } from '@/components/primitives/Icon'
 
 export const DashboardPage: React.FC = () => {
-  const overviewQuery = useQuery({
-    queryKey: ['portfolio', 'overview'],
-    queryFn: portfolioApi.getOverview,
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: dashboardApi.getSummary,
   })
 
-  const healthQuery = useQuery({
-    queryKey: ['portfolio', 'health'],
-    queryFn: portfolioApi.getHealth,
-  })
-
-  const alertsQuery = useQuery({
-    queryKey: ['portfolio', 'alerts'],
-    queryFn: portfolioApi.getAlerts,
-  })
-
-  const milestonesQuery = useQuery({
-    queryKey: ['portfolio', 'milestones'],
-    queryFn: () => portfolioApi.getUpcomingMilestones(10),
-  })
-
-  const trendQuery = useQuery({
-    queryKey: ['portfolio', 'trend'],
-    queryFn: () => portfolioApi.getEnrollmentTrend(),
-  })
-
-  const isLoading = overviewQuery.isLoading || healthQuery.isLoading
-  const isError = overviewQuery.isError || healthQuery.isError
-
-  const handleRefetchAll = () => {
-    overviewQuery.refetch()
-    healthQuery.refetch()
-    alertsQuery.refetch()
-    milestonesQuery.refetch()
-    trendQuery.refetch()
+  // Dynamic header titles based on resolved role
+  const getHeaderMeta = (role?: string) => {
+    switch (role) {
+      case 'super_admin':
+        return {
+          title: 'Platform Operations Oversight',
+          subtitle: 'Read-only cross-organizational telemetry across all registered Sponsors, CROs, and active protocols',
+        }
+      case 'research_pi':
+        return {
+          title: 'Research Principal Investigator Hub',
+          subtitle: 'Protocol delivery oversight, affiliated site activations, and research milestones',
+        }
+      case 'cro':
+        return {
+          title: 'CRO Trial Operations Workspace',
+          subtitle: 'Multi-center protocol orchestration, site recruitment discovery, and participant monitoring',
+        }
+      case 'site_pi':
+        return {
+          title: 'Clinical Research Site Console',
+          subtitle: 'Institutional study participation, protocol confirmation, and patient tracking',
+        }
+      default:
+        return {
+          title: 'AyuCTMS Operations Dashboard',
+          subtitle: 'Institutional governance, multi-center trial progression, and GCP oversight',
+        }
+    }
   }
+
+  const meta = getHeaderMeta(data?.role)
 
   return (
     <PageContainer maxWidth="2xl">
       <PageHeader
-        title="Portfolio Operations Dashboard"
-        subtitle="Institutional governance, multi-center trial progression, and GCP oversight"
+        title={meta.title}
+        subtitle={meta.subtitle}
         actions={
           <Button
             variant="outline"
             size="sm"
-            onClick={handleRefetchAll}
-            leftIcon={<Icon name="refresh" size="xs" />}
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="text-xs"
           >
-            Refresh Telemetry
+            <Icon name="refresh" size="xs" className="mr-1.5" />
+            {isFetching ? 'Refreshing...' : 'Refresh Telemetry'}
           </Button>
         }
       />
 
-      {isLoading && <LoadingState message="Loading portfolio analytics and telemetry..." />}
+      {isLoading && (
+        <LoadingState message="Resolving role authorization and operational dashboard..." />
+      )}
 
       {isError && (
         <ErrorState
-          title="Telemetry Load Error"
-          message="Unable to retrieve real-time portfolio metrics from the backend. Please check your network and authorization."
-          onRetry={handleRefetchAll}
+          title="Dashboard Telemetry Error"
+          message="Unable to retrieve role-scoped dashboard metrics from the backend. Please check your network and authorization."
+          onRetry={() => refetch()}
         />
       )}
 
-      {!isLoading && !isError && overviewQuery.data && healthQuery.data && (
+      {!isLoading && !isError && data && (
         <div className="space-y-6">
-          {/* Composite Health Risk Summary */}
-          <HealthSummaryCard health={healthQuery.data} />
+          {data.role === 'super_admin' && data.super_admin && (
+            <SuperAdminOverviewDashboard data={data.super_admin} />
+          )}
 
-          {/* High-level Operational KPIs */}
-          <OverviewKPIs data={overviewQuery.data} />
+          {data.role === 'research_pi' && data.research_pi && (
+            <ResearchPIDashboard data={data.research_pi} />
+          )}
 
-          {/* Charts & Split Operations View */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <EnrollmentTrendChart trend={trendQuery.data || []} />
-            </div>
-            <div>
-              <AlertsPanel alerts={alertsQuery.data || []} />
-            </div>
-          </div>
+          {data.role === 'cro' && data.cro && (
+            <CROWorkspaceDashboard data={data.cro} />
+          )}
 
-          {/* Milestones Schedule */}
-          <div>
-            <UpcomingMilestones milestones={milestonesQuery.data || []} />
-          </div>
+          {data.role === 'site_pi' && data.site_pi && (
+            <SitePIDashboard data={data.site_pi} />
+          )}
+
+          {data.role === 'unassigned' && (
+            <AccessPendingDashboard onRefresh={() => refetch()} isRefreshing={isFetching} />
+          )}
         </div>
       )}
     </PageContainer>

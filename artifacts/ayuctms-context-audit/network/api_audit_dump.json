@@ -1,0 +1,474 @@
+[
+  {
+    "account": "admin@ayuctms.gov.in",
+    "name": "AyuCTMS System Administrator",
+    "endpoints": [
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"status\":\"healthy\",\"service\":\"ayuctms-backend\",\"version\":\"1.0.0\"}"
+      },
+      {
+        "endpoint": "/dashboard/summary",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"role\":\"unassigned\",\"super_admin\":null,\"research_pi\":null,\"cro\":null,\"site_pi\":null}"
+      },
+      {
+        "endpoint": "/organizations",
+        "method": "GET",
+        "status": 200,
+        "count": 6,
+        "sample": "[{\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"website\":null,\"phone\":null,\"email\":\"research@aiia.gov.in\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"id\":\"33"
+      },
+      {
+        "endpoint": "/studies",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/sites",
+        "method": "GET",
+        "status": 200,
+        "count": 3,
+        "sample": "[{\"site_code\":\"SITE-DEL-01\",\"name\":\"All India Institute of Ayurveda Main Hospital\",\"site_type\":\"hospital\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"phone\":null,\"email\":null,\"organization_id\":null,\"id\":\"bcd98577-689c-4c8f-a873-2"
+      },
+      {
+        "endpoint": "/participants",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/safety",
+        "method": "GET",
+        "status": 404,
+        "error": "{\"detail\":\"Not Found\"}"
+      },
+      {
+        "endpoint": "/compliance/capa",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/documents",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"organization_id\":null,\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":null,\"document_type\":\"protocol\",\"title\":\"AIIA Ashwagandha Cognitive Clinical Protocol Final\",\"version\":\"2.1\",\"expiry_date\":null,\"storage_key\":\"s3://aiia-ctms/protocols/AIIA-ASHWA-COG-II-v2.1.pdf\",\"file_name\":\"AIIA-A"
+      },
+      {
+        "endpoint": "/audit/logs",
+        "method": "GET",
+        "status": 200,
+        "count": 9,
+        "sample": "[{\"id\":\"e7a5834e-4689-4a94-b843-09d930591225\",\"timestamp\":\"2026-10-10T02:32:44.259178\",\"user_id\":\"5de5d0da-ce28-4ffd-887f-4dfe72ff5f31\",\"action\":\"organization.create\",\"resource_type\":\"organization\",\"resource_id\":\"c1b97d1f-98c8-45b4-9953-c653264c0e1b\",\"changes\":{\"new\":{\"name\":\"Rewa hospital \",\"organi"
+      },
+      {
+        "endpoint": "/users",
+        "method": "GET",
+        "status": 200,
+        "count": 5,
+        "sample": "[{\"email\":\"admin@ayuctms.gov.in\",\"full_name\":\"AyuCTMS System Administrator\",\"phone\":null,\"id\":\"00000000-0000-0000-0000-000000000001\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\"2026-10-05T11:59:14\",\"updated_at\":\"2026-10-05T11:59:14\"},{\"email\":\"pi.rajesh@aiia.gov.in\",\"full_name\":\"Dr."
+      },
+      {
+        "endpoint": "/platform/onboarding-requests",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      },
+      {
+        "endpoint": "/platform/super-admin/me",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      }
+    ]
+  },
+  {
+    "account": "pi.rajesh@aiia.gov.in",
+    "name": "Dr. Rajesh Sharma",
+    "endpoints": [
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"status\":\"healthy\",\"service\":\"ayuctms-backend\",\"version\":\"1.0.0\"}"
+      },
+      {
+        "endpoint": "/dashboard/summary",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"role\":\"site_pi\",\"super_admin\":null,\"research_pi\":null,\"cro\":null,\"site_pi\":{\"site_id\":\"bcd98577-689c-4c8f-a873-21a045c04ea4\",\"site_name\":\"All India Institute of Ayurveda Main Hospital\",\"site_code\":\"SITE-DEL-01\",\"city\":\"New Delhi\",\"active_studies_count\":1,\"pending_requests_count\":0,\"participants_co"
+      },
+      {
+        "endpoint": "/organizations",
+        "method": "GET",
+        "status": 200,
+        "count": 6,
+        "sample": "[{\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"website\":null,\"phone\":null,\"email\":\"research@aiia.gov.in\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"id\":\"33"
+      },
+      {
+        "endpoint": "/studies",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"study_code\":\"AYU-CT-2026-001\",\"protocol_number\":\"AIIA-ASHWA-COG-II\",\"title\":\"Multi-Center Randomized Trial on Ashwagandha Formulation for Cognitive Health\",\"short_title\":\"Ashwagandha Cognitive Trial\",\"study_type\":\"interventional\",\"phase\":\"phase_2\",\"sponsor_org_id\":\"3330c197-5f5d-4623-983a-ad24c7b"
+      },
+      {
+        "endpoint": "/sites",
+        "method": "GET",
+        "status": 200,
+        "count": 3,
+        "sample": "[{\"site_code\":\"SITE-DEL-01\",\"name\":\"All India Institute of Ayurveda Main Hospital\",\"site_type\":\"hospital\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"phone\":null,\"email\":null,\"organization_id\":null,\"id\":\"bcd98577-689c-4c8f-a873-2"
+      },
+      {
+        "endpoint": "/participants",
+        "method": "GET",
+        "status": 200,
+        "count": 15,
+        "sample": "[{\"participant_code\":\"ASH-DEL-001\",\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":\"bcd98577-689c-4c8f-a873-21a045c04ea4\",\"screening_date\":\"2026-07-18\",\"id\":\"5066870c-c39a-4526-8fed-e610ae72c5ce\",\"status\":\"completed\",\"enrollment_date\":\"2026-07-28\",\"randomization_date\":null,\"completion_da"
+      },
+      {
+        "endpoint": "/safety",
+        "method": "GET",
+        "status": 404,
+        "error": "{\"detail\":\"Not Found\"}"
+      },
+      {
+        "endpoint": "/compliance/capa",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/documents",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"organization_id\":null,\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":null,\"document_type\":\"protocol\",\"title\":\"AIIA Ashwagandha Cognitive Clinical Protocol Final\",\"version\":\"2.1\",\"expiry_date\":null,\"storage_key\":\"s3://aiia-ctms/protocols/AIIA-ASHWA-COG-II-v2.1.pdf\",\"file_name\":\"AIIA-A"
+      },
+      {
+        "endpoint": "/audit/logs",
+        "method": "GET",
+        "status": 200,
+        "count": 9,
+        "sample": "[{\"id\":\"e7a5834e-4689-4a94-b843-09d930591225\",\"timestamp\":\"2026-10-10T02:32:44.259178\",\"user_id\":\"5de5d0da-ce28-4ffd-887f-4dfe72ff5f31\",\"action\":\"organization.create\",\"resource_type\":\"organization\",\"resource_id\":\"c1b97d1f-98c8-45b4-9953-c653264c0e1b\",\"changes\":{\"new\":{\"name\":\"Rewa hospital \",\"organi"
+      },
+      {
+        "endpoint": "/users",
+        "method": "GET",
+        "status": 200,
+        "count": 5,
+        "sample": "[{\"email\":\"admin@ayuctms.gov.in\",\"full_name\":\"AyuCTMS System Administrator\",\"phone\":null,\"id\":\"00000000-0000-0000-0000-000000000001\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\"2026-10-05T11:59:14\",\"updated_at\":\"2026-10-05T11:59:14\"},{\"email\":\"pi.rajesh@aiia.gov.in\",\"full_name\":\"Dr."
+      },
+      {
+        "endpoint": "/platform/onboarding-requests",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      },
+      {
+        "endpoint": "/platform/super-admin/me",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      }
+    ]
+  },
+  {
+    "account": "admin@ayuctms.example",
+    "name": "Nitin Bhujwa",
+    "endpoints": [
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"status\":\"healthy\",\"service\":\"ayuctms-backend\",\"version\":\"1.0.0\"}"
+      },
+      {
+        "endpoint": "/dashboard/summary",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"role\":\"super_admin\",\"super_admin\":{\"is_read_only\":true,\"total_sponsors\":1,\"total_cros\":3,\"total_studies\":2,\"sponsors\":[{\"id\":\"3330c197-5f5d-4623-983a-ad24c7b5610d\",\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"status\":\"active\""
+      },
+      {
+        "endpoint": "/organizations",
+        "method": "GET",
+        "status": 200,
+        "count": 6,
+        "sample": "[{\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"website\":null,\"phone\":null,\"email\":\"research@aiia.gov.in\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"id\":\"33"
+      },
+      {
+        "endpoint": "/studies",
+        "method": "GET",
+        "status": 200,
+        "count": 2,
+        "sample": "[{\"study_code\":\"AYU-CT-2026-001\",\"protocol_number\":\"AIIA-ASHWA-COG-II\",\"title\":\"Multi-Center Randomized Trial on Ashwagandha Formulation for Cognitive Health\",\"short_title\":\"Ashwagandha Cognitive Trial\",\"study_type\":\"interventional\",\"phase\":\"phase_2\",\"sponsor_org_id\":\"3330c197-5f5d-4623-983a-ad24c7b"
+      },
+      {
+        "endpoint": "/sites",
+        "method": "GET",
+        "status": 200,
+        "count": 3,
+        "sample": "[{\"site_code\":\"SITE-DEL-01\",\"name\":\"All India Institute of Ayurveda Main Hospital\",\"site_type\":\"hospital\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"phone\":null,\"email\":null,\"organization_id\":null,\"id\":\"bcd98577-689c-4c8f-a873-2"
+      },
+      {
+        "endpoint": "/participants",
+        "method": "GET",
+        "status": 200,
+        "count": 15,
+        "sample": "[{\"participant_code\":\"ASH-DEL-001\",\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":\"bcd98577-689c-4c8f-a873-21a045c04ea4\",\"screening_date\":\"2026-07-18\",\"id\":\"5066870c-c39a-4526-8fed-e610ae72c5ce\",\"status\":\"completed\",\"enrollment_date\":\"2026-07-28\",\"randomization_date\":null,\"completion_da"
+      },
+      {
+        "endpoint": "/safety",
+        "method": "GET",
+        "status": 404,
+        "error": "{\"detail\":\"Not Found\"}"
+      },
+      {
+        "endpoint": "/compliance/capa",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/documents",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"organization_id\":null,\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":null,\"document_type\":\"protocol\",\"title\":\"AIIA Ashwagandha Cognitive Clinical Protocol Final\",\"version\":\"2.1\",\"expiry_date\":null,\"storage_key\":\"s3://aiia-ctms/protocols/AIIA-ASHWA-COG-II-v2.1.pdf\",\"file_name\":\"AIIA-A"
+      },
+      {
+        "endpoint": "/audit/logs",
+        "method": "GET",
+        "status": 200,
+        "count": 9,
+        "sample": "[{\"id\":\"e7a5834e-4689-4a94-b843-09d930591225\",\"timestamp\":\"2026-10-10T02:32:44.259178\",\"user_id\":\"5de5d0da-ce28-4ffd-887f-4dfe72ff5f31\",\"action\":\"organization.create\",\"resource_type\":\"organization\",\"resource_id\":\"c1b97d1f-98c8-45b4-9953-c653264c0e1b\",\"changes\":{\"new\":{\"name\":\"Rewa hospital \",\"organi"
+      },
+      {
+        "endpoint": "/users",
+        "method": "GET",
+        "status": 200,
+        "count": 5,
+        "sample": "[{\"email\":\"admin@ayuctms.gov.in\",\"full_name\":\"AyuCTMS System Administrator\",\"phone\":null,\"id\":\"00000000-0000-0000-0000-000000000001\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\"2026-10-05T11:59:14\",\"updated_at\":\"2026-10-05T11:59:14\"},{\"email\":\"pi.rajesh@aiia.gov.in\",\"full_name\":\"Dr."
+      },
+      {
+        "endpoint": "/platform/onboarding-requests",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"request_type\":\"cro_staff\",\"applicant_name\":\"Nitin Bhujwa\",\"organization_name\":\"Rewa ayu collage\",\"organization_type\":\"cro\",\"email\":\"nitinbhujwa@gmail.com\",\"phone\":\"6263990721\",\"website\":null,\"description\":null,\"designation\":\"Clinical Research Associate\",\"qualifications\":\"Dhejh\",\"requested_role\":\""
+      },
+      {
+        "endpoint": "/platform/super-admin/me",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"user_id\":\"3330a57a-b430-4450-962a-5bdfb38718da\",\"is_active\":true,\"bootstrapped_at\":\"2026-10-09T16:00:54\",\"user\":{\"email\":\"admin@ayuctms.example\",\"full_name\":\"Nitin Bhujwa\",\"phone\":\"6263990731\",\"id\":\"3330a57a-b430-4450-962a-5bdfb38718da\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\""
+      }
+    ]
+  },
+  {
+    "account": "nitinbhujwa@gmail.com",
+    "name": "Nitin Bhujwa",
+    "endpoints": [
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"status\":\"healthy\",\"service\":\"ayuctms-backend\",\"version\":\"1.0.0\"}"
+      },
+      {
+        "endpoint": "/dashboard/summary",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"role\":\"cro\",\"super_admin\":null,\"research_pi\":null,\"cro\":{\"studies\":[],\"eligible_sites_count\":3,\"pending_site_requests_count\":0,\"total_participants_in_scope\":0,\"recent_site_requests\":[]},\"site_pi\":null}"
+      },
+      {
+        "endpoint": "/organizations",
+        "method": "GET",
+        "status": 200,
+        "count": 6,
+        "sample": "[{\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"website\":null,\"phone\":null,\"email\":\"research@aiia.gov.in\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"id\":\"33"
+      },
+      {
+        "endpoint": "/studies",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/sites",
+        "method": "GET",
+        "status": 200,
+        "count": 3,
+        "sample": "[{\"site_code\":\"SITE-DEL-01\",\"name\":\"All India Institute of Ayurveda Main Hospital\",\"site_type\":\"hospital\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"phone\":null,\"email\":null,\"organization_id\":null,\"id\":\"bcd98577-689c-4c8f-a873-2"
+      },
+      {
+        "endpoint": "/participants",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/safety",
+        "method": "GET",
+        "status": 404,
+        "error": "{\"detail\":\"Not Found\"}"
+      },
+      {
+        "endpoint": "/compliance/capa",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/documents",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"organization_id\":null,\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":null,\"document_type\":\"protocol\",\"title\":\"AIIA Ashwagandha Cognitive Clinical Protocol Final\",\"version\":\"2.1\",\"expiry_date\":null,\"storage_key\":\"s3://aiia-ctms/protocols/AIIA-ASHWA-COG-II-v2.1.pdf\",\"file_name\":\"AIIA-A"
+      },
+      {
+        "endpoint": "/audit/logs",
+        "method": "GET",
+        "status": 200,
+        "count": 9,
+        "sample": "[{\"id\":\"e7a5834e-4689-4a94-b843-09d930591225\",\"timestamp\":\"2026-10-10T02:32:44.259178\",\"user_id\":\"5de5d0da-ce28-4ffd-887f-4dfe72ff5f31\",\"action\":\"organization.create\",\"resource_type\":\"organization\",\"resource_id\":\"c1b97d1f-98c8-45b4-9953-c653264c0e1b\",\"changes\":{\"new\":{\"name\":\"Rewa hospital \",\"organi"
+      },
+      {
+        "endpoint": "/users",
+        "method": "GET",
+        "status": 200,
+        "count": 5,
+        "sample": "[{\"email\":\"admin@ayuctms.gov.in\",\"full_name\":\"AyuCTMS System Administrator\",\"phone\":null,\"id\":\"00000000-0000-0000-0000-000000000001\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\"2026-10-05T11:59:14\",\"updated_at\":\"2026-10-05T11:59:14\"},{\"email\":\"pi.rajesh@aiia.gov.in\",\"full_name\":\"Dr."
+      },
+      {
+        "endpoint": "/platform/onboarding-requests",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      },
+      {
+        "endpoint": "/platform/super-admin/me",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      }
+    ]
+  },
+  {
+    "account": "dr.patel.dbg@gah.edu.in",
+    "name": "Dr. Patel",
+    "endpoints": [
+      {
+        "endpoint": "/health",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"status\":\"healthy\",\"service\":\"ayuctms-backend\",\"version\":\"1.0.0\"}"
+      },
+      {
+        "endpoint": "/dashboard/summary",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "{\"role\":\"site_pi\",\"super_admin\":null,\"research_pi\":null,\"cro\":null,\"site_pi\":{\"site_id\":null,\"site_name\":null,\"site_code\":null,\"city\":null,\"active_studies_count\":0,\"pending_requests_count\":0,\"participants_count\":0,\"open_safety_events\":0,\"incoming_requests\":[]}}"
+      },
+      {
+        "endpoint": "/organizations",
+        "method": "GET",
+        "status": 200,
+        "count": 6,
+        "sample": "[{\"name\":\"All India Institute of Ayurveda (AIIA)\",\"organization_type\":\"sponsor\",\"registration_number\":\"AYUSH-INST-001\",\"website\":null,\"phone\":null,\"email\":\"research@aiia.gov.in\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"id\":\"33"
+      },
+      {
+        "endpoint": "/studies",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/sites",
+        "method": "GET",
+        "status": 200,
+        "count": 3,
+        "sample": "[{\"site_code\":\"SITE-DEL-01\",\"name\":\"All India Institute of Ayurveda Main Hospital\",\"site_type\":\"hospital\",\"address_line1\":null,\"address_line2\":null,\"city\":\"New Delhi\",\"state\":\"Delhi\",\"country\":\"India\",\"postal_code\":null,\"phone\":null,\"email\":null,\"organization_id\":null,\"id\":\"bcd98577-689c-4c8f-a873-2"
+      },
+      {
+        "endpoint": "/participants",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/safety",
+        "method": "GET",
+        "status": 404,
+        "error": "{\"detail\":\"Not Found\"}"
+      },
+      {
+        "endpoint": "/compliance/capa",
+        "method": "GET",
+        "status": 200,
+        "count": 0,
+        "sample": "[]"
+      },
+      {
+        "endpoint": "/documents",
+        "method": "GET",
+        "status": 200,
+        "count": 1,
+        "sample": "[{\"organization_id\":null,\"study_id\":\"92966003-40a0-432a-a729-1fd088307b1b\",\"site_id\":null,\"document_type\":\"protocol\",\"title\":\"AIIA Ashwagandha Cognitive Clinical Protocol Final\",\"version\":\"2.1\",\"expiry_date\":null,\"storage_key\":\"s3://aiia-ctms/protocols/AIIA-ASHWA-COG-II-v2.1.pdf\",\"file_name\":\"AIIA-A"
+      },
+      {
+        "endpoint": "/audit/logs",
+        "method": "GET",
+        "status": 200,
+        "count": 9,
+        "sample": "[{\"id\":\"e7a5834e-4689-4a94-b843-09d930591225\",\"timestamp\":\"2026-10-10T02:32:44.259178\",\"user_id\":\"5de5d0da-ce28-4ffd-887f-4dfe72ff5f31\",\"action\":\"organization.create\",\"resource_type\":\"organization\",\"resource_id\":\"c1b97d1f-98c8-45b4-9953-c653264c0e1b\",\"changes\":{\"new\":{\"name\":\"Rewa hospital \",\"organi"
+      },
+      {
+        "endpoint": "/users",
+        "method": "GET",
+        "status": 200,
+        "count": 5,
+        "sample": "[{\"email\":\"admin@ayuctms.gov.in\",\"full_name\":\"AyuCTMS System Administrator\",\"phone\":null,\"id\":\"00000000-0000-0000-0000-000000000001\",\"status\":\"active\",\"must_change_password\":false,\"created_at\":\"2026-10-05T11:59:14\",\"updated_at\":\"2026-10-05T11:59:14\"},{\"email\":\"pi.rajesh@aiia.gov.in\",\"full_name\":\"Dr."
+      },
+      {
+        "endpoint": "/platform/onboarding-requests",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      },
+      {
+        "endpoint": "/platform/super-admin/me",
+        "method": "GET",
+        "status": 403,
+        "error": "{\"detail\":\"Super Admin access required\"}"
+      }
+    ]
+  }
+]

@@ -44,6 +44,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Summary
+         * @description Returns role-tailored dashboard telemetry and data strictly scoped to the authenticated user.
+         *     Prevents unauthorized global aggregate leakage by dispatching to role-specific builders.
+         */
+        get: operations["get_dashboard_summary_api_v1_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations": {
         parameters: {
             query?: never;
@@ -221,6 +242,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/studies/{study_id}/eligible-sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Eligible Sites
+         * @description Returns registered clinical trial sites for site discovery.
+         *     Includes active assignment status and pending participation request status for this study.
+         */
+        get: operations["list_eligible_sites_api_v1_studies__study_id__eligible_sites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studies/{study_id}/sites/{site_id}/transition": {
         parameters: {
             query?: never;
@@ -303,6 +345,27 @@ export interface paths {
         put?: never;
         /** Create Participant */
         post: operations["create_participant_api_v1_participants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/bulk-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Import Participants
+         * @description Bulk imports participants for a study protocol with strict row-level validation.
+         *     Verifies study existence, activated StudySite association, and participant code uniqueness.
+         */
+        post: operations["bulk_import_participants_api_v1_participants_bulk_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1207,6 +1270,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/super-admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Super Admin Overview
+         * @description Global read-only platform operations overview for Super Admin.
+         */
+        get: operations["get_super_admin_overview_api_v1_platform_super_admin_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/super-admin/studies/{study_id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspect Study Participants
+         * @description Read-only study-scoped participant inspection for Super Admin.
+         */
+        get: operations["inspect_study_participants_api_v1_platform_super_admin_studies__study_id__participants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1472,6 +1575,54 @@ export interface components {
          * @enum {string}
          */
         CAPAType: "corrective" | "preventive";
+        /** CRODashboardResponse */
+        CRODashboardResponse: {
+            /** Studies */
+            studies: components["schemas"]["CROStudyItem"][];
+            /** Eligible Sites Count */
+            eligible_sites_count: number;
+            /** Pending Site Requests Count */
+            pending_site_requests_count: number;
+            /** Total Participants In Scope */
+            total_participants_in_scope: number;
+            /** Recent Site Requests */
+            recent_site_requests: components["schemas"]["CROSiteRequestItem"][];
+        };
+        /** CROSiteRequestItem */
+        CROSiteRequestItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /** Study Title */
+            study_title: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Site Name */
+            site_name: string;
+            /** Site Code */
+            site_code: string;
+            /** Government Status */
+            government_status: string;
+            /** Site Status */
+            site_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** CROStaffRequestCreate */
         CROStaffRequestCreate: {
             /** Applicant Name */
@@ -1514,6 +1665,32 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** CROStudyItem */
+        CROStudyItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Study Code */
+            study_code: string;
+            /** Protocol Number */
+            protocol_number: string;
+            /** Title */
+            title: string;
+            /** Phase */
+            phase: string;
+            /** Status */
+            status: string;
+            /** Sponsor Name */
+            sponsor_name?: string | null;
+            /** Active Sites Count */
+            active_sites_count: number;
+            /** Enrolled Participants */
+            enrolled_participants: number;
+            /** Planned Sample Size */
+            planned_sample_size?: number | null;
+        };
         /**
          * CTRIStatus
          * @enum {string}
@@ -1536,6 +1713,15 @@ export interface components {
          * @enum {string}
          */
         ContractStatus: "not_started" | "negotiating" | "executed" | "terminated";
+        /** DashboardSummaryResponse */
+        DashboardSummaryResponse: {
+            /** Role */
+            role: string;
+            super_admin?: components["schemas"]["SuperAdminOverviewResponse"] | null;
+            research_pi?: components["schemas"]["ResearchPIDashboardResponse"] | null;
+            cro?: components["schemas"]["CRODashboardResponse"] | null;
+            site_pi?: components["schemas"]["SitePIDashboardResponse"] | null;
+        };
         /**
          * DeviationSeverity
          * @enum {string}
@@ -1638,6 +1824,38 @@ export interface components {
          * @enum {string}
          */
         ECStatus: "not_submitted" | "pending" | "approved" | "conditional" | "rejected" | "expired";
+        /** EligibleSiteItem */
+        EligibleSiteItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Site Code */
+            site_code: string;
+            /** Name */
+            name: string;
+            site_type: components["schemas"]["SiteType"];
+            /** City */
+            city?: string | null;
+            /** State */
+            state?: string | null;
+            /** Country */
+            country?: string | null;
+            status: components["schemas"]["SiteStatus"];
+            /** Is Assigned */
+            is_assigned: boolean;
+            /** Activation Status */
+            activation_status?: string | null;
+            /** Participation Request Id */
+            participation_request_id?: string | null;
+            /** Participation Status */
+            participation_status?: string | null;
+            /** Government Status */
+            government_status?: string | null;
+            /** Site Status */
+            site_status?: string | null;
+        };
         /** EnrollmentTrendPoint */
         EnrollmentTrendPoint: {
             /** Date */
@@ -2057,6 +2275,29 @@ export interface components {
             /** Postal Code */
             postal_code?: string | null;
         };
+        /** ParticipantBulkImportRequest */
+        ParticipantBulkImportRequest: {
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /** Participants */
+            participants: components["schemas"]["ParticipantImportItem"][];
+        };
+        /** ParticipantBulkImportResponse */
+        ParticipantBulkImportResponse: {
+            /** Total Processed */
+            total_processed: number;
+            /** Imported Count */
+            imported_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /** Errors */
+            errors: components["schemas"]["ParticipantImportError"][];
+            /** Imported Participants */
+            imported_participants: components["schemas"]["ParticipantRead"][];
+        };
         /** ParticipantCreate */
         ParticipantCreate: {
             /** Participant Code */
@@ -2070,6 +2311,31 @@ export interface components {
             site_id?: string | null;
             /** Screening Date */
             screening_date?: string | null;
+        };
+        /** ParticipantImportError */
+        ParticipantImportError: {
+            /** Row */
+            row: number;
+            /** Participant Code */
+            participant_code: string;
+            /** Error */
+            error: string;
+        };
+        /** ParticipantImportItem */
+        ParticipantImportItem: {
+            /** Participant Code */
+            participant_code: string;
+            /**
+             * Site Id
+             * Format: uuid
+             */
+            site_id: string;
+            /** Screening Date */
+            screening_date?: string | null;
+            /** Enrollment Date */
+            enrollment_date?: string | null;
+            /** @default screened */
+            status: components["schemas"]["ParticipantStatus"];
         };
         /** ParticipantRead */
         ParticipantRead: {
@@ -2359,6 +2625,19 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ResearchPIDashboardResponse */
+        ResearchPIDashboardResponse: {
+            /** Studies */
+            studies: components["schemas"]["ResearchPIStudyItem"][];
+            /** Active Sites Count */
+            active_sites_count: number;
+            /** Pending Team Invitations */
+            pending_team_invitations: number;
+            /** Upcoming Milestones */
+            upcoming_milestones: {
+                [key: string]: unknown;
+            }[];
+        };
         /** ResearchPIRequestCreate */
         ResearchPIRequestCreate: {
             /** Applicant Name */
@@ -2400,6 +2679,32 @@ export interface components {
             website?: string | null;
             /** Description */
             description?: string | null;
+        };
+        /** ResearchPIStudyItem */
+        ResearchPIStudyItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Study Code */
+            study_code: string;
+            /** Protocol Number */
+            protocol_number: string;
+            /** Title */
+            title: string;
+            /** Phase */
+            phase: string;
+            /** Status */
+            status: string;
+            /** Active Sites Count */
+            active_sites_count: number;
+            /** Enrolled Participants */
+            enrolled_participants: number;
+            /** Planned Sample Size */
+            planned_sample_size?: number | null;
+            /** Pending Milestones */
+            pending_milestones: number;
         };
         /** RoleCreate */
         RoleCreate: {
@@ -2486,6 +2791,57 @@ export interface components {
             recruitment_percentage: number;
             /** Activation Status */
             activation_status: string;
+        };
+        /** SiteIncomingRequestItem */
+        SiteIncomingRequestItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /** Study Title */
+            study_title: string;
+            /** Study Code */
+            study_code: string;
+            /** Requester Name */
+            requester_name: string;
+            /** Government Status */
+            government_status: string;
+            /** Site Status */
+            site_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SitePIDashboardResponse */
+        SitePIDashboardResponse: {
+            /** Site Id */
+            site_id?: string | null;
+            /** Site Name */
+            site_name?: string | null;
+            /** Site Code */
+            site_code?: string | null;
+            /** City */
+            city?: string | null;
+            /** Active Studies Count */
+            active_studies_count: number;
+            /** Pending Requests Count */
+            pending_requests_count: number;
+            /** Participants Count */
+            participants_count: number;
+            /** Open Safety Events */
+            open_safety_events: number;
+            /** Incoming Requests */
+            incoming_requests: components["schemas"]["SiteIncomingRequestItem"][];
         };
         /** SitePIRequestCreate */
         SitePIRequestCreate: {
@@ -3040,6 +3396,48 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** SuperAdminOrgItem */
+        SuperAdminOrgItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Organization Type */
+            organization_type: string;
+            /** Registration Number */
+            registration_number?: string | null;
+            /** Status */
+            status: string;
+            /** City */
+            city?: string | null;
+            /** State */
+            state?: string | null;
+            /** Studies Count */
+            studies_count: number;
+        };
+        /** SuperAdminOverviewResponse */
+        SuperAdminOverviewResponse: {
+            /**
+             * Is Read Only
+             * @default true
+             */
+            is_read_only: boolean;
+            /** Total Sponsors */
+            total_sponsors: number;
+            /** Total Cros */
+            total_cros: number;
+            /** Total Studies */
+            total_studies: number;
+            /** Sponsors */
+            sponsors: components["schemas"]["SuperAdminOrgItem"][];
+            /** Cros */
+            cros: components["schemas"]["SuperAdminOrgItem"][];
+            /** Studies */
+            studies: components["schemas"]["SuperAdminStudyItem"][];
+        };
         /** SuperAdminProfileRead */
         SuperAdminProfileRead: {
             /**
@@ -3055,6 +3453,40 @@ export interface components {
              */
             bootstrapped_at: string;
             user: components["schemas"]["UserRead"];
+        };
+        /** SuperAdminStudyItem */
+        SuperAdminStudyItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Study Code */
+            study_code: string;
+            /** Protocol Number */
+            protocol_number: string;
+            /** Title */
+            title: string;
+            /** Phase */
+            phase: string;
+            /** Status */
+            status: string;
+            /** Sponsor Name */
+            sponsor_name?: string | null;
+            /** Cro Name */
+            cro_name?: string | null;
+            /** Participating Sites Count */
+            participating_sites_count: number;
+            /** Participant Count */
+            participant_count: number;
+            /** Participant Status Distribution */
+            participant_status_distribution: {
+                [key: string]: number;
+            };
+            /** Pending Milestones Count */
+            pending_milestones_count: number;
+            /** Completed Milestones Count */
+            completed_milestones_count: number;
         };
         /** TeamMemberInviteCreate */
         TeamMemberInviteCreate: {
@@ -3179,6 +3611,8 @@ export interface components {
             organization_id: string;
             /** Organization Name */
             organization_name?: string | null;
+            /** Organization Type */
+            organization_type?: string | null;
             /** Role Name */
             role_name?: string | null;
             /** Scope Level */
@@ -3198,8 +3632,18 @@ export interface components {
              * @default false
              */
             is_super_admin: boolean;
+            /**
+             * Assigned Role
+             * @default unassigned
+             */
+            assigned_role: string;
             /** Memberships */
             memberships: components["schemas"]["UserMembershipDetail"][];
+            /**
+             * Study Assignments
+             * @default []
+             */
+            study_assignments: components["schemas"]["UserStudyAssignment"][];
         };
         /** UserRead */
         UserRead: {
@@ -3236,6 +3680,22 @@ export interface components {
          * @enum {string}
          */
         UserStatus: "active" | "inactive" | "suspended";
+        /** UserStudyAssignment */
+        UserStudyAssignment: {
+            /**
+             * Study Id
+             * Format: uuid
+             */
+            study_id: string;
+            /** Study Title */
+            study_title?: string | null;
+            /** Role Name */
+            role_name?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Assignment Status */
+            assignment_status: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -3314,6 +3774,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserProfileRead"];
+                };
+            };
+        };
+    };
+    get_dashboard_summary_api_v1_dashboard_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummaryResponse"];
                 };
             };
         };
@@ -3885,6 +4365,39 @@ export interface operations {
             };
         };
     };
+    list_eligible_sites_api_v1_studies__study_id__eligible_sites_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EligibleSiteItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     transition_study_site_status_api_v1_studies__study_id__sites__site_id__transition_post: {
         parameters: {
             query?: never;
@@ -4141,6 +4654,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParticipantRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_import_participants_api_v1_participants_bulk_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantBulkImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantBulkImportResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6003,6 +6549,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_super_admin_overview_api_v1_platform_super_admin_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuperAdminOverviewResponse"];
+                };
+            };
+        };
+    };
+    inspect_study_participants_api_v1_platform_super_admin_studies__study_id__participants_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantRead"][];
                 };
             };
             /** @description Validation Error */

@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import contextlib
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user, security_bearer
+from app.core.auth import (
+    get_current_user,
+    has_user_manage_permission,
+    is_technical_system_admin,
+    require_user_management,
+    security_bearer,
+)
 from app.core.database import get_db
 from app.core.security import hash_password
-from app.models.enums import UserStatus
+from app.models.enums import ScopeLevel, UserStatus
 from app.models.user import Permission, Role, User
 from app.schemas.user import PermissionRead, RoleCreate, RoleRead, UserCreate, UserRead
 from app.services.audit import AuditService
@@ -81,7 +88,7 @@ async def list_users(
     status: UserStatus | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_user_management),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(User)
@@ -98,6 +105,13 @@ async def get_user(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Allow self-lookup; require explicit user:manage permission or technical System Administrator for third-party lookup
+    if current_user.id != user_id and not has_user_manage_permission(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: missing required permission 'user:manage'",
+        )
+
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -111,17 +125,45 @@ async def get_user(
 
 @router.post("/roles", response_model=RoleRead, status_code=status.HTTP_201_CREATED)
 async def create_role(
+    request: Request,
     role_in: RoleCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_user_management),
     db: AsyncSession = Depends(get_db),
 ):
+    raw_body: dict = {}
+    with contextlib.suppress(Exception):
+        raw_body = await request.json()
+
+    is_tech_admin = is_technical_system_admin(current_user)
+    is_system_scope = (role_in.scope_level == ScopeLevel.system)
+    is_system_flag = (raw_body.get("is_system_role") is True) or getattr(role_in, "is_system_role", False) is True
+    name_norm = role_in.name.strip().lower()
+    reserved_role_names = {
+        "system administrator",
+        "system admin",
+        "super admin",
+        "superadmin",
+        "platform super admin",
+        "government verification super admin",
+        "government super admin",
+    }
+    is_reserved_name = name_norm in reserved_role_names
+
+    # Prevent privilege escalation and payload bypasses: only technical System Administrators can create system-level roles
+    if (is_system_scope or is_system_flag or is_reserved_name) and not is_tech_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: only technical System Administrators can create system-level roles",
+        )
+
     existing = await db.execute(select(Role).where(Role.name == role_in.name))
     if existing.scalars().first():
         raise HTTPException(status_code=400, detail="Role name already exists")
 
+    is_sys = bool(is_tech_admin and (is_system_scope or is_system_flag))
     role = Role(
         **role_in.model_dump(),
-        is_system_role=False,
+        is_system_role=is_sys,
     )
     db.add(role)
     await db.flush()
@@ -151,7 +193,7 @@ async def list_roles(
 
 @router.get("/permissions", response_model=list[PermissionRead])
 async def list_permissions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_user_management),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Permission)

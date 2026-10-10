@@ -146,7 +146,30 @@ ctms/
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start (Single-Command Runner)
+
+To start both the Backend (FastAPI on port 8000) and Frontend (React/Vite on port 5173) simultaneously with automatic cleanup on `Ctrl+C`:
+
+- **Linux / macOS / Git Bash / WSL**:
+  ```bash
+  ./run_dev.sh
+  ```
+
+- **Windows (Command Prompt / Double-Click)**:
+  ```cmd
+  run_dev.bat
+  ```
+
+- **Windows (PowerShell)**:
+  ```powershell
+  .\run_dev.ps1
+  ```
+
+Pressing `Ctrl+C` cleanly terminates both backend and frontend processes without leaving orphan background processes.
+
+---
+
+## 🛠️ Manual Getting Started
 
 ### Prerequisites
 

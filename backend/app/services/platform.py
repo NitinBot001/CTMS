@@ -273,20 +273,19 @@ class PlatformService:
         )
 
         # 8. Send Activation Email via Resend
-        await EmailService.send_activation_email(
+        email_res = await EmailService.send_activation_email(
             to_email=user.email,
             recipient_name=user.full_name,
             raw_token=raw_token,
             settings=settings,
         )
+        invitation_sent = bool(email_res.get("id") or email_res.get("status") == "simulated")
 
         return {
             "organization_id": org_id,
             "user_email": user.email,
-            "invitation_sent": bool(settings.RESEND_API_KEY or settings.MAIL_ENABLED),
-            "raw_token": raw_token
-            if (not settings.RESEND_API_KEY and not settings.MAIL_ENABLED)
-            else None,
+            "invitation_sent": invitation_sent,
+            "raw_token": raw_token,
         }
 
     # =========================================================================

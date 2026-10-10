@@ -18,10 +18,13 @@ async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     await init_db()
     
-    # Bootstrap super admin if configured
+    # Seed canonical RBAC permissions & roles
     async with AsyncSessionLocal() as db:
+        from app.core.rbac import seed_rbac_permissions_and_roles
+        await seed_rbac_permissions_and_roles(db)
         await PlatformService.ensure_super_admin_bootstrapped(db, settings)
-        
+        await db.commit()
+
     yield
 
 

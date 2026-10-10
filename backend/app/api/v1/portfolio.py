@@ -4,12 +4,12 @@ import datetime
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_permission, require_study_access
 from app.core.database import get_db
 from app.models.compliance import EthicsApproval, ProtocolDeviation
 from app.models.enums import (
@@ -44,7 +44,7 @@ router = APIRouter(prefix="/portfolio", tags=["Portfolio / Derived Analytics"])
 
 @router.get("/overview", response_model=PortfolioOverviewResponse)
 async def get_portfolio_overview(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("analytics:global")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """
@@ -162,7 +162,7 @@ async def get_portfolio_overview(
 
 @router.get("/health", response_model=PortfolioHealthResponse)
 async def get_portfolio_health(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("analytics:global")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """
@@ -236,7 +236,7 @@ async def get_portfolio_health(
 
 @router.get("/alerts", response_model=list[PortfolioAlertItem])
 async def get_portfolio_alerts(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("analytics:global")),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """
@@ -332,7 +332,7 @@ async def get_portfolio_alerts(
 @router.get("/milestones/upcoming", response_model=list[UpcomingMilestoneItem])
 async def get_upcoming_milestones(
     limit: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("analytics:global")),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Returns aggregated upcoming milestones across studies, ordered by planned date."""
@@ -367,7 +367,7 @@ async def get_upcoming_milestones(
 @router.get("/enrollment/trend", response_model=list[EnrollmentTrendPoint])
 async def get_enrollment_trend(
     study_id: uuid.UUID | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("analytics:global")),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """
@@ -412,6 +412,7 @@ async def get_enrollment_trend(
 @router.get("/studies/{study_id}/enrollment/by-site", response_model=list[SiteEnrollmentItem])
 async def get_enrollment_by_site(
     study_id: uuid.UUID,
+    study: Study = Depends(require_study_access()),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
@@ -419,10 +420,6 @@ async def get_enrollment_by_site(
     Computes recruitment progress, planned target vs actual enrolled count,
     broken down per site for the specified study.
     """
-    study = await db.get(Study, study_id)
-    if not study:
-        raise HTTPException(status_code=404, detail="Study not found")
-
     # Fetch study sites with site details
     stmt = (
         select(StudySite)
@@ -468,15 +465,13 @@ async def get_enrollment_by_site(
 @router.get("/studies/{study_id}/metrics", response_model=StudyMetricsResponse)
 async def get_study_metrics(
     study_id: uuid.UUID,
+    study: Study = Depends(require_study_access()),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """
     Computes study-level progress, enrollment, and safety metrics dynamically.
     """
-    study = await db.get(Study, study_id)
-    if not study:
-        raise HTTPException(status_code=404, detail="Study not found")
 
     today = datetime.date.today()
 

@@ -1,9 +1,18 @@
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(str(ROOT_DIR / ".env"), ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     DATABASE_URL: str = "sqlite+aiosqlite:///./ctms.db"
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "AyuCTMS"

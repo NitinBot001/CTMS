@@ -9,6 +9,7 @@ import type {
   StudySiteRead,
   StudySiteCreate,
   StatusTransitionRequest,
+  EligibleSiteItem,
 } from '@/types/api'
 
 export const studiesApi = {
@@ -53,4 +54,9 @@ export const studiesApi = {
     apiClient.post<StudySiteRead>(`/studies/${studyId}/sites/${siteId}/transition`, data),
   transitionSiteActivation: (studyId: string, siteId: string, data: StatusTransitionRequest) =>
     apiClient.post<StudySiteRead>(`/studies/${studyId}/sites/${siteId}/transition`, data),
+
+  listEligibleSites: (studyId: string, q?: string) =>
+    apiClient.get<EligibleSiteItem[]>(`/studies/${studyId}/eligible-sites`, {
+      params: q ? { q } : undefined,
+    }),
 }
