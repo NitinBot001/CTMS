@@ -13,16 +13,21 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Local commits committed locally (ahead of `origin/master`). Remote `origin/master` at `7f9e63d`.
-  - Backend: 100% GREEN (177/177 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
+  - Backend: 100% GREEN (179/179 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 20.7s with optimized assets).
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 10.4s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B: Fully remediated and verified with 85 dedicated RBAC and adversarial regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C: Fully remediated and verified with 87 dedicated RBAC and adversarial regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Role Token Matching vs Insecure Substring Matching (F03C)**:
+  - Eliminated unsafe substring matching (`"pi" in role_name`) in `can_user_approve_document`. Replaced with exact word-boundary token matching (`_get_role_tokens`) and explicit non-approver exclusion (`coordinator`, `administrator`, `nurse`, `assistant`, `clerk`, etc.).
+  - Roles containing the string "hospital" (such as "Hospital Site Coordinator" or "Hospital Administrator") can NEVER acquire approval privileges through the letters "pi" inside "hospital".
+  - Distinguished separate authorization paths for: (1) Site-scoped documents (requires active site assignment and designated investigator/PI/director role), (2) Study-scoped documents (requires study team assignment and Principal Investigator/clinical director role), and (3) Sponsor/CRO documents (requires membership in sponsor/CRO organization and monitor/CRA/investigator/director role).
+  - Confined "lead" and "monitor" privileges strictly to Sponsor/CRO organization scope (`CRO Lead Monitor`, `Clinical Research Associate`), preventing arbitrary site or study team roles from claiming approval rights.
 - **Granular Document Lifecycle Governance & Separation of Powers (F03B)**:
   - Enforced strict separation between document upload rights and lifecycle governance authority. `documents:upload` authorizes draft creation (`POST /documents`) and submission for review (`draft -> under_review`).
   - All review, governance, and terminal transitions strictly require approval authority (`can_user_approve_document`):
@@ -51,6 +56,35 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-10 21:15 — F03C: Fix Role-Name Matching Vulnerability in Document Approval
+
+- **What**: Remediated unsafe substring matching vulnerability in `backend/app/core/auth.py:can_user_approve_document()` by replacing loose substring checks (`"pi" in role_name`) with strict word-boundary token matching (`_get_role_tokens`) and explicit non-approver exclusion lists. Added 2 adversarial regression tests in `backend/tests/test_documents_rbac.py` bringing the suite to 20 tests and backend to 179 tests.
+- **Why**: Prevent unintended privilege escalation where roles containing the string "hospital" (e.g. `Hospital Site Coordinator`, `Hospital Administrator`) acquired document approval, rejection, and archival authority due to `"pi"` matching inside `"hospital"`. Ensure site-level approval is strictly confined to genuine Principal Investigators and clinical directors, while preserving multi-tier scoping across site, study, and sponsor/CRO scopes.
+- **How**:
+  1. In `backend/app/core/auth.py`:
+     - Implemented `_get_role_tokens(role_name)` using regex `r"[a-z0-9]+"` to parse discrete words.
+     - Implemented `_is_site_approver_role(role_name)`: validates tokens for `investigator`, `director`, or standalone `pi`, and explicitly excludes non-approver tokens (`coordinator`, `administrator`, `admin`, `manager`, `nurse`, `associate`, `specialist`, `assistant`, `technician`, `clerk`, `auditor`, `monitor`).
+     - Implemented `_is_study_approver_role(role_name)`: restricts study team approval to Study Principal Investigator or clinical director; excludes coordinators, administrators, nurses, monitors, etc.
+     - Implemented `_is_sponsor_cro_approver_role(role_name, is_system_role)`: strictly limits Sponsor/CRO approval to explicit canonical oversight roles (`CRO Lead Monitor`, `Clinical Research Associate` / `CRA`, `Principal Investigator`, clinical `director`, or system admin); explicitly excludes ordinary tenant coordinators/clerks/administrators.
+     - Separated authorization paths in `can_user_approve_document()`:
+       - Study-scoped documents: Sponsor/CRO org members via `_is_sponsor_cro_approver_role`; study-level team members via `_is_study_approver_role`; site team members strictly limited to their own site via `_is_site_approver_role` (blocked from study-wide docs where `site_id=None`).
+       - Standalone site documents: members/assignees via `_is_site_approver_role`.
+       - Standalone org documents: members via `_is_sponsor_cro_approver_role`.
+  2. In `backend/tests/test_documents_rbac.py`:
+     - Added `test_hospital_site_coordinator_and_administrator_cannot_exploit_substring_vulnerability`: proves `Hospital Site Coordinator` and `Hospital Administrator` (at site and org levels) are rejected with `HTTP 403 Forbidden` on approval, rejection, and archival transitions.
+     - Added `test_site_investigator_approval_scoping_and_isolation`: proves an explicitly assigned `Investigator` can approve documents only for their assigned site, and is rejected with `HTTP 403 Forbidden` for other sites, study-wide documents, and other studies.
+- **Result**: Watertight role matching and approval scoping. Zero contract drift (`docs/API_CONTRACT.md` and `docs/openapi.json` intact). No database schema changes. All 179 backend tests passing (100% green across all 16 suites). Static analysis clean (ruff 0 errors, mypy 0 errors). Frontend verification passing clean (10.4s).
+- **Verified by**:
+  - Full backend test suite (`pytest tests/ -q`): 179/179 passed in 561.96s (100% green across all 16 suites).
+  - Targeted document RBAC suite (`pytest tests/test_documents_rbac.py tests/test_audit_chain.py -q`): 21/21 passed in 75.47s.
+  - Granular document RBAC tests (`pytest tests/test_documents_rbac.py -v`): 20/20 passed in 76s.
+  - Static analysis: `ruff check` (0 errors), `mypy` (0 errors).
+  - Frontend verification (`npm run verify`): passed in 10.43s (oxlint clean, TypeScript clean, Vite production build clean).
+  - Secret scan on git diff: clean (0 leaks).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to checkpoint F03C changes in git.
 
 ### 2026-10-10 20:15 — F03B: Document Lifecycle Authorization Adversarial Review
 

@@ -1328,3 +1328,285 @@ async def test_direct_lookup_by_id_enforces_exact_same_boundaries_as_listing(
         headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
     )
     assert res.status_code == 404
+
+
+# ==============================================================================
+# 10. F03C: Substring Vulnerability Remediation & Exact Token Matching
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_hospital_site_coordinator_and_administrator_cannot_exploit_substring_vulnerability(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+    db_session: AsyncSession,
+):
+    """
+    Adversarial regression test for F03C:
+    Proves that roles containing 'hospital' (which contains the substring 'pi')
+    such as 'Hospital Site Coordinator' and 'Hospital Administrator' CANNOT acquire
+    unintended document approval, rejection, or archival authority.
+    """
+    study_a = document_rbac_setup["study_a"]
+    site_a1 = document_rbac_setup["site_a1"]
+    org_a = document_rbac_setup["org_a"]
+
+    perm_doc_read = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:read")
+    )).scalars().first()
+    perm_doc_upload = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:upload")
+    )).scalars().first()
+    assert perm_doc_read and perm_doc_upload
+
+    # 1. Role: Hospital Site Coordinator
+    role_hosp_coord = Role(name="Hospital Site Coordinator", scope_level=ScopeLevel.site, is_system_role=False)
+    role_hosp_admin = Role(name="Hospital Administrator", scope_level=ScopeLevel.site, is_system_role=False)
+    role_hosp_org_admin = Role(name="Hospital Org Administrator", scope_level=ScopeLevel.organization, is_system_role=False)
+    db_session.add_all([role_hosp_coord, role_hosp_admin, role_hosp_org_admin])
+    await db_session.flush()
+
+    for r in (role_hosp_coord, role_hosp_admin, role_hosp_org_admin):
+        db_session.add_all([
+            RolePermission(role_id=r.id, permission_id=perm_doc_read.id),
+            RolePermission(role_id=r.id, permission_id=perm_doc_upload.id),
+        ])
+    await db_session.flush()
+
+    user_hosp_coord = User(
+        email="hosp_coord@hospital.org",
+        full_name="Hospital Site Coordinator User",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    user_hosp_admin = User(
+        email="hosp_admin@hospital.org",
+        full_name="Hospital Administrator User",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    user_org_admin = User(
+        email="org_admin@hospital.org",
+        full_name="Hospital Org Administrator User",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add_all([user_hosp_coord, user_hosp_admin, user_org_admin])
+    await db_session.flush()
+
+    db_session.add_all([
+        StudyTeamMember(
+            study_id=study_a.id,
+            site_id=site_a1.id,
+            user_id=user_hosp_coord.id,
+            role_id=role_hosp_coord.id,
+            assignment_status=AssignmentStatus.active,
+        ),
+        StudyTeamMember(
+            study_id=study_a.id,
+            site_id=site_a1.id,
+            user_id=user_hosp_admin.id,
+            role_id=role_hosp_admin.id,
+            assignment_status=AssignmentStatus.active,
+        ),
+        OrganizationMember(
+            organization_id=org_a.id,
+            user_id=user_org_admin.id,
+            role_id=role_hosp_org_admin.id,
+            status=AssignmentStatus.active,
+        ),
+    ])
+    await db_session.commit()
+
+    token_hosp_coord = create_access_token({"sub": str(user_hosp_coord.id), "email": user_hosp_coord.email})
+    token_hosp_admin = create_access_token({"sub": str(user_hosp_admin.id), "email": user_hosp_admin.email})
+    token_org_admin = create_access_token({"sub": str(user_org_admin.id), "email": user_org_admin.email})
+    token_site_pi = document_rbac_setup["tokens"]["site_pi_a1"]
+
+    # Create a site document in draft and submit to under_review
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token_hosp_coord}"},
+        json={
+            "study_id": str(study_a.id),
+            "site_id": str(site_a1.id),
+            "document_type": "essential",
+            "title": "Hospital Site Log",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/sites/A1/hosp_log.pdf",
+            "file_name": "hosp_log.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id = res.json()["id"]
+
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_hosp_coord}"},
+        json={"new_status": "under_review", "reason": "Submitted for approval"},
+    )
+    assert res.status_code == 200
+
+    # 1. Hospital Site Coordinator CANNOT approve (under_review -> approved) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_hosp_coord}"},
+        json={"new_status": "approved", "reason": "Hospital Site Coordinator attempting approval"},
+    )
+    assert res.status_code == 403
+    assert "approve" in res.json()["detail"].lower()
+
+    # Hospital Site Coordinator CANNOT reject (under_review -> draft) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_hosp_coord}"},
+        json={"new_status": "draft", "reason": "Hospital Site Coordinator attempting rejection"},
+    )
+    assert res.status_code == 403
+
+    # Hospital Site Coordinator CANNOT archive (under_review -> archived) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_hosp_coord}"},
+        json={"new_status": "archived", "reason": "Hospital Site Coordinator attempting archival"},
+    )
+    assert res.status_code == 403
+
+    # 2. Hospital Administrator CANNOT approve (under_review -> approved) -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_hosp_admin}"},
+        json={"new_status": "approved", "reason": "Hospital Administrator attempting approval"},
+    )
+    assert res.status_code == 403
+    assert "approve" in res.json()["detail"].lower()
+
+    # 3. Hospital Org Administrator CANNOT approve via organization membership -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_org_admin}"},
+        json={"new_status": "approved", "reason": "Org Hospital Administrator attempting approval"},
+    )
+    assert res.status_code == 403
+
+    # 4. Legitimate Site PI CAN approve
+    res = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_site_pi}"},
+        json={"new_status": "approved", "reason": "Legitimate Site PI approval"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_site_investigator_approval_scoping_and_isolation(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+    db_session: AsyncSession,
+):
+    """
+    Proves that an explicitly authorized Investigator or Site PI:
+    - Can approve documents ONLY within their assigned site.
+    - CANNOT approve documents in another site (even within the same study).
+    - CANNOT approve study-wide documents (site_id=None).
+    - CANNOT approve documents in another study.
+    """
+    study_a = document_rbac_setup["study_a"]
+    site_a1 = document_rbac_setup["site_a1"]
+    doc_site_a2 = document_rbac_setup["docs"]["a_site2"]
+    doc_proto_a = document_rbac_setup["docs"]["a_protocol"]
+    doc_proto_b = document_rbac_setup["docs"]["b_protocol"]
+
+    perm_doc_read = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:read")
+    )).scalars().first()
+    perm_doc_upload = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:upload")
+    )).scalars().first()
+
+    # Create role 'Investigator' (pure token 'investigator')
+    role_inv = Role(name="Investigator", scope_level=ScopeLevel.site, is_system_role=False)
+    db_session.add(role_inv)
+    await db_session.flush()
+
+    db_session.add_all([
+        RolePermission(role_id=role_inv.id, permission_id=perm_doc_read.id),
+        RolePermission(role_id=role_inv.id, permission_id=perm_doc_upload.id),
+    ])
+    await db_session.flush()
+
+    user_inv = User(
+        email="sub_investigator@haridwar.org",
+        full_name="Site A1 Sub-Investigator",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(user_inv)
+    await db_session.flush()
+
+    db_session.add(
+        StudyTeamMember(
+            study_id=study_a.id,
+            site_id=site_a1.id,
+            user_id=user_inv.id,
+            role_id=role_inv.id,
+            assignment_status=AssignmentStatus.active,
+        )
+    )
+    await db_session.commit()
+
+    token_inv = create_access_token({"sub": str(user_inv.id), "email": user_inv.email})
+
+    # 1. Investigator creates and approves document for assigned Site A1 -> 200 OK
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={
+            "study_id": str(study_a.id),
+            "site_id": str(site_a1.id),
+            "document_type": "essential",
+            "title": "Investigator Delegation Log",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/sites/A1/delegation.pdf",
+            "file_name": "delegation.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id = res.json()["id"]
+
+    await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={"new_status": "under_review", "reason": "Ready for sign-off"},
+    )
+    res_app = await client.post(
+        f"/api/v1/documents/{doc_id}/transition",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={"new_status": "approved", "reason": "Investigator signs delegation log"},
+    )
+    assert res_app.status_code == 200
+    assert res_app.json()["status"] == "approved"
+
+    # 2. Investigator CANNOT approve Site A2 document -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_site_a2.id}/transition",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={"new_status": "approved", "reason": "Investigator attempting cross-site approval"},
+    )
+    assert res.status_code == 403
+
+    # 3. Investigator CANNOT approve study-wide protocol -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto_a.id}/transition",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={"new_status": "approved", "reason": "Investigator attempting study-wide approval"},
+    )
+    assert res.status_code == 403
+
+    # 4. Investigator CANNOT approve other study document -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_proto_b.id}/transition",
+        headers={"Authorization": f"Bearer {token_inv}"},
+        json={"new_status": "approved", "reason": "Investigator attempting cross-study approval"},
+    )
+    assert res.status_code == 403
