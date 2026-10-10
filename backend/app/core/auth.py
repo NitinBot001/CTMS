@@ -78,24 +78,27 @@ def has_user_manage_permission(user: User) -> bool:
 
 def has_global_audit_permission(user: User) -> bool:
     """
-    Checks whether the user has explicit global audit access (audit:read or technical System Administrator).
-    Strictly excludes Government Verification SuperAdminProfile wildcard bypass.
+    Checks whether the user has explicit global audit access (technical System Administrator
+    or explicit system-scoped role with audit:read).
+    Strictly excludes:
+    - Government Verification SuperAdminProfile wildcard bypass.
+    - Organization-scoped roles granting audit:read or wildcard * (must not leak cross-tenant).
+    - Study-scoped roles granting audit:read or wildcard * (must not leak global logs).
+    - Non-system roles with wildcard *.
     """
     if is_technical_system_admin(user):
         return True
 
     for membership in user.memberships:
-        if membership.status == AssignmentStatus.active and membership.role:
+        if (
+            membership.status == AssignmentStatus.active
+            and membership.role
+            and membership.role.scope_level == ScopeLevel.system
+        ):
             for rp in membership.role.permissions:
-                if rp.permission and rp.permission.codename in ("audit:read", "*"):
+                if rp.permission and rp.permission.codename == "audit:read":
                     return True
 
-    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
-        for assignment in user.study_team_assignments:
-            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
-                for rp in assignment.role.permissions:
-                    if rp.permission and rp.permission.codename in ("audit:read", "*"):
-                        return True
     return False
 
 

@@ -12,12 +12,12 @@
 - **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
-  - Git & GitHub Sync: Master branch fully synchronized with `origin/master` at commit `1429b53`. All local commits (`0211b8a`, `9b9b449`, `1429b53`) pushed successfully to `https://github.com/NitinBot001/CTMS.git`.
-  - Backend: 100% GREEN (140/140 pytest async tests passing, ruff check 0 errors, mypy 0 errors across 56 source files).
+  - Git & GitHub Sync: Local commit `ff3580e` committed locally (ahead of `origin/master` by 1 commit). Remote `origin/master` at `7f9e63d`.
+  - Backend: 100% GREEN (147/147 pytest async tests passing, ruff check 0 errors, mypy 0 errors across 56 source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 6.7s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, and F02: Fully remediated, verified with 49 dedicated RBAC tests, committed, and pushed.
+  - Security Findings F01, F01B, F02, F02B: Fully remediated and verified with 55 dedicated RBAC and adversarial audit regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
@@ -25,8 +25,27 @@
 ## 2. Decisions
 - **Real Application Context & Role Discovery**: Generated authoritative markdown context documentation and sanitized rendered HTML snapshots for downstream AI discussion without modifying application source code or permissions.
 - **Role-Dedicated Dashboards & Zero Fabricated Telemetry**: Eliminated shared/generic dashboards that exposed system-wide counts to ordinary users. Ordinary users see only data scoped to their assigned studies and sites. Unassigned or pending users see a safe access-pending state. Global `/portfolio` analytics endpoints protected by `analytics:global` returning `HTTP 403 Forbidden` to non-superadmins.
+- **Assignment-Scoped Global Audit Authorization**: Global audit access (`/audit/logs` unscoped and `/audit/verify`) strictly requires technical System Administrator status or an explicit assignment of a system-scoped role (`ScopeLevel.system`) with `audit:read`. Organization-scoped and study-scoped roles with `audit:read` are restricted to their authorized study resources and receive `HTTP 403 Forbidden` for global endpoints.
+- **Shared-Site Cross-Study Isolation**: For sites linked to multiple studies, study-scoped callers cannot retrieve audit events of other studies. Audit records with study context in `changes` are strictly matched against the caller's authorized studies, and ambiguous unseparated site-level events on shared sites are excluded from study-scoped responses.
 
 ## 3. Task Log
+
+### 2026-10-10 12:45 — F02B: Adversarial Audit Authorization Review
+
+- **What**: Remediated assignment-scope privilege escalation on global audit endpoints and eliminated cross-study audit log leakage for sites shared across multiple studies.
+- **Why**: `has_global_audit_permission()` previously granted global audit access to users with `audit:read` or `*` on any organization membership or study-team assignment, allowing study- or org-scoped roles to inspect global logs and call `/audit/verify`. Additionally, `GET /api/v1/audit/logs?resource_type=site` previously returned all site audit events without verifying whether individual events belonged to the caller's authorized study.
+- **How**:
+  1. In `backend/app/core/auth.py`: updated `has_global_audit_permission` to strictly require `is_technical_system_admin(user)` or an active membership with a system-scoped role (`membership.role.scope_level == ScopeLevel.system`) explicitly granting `audit:read`. Excluded organization-scoped, study-scoped, and wildcard grants on non-system roles.
+  2. In `backend/app/api/v1/audit.py`:
+     - Added `extract_study_id_from_audit_changes(changes)` to extract study IDs from audit payloads.
+     - Enforced shared-site event isolation: when querying a site linked to multiple studies, scoped callers receive only events explicitly attributed to their authorized studies (`log_study_id in accessible_study_ids`); ambiguous records without study context on shared sites are filtered out.
+     - Supported `resource_type="study_site"` with study-scoping checks.
+  3. Added 7 focused adversarial regression tests in `backend/tests/test_audit_rbac.py` verifying study-scoped auditor global 403s, org-scoped auditor global 403s, org-scoped cross-tenant 403s, and shared-site event isolation.
+- **Result**: Global audit access is strictly confined to platform administrators and system auditors. Shared sites can no longer leak third-party study events or ambiguous global site history to study-scoped callers.
+- **Verified by**: `pytest tests/test_audit_rbac.py tests/test_audit_chain.py -v` (26/26 passed), `pytest tests/test_auth_rbac.py tests/test_role_dashboards_rbac.py tests/test_api_endpoints.py -v` (43/43 passed), `ruff check app/core/auth.py app/api/v1/audit.py tests/test_audit_rbac.py` (0 errors), `mypy app/core/auth.py app/api/v1/audit.py` (0 errors).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready for subsequent tasks (e.g., F03 Document/TMF scoping).
 
 ### 2026-10-10 11:50 — Git Stage, Commit, and GitHub Push
 

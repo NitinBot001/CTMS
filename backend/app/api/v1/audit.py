@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -38,6 +39,25 @@ class AuditLogRead(BaseModel):
     ip_address: str | None = None
     previous_hash: str | None = None
     entry_hash: str
+
+
+def extract_study_id_from_audit_changes(changes: Any) -> uuid.UUID | None:
+    """Extracts study_id from audit changes payload if present."""
+    if not changes:
+        return None
+    if isinstance(changes, str):
+        try:
+            changes = json.loads(changes)
+        except Exception:
+            return None
+    if isinstance(changes, dict):
+        raw_sid = changes.get("study_id") or changes.get("studyId")
+        if raw_sid:
+            try:
+                return uuid.UUID(str(raw_sid))
+            except (ValueError, TypeError):
+                return None
+    return None
 
 
 async def get_user_study_scope_ids(user: User, db: AsyncSession) -> set[uuid.UUID]:
@@ -129,15 +149,24 @@ async def list_audit_logs(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied: site is not associated with an authorized study",
                 )
-            ss_stmt = select(StudySite).where(
-                StudySite.site_id == resource_id,
-                StudySite.study_id.in_(accessible_study_ids),
-            )
-            site_in_study = (await db.execute(ss_stmt)).scalars().first()
-            if not site_in_study:
+            ss_stmt = select(StudySite.study_id).where(StudySite.site_id == resource_id)
+            all_site_study_ids = set((await db.execute(ss_stmt)).scalars().all())
+            authorized_site_study_ids = all_site_study_ids.intersection(accessible_study_ids)
+            if not authorized_site_study_ids:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied: site is not associated with an authorized study",
+                )
+            is_shared_with_inaccessible_studies = bool(all_site_study_ids - accessible_study_ids)
+
+        elif resource_type == "study_site":
+            study_site = await db.get(StudySite, resource_id)
+            if not study_site:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study site assignment not found")
+            if study_site.study_id not in accessible_study_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: study site does not belong to an authorized study",
                 )
 
         else:
@@ -154,6 +183,23 @@ async def list_audit_logs(
         stmt = stmt.where(AuditLog.resource_id == resource_id)
     if action:
         stmt = stmt.where(AuditLog.action == action)
+
+    if not is_global_auditor and resource_type == "site":
+        raw_logs = (await db.execute(stmt)).scalars().all()
+        filtered_logs: list[AuditLog] = []
+        for log in raw_logs:
+            log_study_id = extract_study_id_from_audit_changes(log.changes)
+            if log_study_id is not None:
+                # Explicit study context: allow only if study is authorized
+                if log_study_id in accessible_study_ids:
+                    filtered_logs.append(log)
+            else:
+                # Ambiguous site-level log with no study context:
+                # Disallow on shared sites to prevent cross-study leakage of global site history
+                if not is_shared_with_inaccessible_studies:
+                    filtered_logs.append(log)
+        return filtered_logs[skip : skip + limit]
+
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()

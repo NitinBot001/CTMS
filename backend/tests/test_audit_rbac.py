@@ -189,7 +189,7 @@ async def two_studies_setup(db_session: AsyncSession):
     db_session.add_all([member_b, team_b])
     await db_session.flush()
 
-    # 5. Global Auditor (User with explicit audit:read permission)
+    # 5. Global Platform Auditor (User with explicit audit:read on a system-scoped role)
     auditor_user = User(
         email="global.auditor@clinicalqa.org",
         full_name="Global QA Auditor",
@@ -197,9 +197,9 @@ async def two_studies_setup(db_session: AsyncSession):
         hashed_password=hash_password("Pass123!"),
     )
     auditor_role = Role(
-        name="Quality Assurance Auditor",
-        scope_level=ScopeLevel.organization,
-        is_system_role=False,
+        name="Global System Auditor",
+        scope_level=ScopeLevel.system,
+        is_system_role=True,
     )
     audit_perm = Permission(
         codename="audit:read",
@@ -218,6 +218,88 @@ async def two_studies_setup(db_session: AsyncSession):
         status=AssignmentStatus.active,
     )
     db_session.add_all([rp_audit, auditor_membership])
+    await db_session.flush()
+
+    # 5b. Organization-Scoped Auditor (Role scoped to organization, not system)
+    org_auditor_user = User(
+        email="org.auditor@sponsoralpha.org",
+        full_name="Org QA Auditor Alpha",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    org_auditor_role = Role(
+        name="Organization Auditor Alpha",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    db_session.add_all([org_auditor_user, org_auditor_role])
+    await db_session.flush()
+
+    rp_org_audit = RolePermission(role_id=org_auditor_role.id, permission_id=audit_perm.id)
+    org_auditor_membership = OrganizationMember(
+        organization_id=org_a.id,
+        user_id=org_auditor_user.id,
+        role_id=org_auditor_role.id,
+        status=AssignmentStatus.active,
+    )
+    db_session.add_all([rp_org_audit, org_auditor_membership])
+    await db_session.flush()
+
+    # 5c. Study-Scoped Auditor (Role scoped to Study A)
+    study_auditor_user = User(
+        email="study.auditor@studyalpha.org",
+        full_name="Study Monitor Auditor Alpha",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    study_auditor_role = Role(
+        name="Study Auditor Alpha",
+        scope_level=ScopeLevel.study,
+        is_system_role=False,
+    )
+    db_session.add_all([study_auditor_user, study_auditor_role])
+    await db_session.flush()
+
+    rp_study_audit = RolePermission(role_id=study_auditor_role.id, permission_id=audit_perm.id)
+    study_auditor_membership = OrganizationMember(
+        organization_id=org_a.id,
+        user_id=study_auditor_user.id,
+        role_id=study_auditor_role.id,
+        status=AssignmentStatus.active,
+    )
+    study_auditor_assignment = StudyTeamMember(
+        study_id=study_a.id,
+        user_id=study_auditor_user.id,
+        role_id=study_auditor_role.id,
+        assignment_status=AssignmentStatus.active,
+    )
+    db_session.add_all([rp_study_audit, study_auditor_membership, study_auditor_assignment])
+    await db_session.flush()
+
+    # 5d. Shared Site linked to BOTH Study A and Study B
+    shared_site = Site(
+        site_code="SITE-SHARED-01",
+        name="Shared Regional Research Hospital",
+        site_type=SiteType.hospital,
+        status=SiteStatus.active,
+        city="New Delhi",
+        state="Delhi",
+        organization_id=org_a.id,
+    )
+    db_session.add(shared_site)
+    await db_session.flush()
+
+    study_site_shared_a = StudySite(
+        study_id=study_a.id,
+        site_id=shared_site.id,
+        activation_status=StudySiteActivationStatus.activated,
+    )
+    study_site_shared_b = StudySite(
+        study_id=study_b.id,
+        site_id=shared_site.id,
+        activation_status=StudySiteActivationStatus.activated,
+    )
+    db_session.add_all([study_site_shared_a, study_site_shared_b])
     await db_session.flush()
 
     # 6. Ordinary unassigned user
@@ -285,12 +367,38 @@ async def two_studies_setup(db_session: AsyncSession):
         resource_id=ordinary_user.id,
         changes={"email": ordinary_user.email},
     )
+    log_shared_site_a = await AuditService.create_audit_log(
+        db=db_session,
+        user_id=user_a.id,
+        action="site.study_event",
+        resource_type="site",
+        resource_id=shared_site.id,
+        changes={"study_id": str(study_a.id), "event": "Study Alpha Site Initiation"},
+    )
+    log_shared_site_b = await AuditService.create_audit_log(
+        db=db_session,
+        user_id=user_b.id,
+        action="site.study_event",
+        resource_type="site",
+        resource_id=shared_site.id,
+        changes={"study_id": str(study_b.id), "event": "Study Beta Site Initiation"},
+    )
+    log_shared_site_ambiguous = await AuditService.create_audit_log(
+        db=db_session,
+        user_id=user_a.id,
+        action="site.update",
+        resource_type="site",
+        resource_id=shared_site.id,
+        changes={"name": "Shared Regional Research Hospital Updated"},
+    )
     await db_session.commit()
 
     tokens = {
         "user_a": create_access_token({"sub": str(user_a.id), "email": user_a.email}),
         "user_b": create_access_token({"sub": str(user_b.id), "email": user_b.email}),
         "auditor": create_access_token({"sub": str(auditor_user.id), "email": auditor_user.email}),
+        "org_auditor": create_access_token({"sub": str(org_auditor_user.id), "email": org_auditor_user.email}),
+        "study_auditor": create_access_token({"sub": str(study_auditor_user.id), "email": study_auditor_user.email}),
         "ordinary": create_access_token({"sub": str(ordinary_user.id), "email": ordinary_user.email}),
         "gov_super_admin": create_access_token({"sub": str(gov_super_admin.id), "email": gov_super_admin.email}),
     }
@@ -300,6 +408,7 @@ async def two_studies_setup(db_session: AsyncSession):
         "study_b": study_b,
         "site_a": site_a,
         "site_b": site_b,
+        "shared_site": shared_site,
         "participant_a": participant_a,
         "participant_b": participant_b,
         "tokens": tokens,
@@ -309,6 +418,9 @@ async def two_studies_setup(db_session: AsyncSession):
             "study_b": log_study_b,
             "part_b": log_part_b,
             "user_sys": log_user_sys,
+            "shared_site_a": log_shared_site_a,
+            "shared_site_b": log_shared_site_b,
+            "shared_site_ambiguous": log_shared_site_ambiguous,
         },
     }
 
@@ -629,3 +741,155 @@ async def test_audit_logs_pagination_and_filtering_for_authorized_users(
     )
     assert res_limit.status_code == 200
     assert len(res_limit.json()) <= 2
+
+
+# ---------------------------------------------------------------------------
+# F02B: Adversarial Scope & Shared-Site Isolation Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_study_scoped_auditor_cannot_list_global_logs_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Study-scoped role with audit:read (assigned only to Study A) must not thereby grant global access.
+    Querying /api/v1/audit/logs without resource scoping must receive HTTP 403 Forbidden.
+    """
+    token = two_studies_setup["tokens"]["study_auditor"]
+    res = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403
+    assert "audit:read" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_verify_study_scoped_auditor_forbidden_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Study-scoped role with audit:read must NOT be able to call global /api/v1/audit/verify.
+    Must receive HTTP 403 Forbidden.
+    """
+    token = two_studies_setup["tokens"]["study_auditor"]
+    res = await client.get(
+        "/api/v1/audit/verify",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403
+    assert "audit:read" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_organization_scoped_auditor_cannot_list_global_logs_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Organization-scoped role with audit:read must not grant cross-tenant global audit access.
+    Querying /api/v1/audit/logs without resource scoping must receive HTTP 403 Forbidden.
+    """
+    token = two_studies_setup["tokens"]["org_auditor"]
+    res = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403
+    assert "audit:read" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_verify_organization_scoped_auditor_forbidden_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Organization-scoped role with audit:read must NOT be able to call global /api/v1/audit/verify.
+    Must receive HTTP 403 Forbidden.
+    """
+    token = two_studies_setup["tokens"]["org_auditor"]
+    res = await client.get(
+        "/api/v1/audit/verify",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403
+    assert "audit:read" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_organization_scoped_auditor_cannot_access_unrelated_tenant_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Organization-scoped auditor in Org A cannot access Study B (belonging to Org B).
+    Must receive HTTP 403 Forbidden.
+    """
+    token = two_studies_setup["tokens"]["org_auditor"]
+    study_b = two_studies_setup["study_b"]
+
+    res = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_b.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 403
+    assert "authorized for this study" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_shared_site_does_not_leak_inaccessible_study_events(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Shared site linked to both Study A and Study B:
+    When Study A caller queries audit logs for the shared site,
+    events belonging to Study B and ambiguous unseparated site events MUST NOT leak.
+    Only events explicitly tied to Study A are returned.
+    """
+    token_a = two_studies_setup["tokens"]["user_a"]
+    shared_site = two_studies_setup["shared_site"]
+    log_shared_a = two_studies_setup["logs"]["shared_site_a"]
+    log_shared_b = two_studies_setup["logs"]["shared_site_b"]
+    log_shared_ambiguous = two_studies_setup["logs"]["shared_site_ambiguous"]
+
+    res = await client.get(
+        f"/api/v1/audit/logs?resource_type=site&resource_id={shared_site.id}",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert res.status_code == 200
+    returned_logs = res.json()
+    assert isinstance(returned_logs, list)
+
+    returned_ids = {item["id"] for item in returned_logs}
+    # Study A event MUST be present
+    assert str(log_shared_a.id) in returned_ids
+    # Study B event MUST NOT be leaked
+    assert str(log_shared_b.id) not in returned_ids
+    # Ambiguous site-level event on shared site MUST NOT be leaked
+    assert str(log_shared_ambiguous.id) not in returned_ids
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_shared_site_global_auditor_sees_all_events(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    A genuine global auditor querying the shared site can inspect all records across both studies.
+    """
+    token = two_studies_setup["tokens"]["auditor"]
+    shared_site = two_studies_setup["shared_site"]
+    log_shared_a = two_studies_setup["logs"]["shared_site_a"]
+    log_shared_b = two_studies_setup["logs"]["shared_site_b"]
+    log_shared_ambiguous = two_studies_setup["logs"]["shared_site_ambiguous"]
+
+    res = await client.get(
+        f"/api/v1/audit/logs?resource_type=site&resource_id={shared_site.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 200
+    returned_logs = res.json()
+
+    returned_ids = {item["id"] for item in returned_logs}
+    assert str(log_shared_a.id) in returned_ids
+    assert str(log_shared_b.id) in returned_ids
+    assert str(log_shared_ambiguous.id) in returned_ids
+
