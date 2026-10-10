@@ -5,6 +5,7 @@ import uuid
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password
@@ -207,17 +208,43 @@ async def two_studies_setup(db_session: AsyncSession):
         action="read",
         description="Inspect cryptographic audit trail",
     )
-    db_session.add_all([auditor_user, auditor_role, audit_perm])
+    central_audit_org = Organization(
+        name="Central Platform Audit Authority",
+        organization_type=OrganizationType.institution,
+        status=OrganizationStatus.active,
+        registration_number="INST-CENTRAL-AUDIT-01",
+        is_platform_authority=True,
+    )
+    db_session.add_all([auditor_user, auditor_role, audit_perm, central_audit_org])
     await db_session.flush()
 
     rp_audit = RolePermission(role_id=auditor_role.id, permission_id=audit_perm.id)
     auditor_membership = OrganizationMember(
-        organization_id=org_a.id,
+        organization_id=central_audit_org.id,
         user_id=auditor_user.id,
         role_id=auditor_role.id,
         status=AssignmentStatus.active,
     )
     db_session.add_all([rp_audit, auditor_membership])
+    await db_session.flush()
+
+    # 5a. Tenant member in Sponsor Org A with an incorrectly assigned system role
+    tenant_imposter_user = User(
+        email="tenant.imposter@sponsoralpha.org",
+        full_name="Tenant Imposter User",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(tenant_imposter_user)
+    await db_session.flush()
+
+    tenant_imposter_membership = OrganizationMember(
+        organization_id=org_a.id,  # Tenant organization!
+        user_id=tenant_imposter_user.id,
+        role_id=auditor_role.id,  # System-scoped role attached to tenant member
+        status=AssignmentStatus.active,
+    )
+    db_session.add(tenant_imposter_membership)
     await db_session.flush()
 
     # 5b. Organization-Scoped Auditor (Role scoped to organization, not system)
@@ -401,9 +428,13 @@ async def two_studies_setup(db_session: AsyncSession):
         "study_auditor": create_access_token({"sub": str(study_auditor_user.id), "email": study_auditor_user.email}),
         "ordinary": create_access_token({"sub": str(ordinary_user.id), "email": ordinary_user.email}),
         "gov_super_admin": create_access_token({"sub": str(gov_super_admin.id), "email": gov_super_admin.email}),
+        "tenant_imposter": create_access_token({"sub": str(tenant_imposter_user.id), "email": tenant_imposter_user.email}),
     }
 
     return {
+        "org_a": org_a,
+        "org_b": org_b,
+        "central_audit_org": central_audit_org,
         "study_a": study_a,
         "study_b": study_b,
         "site_a": site_a,
@@ -411,6 +442,8 @@ async def two_studies_setup(db_session: AsyncSession):
         "shared_site": shared_site,
         "participant_a": participant_a,
         "participant_b": participant_b,
+        "auditor_role": auditor_role,
+        "tenant_imposter_user": tenant_imposter_user,
         "tokens": tokens,
         "logs": {
             "study_a": log_study_a,
@@ -585,16 +618,16 @@ async def test_audit_logs_study_scoped_user_permitted_for_own_study(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study A investigator querying Study A audit logs receives 200 with strictly isolated data.
+    Study A authorized auditor querying Study A audit logs receives 200 with strictly isolated data.
     Logs from Study B must NOT appear in the response.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     study_a = two_studies_setup["study_a"]
     study_b = two_studies_setup["study_b"]
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=study&resource_id={study_a.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 200
     data = res.json()
@@ -612,14 +645,14 @@ async def test_audit_logs_study_scoped_user_forbidden_for_other_study(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study A investigator attempting to query Study B audit logs must receive HTTP 403 Forbidden.
+    Study A authorized auditor attempting to query Study B audit logs must receive HTTP 403 Forbidden.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     study_b = two_studies_setup["study_b"]
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=study&resource_id={study_b.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 403
     assert "authorized for this study" in res.json()["detail"]
@@ -630,14 +663,14 @@ async def test_audit_logs_study_scoped_user_bypass_omitted_filter_forbidden_retu
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study-scoped investigator attempting to bypass scoping by omitting resource_id must receive 403.
+    Study-scoped auditor attempting to bypass scoping by omitting resource_id must receive 403.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
 
     # Omitting resource_id while passing resource_type=study
     res = await client.get(
         "/api/v1/audit/logs?resource_type=study",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 403
     assert "audit:read" in res.json()["detail"]
@@ -648,14 +681,14 @@ async def test_audit_logs_study_scoped_user_permitted_for_own_participant(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study A investigator querying audit logs for a participant in Study A receives 200.
+    Study A auditor querying audit logs for a participant in Study A receives 200.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     part_a = two_studies_setup["participant_a"]
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=participant&resource_id={part_a.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 200
     data = res.json()
@@ -669,14 +702,14 @@ async def test_audit_logs_study_scoped_user_forbidden_for_other_participant(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study A investigator attempting to query audit logs for a participant in Study B must receive 403.
+    Study A auditor attempting to query audit logs for a participant in Study B must receive 403.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     part_b = two_studies_setup["participant_b"]
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=participant&resource_id={part_b.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 403
     assert "authorized study" in res.json()["detail"]
@@ -687,14 +720,14 @@ async def test_audit_logs_study_scoped_user_forbidden_for_unrelated_site(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study A investigator attempting to query audit logs for Site B (not associated with Study A) must receive 403.
+    Study A auditor attempting to query audit logs for Site B (not associated with Study A) must receive 403.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     site_b = two_studies_setup["site_b"]
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=site&resource_id={site_b.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 403
     assert "associated with an authorized study" in res.json()["detail"]
@@ -705,14 +738,14 @@ async def test_audit_logs_study_scoped_user_forbidden_for_system_entity_types(
     client: AsyncClient, two_studies_setup: dict
 ):
     """
-    Study-scoped investigator attempting to query system-level audit logs (e.g. user, role) must receive 403.
+    Study-scoped auditor attempting to query system-level audit logs (e.g. user, role) must receive 403.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     random_user_id = uuid.uuid4()
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=user&resource_id={random_user_id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 403
     assert "audit:read" in res.json()["detail"]
@@ -845,7 +878,7 @@ async def test_audit_logs_shared_site_does_not_leak_inaccessible_study_events(
     events belonging to Study B and ambiguous unseparated site events MUST NOT leak.
     Only events explicitly tied to Study A are returned.
     """
-    token_a = two_studies_setup["tokens"]["user_a"]
+    token = two_studies_setup["tokens"]["study_auditor"]
     shared_site = two_studies_setup["shared_site"]
     log_shared_a = two_studies_setup["logs"]["shared_site_a"]
     log_shared_b = two_studies_setup["logs"]["shared_site_b"]
@@ -853,7 +886,7 @@ async def test_audit_logs_shared_site_does_not_leak_inaccessible_study_events(
 
     res = await client.get(
         f"/api/v1/audit/logs?resource_type=site&resource_id={shared_site.id}",
-        headers={"Authorization": f"Bearer {token_a}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 200
     returned_logs = res.json()
@@ -892,4 +925,570 @@ async def test_audit_logs_shared_site_global_auditor_sees_all_events(
     assert str(log_shared_a.id) in returned_ids
     assert str(log_shared_b.id) in returned_ids
     assert str(log_shared_ambiguous.id) in returned_ids
+
+
+# ---------------------------------------------------------------------------
+# F02C: Final Audit Authorization Boundary Verification Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_study_assigned_user_without_audit_read_forbidden_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 1: Study-assigned user (e.g. investigator, nurse, coordinator) WITHOUT explicit
+    audit:read permission MUST NOT gain audit log access merely by study assignment.
+    Must receive HTTP 403 Forbidden across study, participant, and site endpoints.
+    """
+    token_investigator = two_studies_setup["tokens"]["user_a"]
+    study_a = two_studies_setup["study_a"]
+    part_a = two_studies_setup["participant_a"]
+    shared_site = two_studies_setup["shared_site"]
+
+    # 1. Attempt reading study audit logs
+    res_study = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_a.id}",
+        headers={"Authorization": f"Bearer {token_investigator}"},
+    )
+    assert res_study.status_code == 403
+    assert "authorized for this study" in res_study.json()["detail"]
+
+    # 2. Attempt reading participant audit logs
+    res_part = await client.get(
+        f"/api/v1/audit/logs?resource_type=participant&resource_id={part_a.id}",
+        headers={"Authorization": f"Bearer {token_investigator}"},
+    )
+    assert res_part.status_code == 403
+    assert "authorized study" in res_part.json()["detail"]
+
+    # 3. Attempt reading site audit logs
+    res_site = await client.get(
+        f"/api/v1/audit/logs?resource_type=site&resource_id={shared_site.id}",
+        headers={"Authorization": f"Bearer {token_investigator}"},
+    )
+    assert res_site.status_code == 403
+    assert "associated with an authorized study" in res_site.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_study_scoped_auditor_can_read_assigned_study_only(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 2: Study-scoped auditor with explicit audit:read on Study A:
+    - CAN read audit logs for Study A (HTTP 200).
+    - CANNOT read audit logs for Study B (HTTP 403 Forbidden).
+    - CANNOT read unscoped global audit logs (HTTP 403 Forbidden).
+    """
+    token_study_auditor = two_studies_setup["tokens"]["study_auditor"]
+    study_a = two_studies_setup["study_a"]
+    study_b = two_studies_setup["study_b"]
+
+    # 1. Permitted on assigned Study A
+    res_a = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_a.id}",
+        headers={"Authorization": f"Bearer {token_study_auditor}"},
+    )
+    assert res_a.status_code == 200
+    assert len(res_a.json()) >= 1
+
+    # 2. Forbidden on unassigned Study B
+    res_b = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_b.id}",
+        headers={"Authorization": f"Bearer {token_study_auditor}"},
+    )
+    assert res_b.status_code == 403
+    assert "authorized for this study" in res_b.json()["detail"]
+
+    # 3. Forbidden on unscoped global logs
+    res_global = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {token_study_auditor}"},
+    )
+    assert res_global.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_org_scoped_auditor_cannot_read_other_org_records(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 3: Organization-scoped auditor with audit:read on Org A:
+    - CAN read audit records of studies sponsored by Org A (HTTP 200).
+    - CANNOT read audit records of studies sponsored by Org B (HTTP 403 Forbidden).
+    - CANNOT read participant logs in Org B (HTTP 403 Forbidden).
+    """
+    token_org_auditor = two_studies_setup["tokens"]["org_auditor"]
+    study_a = two_studies_setup["study_a"]
+    study_b = two_studies_setup["study_b"]
+    part_b = two_studies_setup["participant_b"]
+
+    # 1. Permitted for Study A (sponsored by Org A)
+    res_a = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_a.id}",
+        headers={"Authorization": f"Bearer {token_org_auditor}"},
+    )
+    assert res_a.status_code == 200
+
+    # 2. Forbidden for Study B (sponsored by Org B)
+    res_b = await client.get(
+        f"/api/v1/audit/logs?resource_type=study&resource_id={study_b.id}",
+        headers={"Authorization": f"Bearer {token_org_auditor}"},
+    )
+    assert res_b.status_code == 403
+    assert "authorized for this study" in res_b.json()["detail"]
+
+    # 3. Forbidden for participant in Study B
+    res_part = await client.get(
+        f"/api/v1/audit/logs?resource_type=participant&resource_id={part_b.id}",
+        headers={"Authorization": f"Bearer {token_org_auditor}"},
+    )
+    assert res_part.status_code == 403
+    assert "authorized study" in res_part.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_audit_logs_tenant_member_cannot_obtain_global_audit_access_returns_403(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 4: A tenant OrganizationMember (sponsor/CRO) with an attached system-scoped role
+    MUST NOT be treated as a platform-level grant.
+    Must receive HTTP 403 Forbidden on both unscoped /audit/logs and /audit/verify.
+    """
+    token_tenant_imposter = two_studies_setup["tokens"]["tenant_imposter"]
+
+    # 1. Unscoped global audit logs attempt
+    res_logs = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {token_tenant_imposter}"},
+    )
+    assert res_logs.status_code == 403
+    assert "audit:read" in res_logs.json()["detail"]
+
+    # 2. Cryptographic audit chain verification attempt
+    res_verify = await client.get(
+        "/api/v1/audit/verify",
+        headers={"Authorization": f"Bearer {token_tenant_imposter}"},
+    )
+    assert res_verify.status_code == 403
+    assert "audit:read" in res_verify.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_ordinary_org_admin_cannot_assign_system_role_via_org_members_api(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 5a: Ordinary organization administrator cannot assign a system-scoped or platform role
+    through POST /api/v1/organizations/{org_id}/members.
+    Must receive HTTP 403 Forbidden.
+    """
+    token_caller = two_studies_setup["tokens"]["user_a"]  # Member of Org A, but ordinary user
+    org_a = two_studies_setup["org_a"]
+    auditor_role = two_studies_setup["auditor_role"]  # System-scoped role
+
+    target_user_id = uuid.uuid4()
+
+    res = await client.post(
+        f"/api/v1/organizations/{org_a.id}/members",
+        json={
+            "user_id": str(target_user_id),
+            "role_id": str(auditor_role.id),
+        },
+        headers={"Authorization": f"Bearer {token_caller}"},
+    )
+    assert res.status_code == 403
+    assert "platform or system-level roles" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_ordinary_study_admin_cannot_assign_system_role_via_study_team_api(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Test 5b: Ordinary study team manager cannot assign a system-scoped role
+    through POST /api/v1/studies/{study_id}/team.
+    Must receive HTTP 403 Forbidden.
+    """
+    token_caller = two_studies_setup["tokens"]["study_auditor"]  # Has study access to Study A
+    study_a = two_studies_setup["study_a"]
+    auditor_role = two_studies_setup["auditor_role"]  # System-scoped role
+
+    target_user_id = uuid.uuid4()
+
+    res = await client.post(
+        f"/api/v1/studies/{study_a.id}/team",
+        json={
+            "user_id": str(target_user_id),
+            "role_id": str(auditor_role.id),
+        },
+        headers={"Authorization": f"Bearer {token_caller}"},
+    )
+    assert res.status_code == 403
+    assert "platform or system-level roles" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_technical_system_admin_and_global_auditor_retain_intended_access(
+    client: AsyncClient, admin_token: str, two_studies_setup: dict, db_session: AsyncSession
+):
+    """
+    Test 6:
+    - Technical System Administrator retains global audit read and chain verification access.
+    - Technical System Administrator can assign roles via POST /organizations/{org_id}/members.
+    - Explicitly authorized global auditor (institution member with system role) retains global access.
+    """
+    token_global_auditor = two_studies_setup["tokens"]["auditor"]
+    org_a = two_studies_setup["org_a"]
+    auditor_role = two_studies_setup["auditor_role"]
+
+    # 1. Global Auditor can read global logs
+    res_aud_logs = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {token_global_auditor}"},
+    )
+    assert res_aud_logs.status_code == 200
+
+    # 2. Global Auditor can verify audit chain
+    res_aud_verify = await client.get(
+        "/api/v1/audit/verify",
+        headers={"Authorization": f"Bearer {token_global_auditor}"},
+    )
+    assert res_aud_verify.status_code == 200
+
+    # 3. Technical System Admin can read global logs
+    res_admin_logs = await client.get(
+        "/api/v1/audit/logs",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_admin_logs.status_code == 200
+
+    # 4. Technical System Admin can verify audit chain
+    res_admin_verify = await client.get(
+        "/api/v1/audit/verify",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_admin_verify.status_code == 200
+
+    # 5. Technical System Admin CAN assign members via organizations API (system role to platform authority)
+    central_org = two_studies_setup["central_audit_org"]
+    new_user = User(
+        email="new.sys.assignee@clinicalqa.org",
+        full_name="New System Assignee",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(new_user)
+    await db_session.flush()
+
+    res_assign = await client.post(
+        f"/api/v1/organizations/{central_org.id}/members",
+        json={
+            "user_id": str(new_user.id),
+            "role_id": str(auditor_role.id),
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_assign.status_code == 201
+    assert res_assign.json()["user_id"] == str(new_user.id)
+
+
+@pytest.mark.asyncio
+async def test_ordinary_institution_member_with_audit_read_cannot_access_global_audit_logs(
+    client: AsyncClient, two_studies_setup: dict, db_session: AsyncSession
+):
+    """
+    Scenario 1, 2, 3:
+    1. An ordinary institution named 'Central Ayurveda Hospital' receives no platform privileges merely because of its name.
+    2. An organization whose registration number contains 'PLATFORM' or 'AYUCTMS' receives no platform privileges merely because of that value.
+    3. An ordinary institution member with 'audit:read' remains unable to access unscoped global audit logs or /audit/verify.
+    """
+    # 1. Create an ordinary clinical research institution with deceptive keywords in name AND registration number
+    heuristic_inst = Organization(
+        name="Central Ayurveda Hospital and Research Center",
+        organization_type=OrganizationType.institution,
+        status=OrganizationStatus.active,
+        registration_number="AYUCTMS-PLATFORM-GOV-9999",
+        is_platform_authority=False,  # Explicitly ordinary tenant institution!
+    )
+    # Role scoped to organization with audit:read
+    inst_auditor_role = Role(
+        name="Institutional Auditor Central Hospital",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    inst_user = User(
+        email="inst.auditor@centralhospital.org",
+        full_name="Central Hospital Site Auditor",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add_all([heuristic_inst, inst_auditor_role, inst_user])
+    await db_session.flush()
+
+    audit_perm = (
+        await db_session.execute(
+            select(Permission).where(Permission.codename == "audit:read")
+        )
+    ).scalars().first()
+    assert audit_perm is not None
+    rp = RolePermission(role_id=inst_auditor_role.id, permission_id=audit_perm.id)
+    membership = OrganizationMember(
+        organization_id=heuristic_inst.id,
+        user_id=inst_user.id,
+        role_id=inst_auditor_role.id,
+        status=AssignmentStatus.active,
+    )
+    db_session.add_all([rp, membership])
+    await db_session.commit()
+
+    token = create_access_token({"sub": str(inst_user.id), "email": inst_user.email})
+
+    # Unscoped global audit logs attempt -> 403 Forbidden
+    res_logs = await client.get("/api/v1/audit/logs", headers={"Authorization": f"Bearer {token}"})
+    assert res_logs.status_code == 403
+    assert "audit:read" in res_logs.json()["detail"]
+
+    # Global hash chain verification attempt -> 403 Forbidden
+    res_verify = await client.get("/api/v1/audit/verify", headers={"Authorization": f"Bearer {token}"})
+    assert res_verify.status_code == 403
+    assert "audit:read" in res_verify.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_tenant_member_with_improperly_attached_system_role_cannot_bypass_platform_boundary(
+    client: AsyncClient, db_session: AsyncSession, two_studies_setup: dict, admin_token: str
+):
+    """
+    Scenario 4:
+    A tenant member carrying an improperly attached system-scoped role cannot bypass the trusted platform boundary:
+    - is_system_admin is False
+    - is_technical_system_admin is False
+    - has_global_audit_permission is False
+    - get_user_permissions does not grant wildcard * or system role permissions
+    - GET /api/v1/audit/logs returns 403
+    - GET /api/v1/audit/verify returns 403
+    - GET /api/v1/users returns 403
+    - POST /api/v1/organizations/{org_id}/members cannot assign system-level role to a tenant organization (400)
+    """
+    org_a = two_studies_setup["org_a"]  # Tenant organization
+    auditor_role = two_studies_setup["auditor_role"]  # System-scoped role ("Global System Auditor")
+
+    # 1. Imposter user with improperly attached system role on tenant organization
+    imposter_user = User(
+        email="tenant.backdoor@sponsoralpha.org",
+        full_name="Tenant Backdoor Imposter",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(imposter_user)
+    await db_session.flush()
+
+    imposter_membership = OrganizationMember(
+        organization_id=org_a.id,  # Tenant organization!
+        user_id=imposter_user.id,
+        role_id=auditor_role.id,  # System role attached to tenant member
+        status=AssignmentStatus.active,
+    )
+    db_session.add(imposter_membership)
+    await db_session.commit()
+
+    token_imposter = create_access_token({"sub": str(imposter_user.id), "email": imposter_user.email})
+
+    # Unscoped global audit logs attempt -> 403
+    res_logs = await client.get("/api/v1/audit/logs", headers={"Authorization": f"Bearer {token_imposter}"})
+    assert res_logs.status_code == 403
+
+    # Global hash chain verification attempt -> 403
+    res_verify = await client.get("/api/v1/audit/verify", headers={"Authorization": f"Bearer {token_imposter}"})
+    assert res_verify.status_code == 403
+
+    # User directory listing attempt -> 403
+    res_users = await client.get("/api/v1/users", headers={"Authorization": f"Bearer {token_imposter}"})
+    assert res_users.status_code == 403
+
+    # 2. Assignment API prevention: even System Admin cannot assign system role to tenant organization
+    another_user = User(
+        email="assignee.test@sponsoralpha.org",
+        full_name="Assignee Test",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    db_session.add(another_user)
+    await db_session.commit()
+
+    res_assign_sys = await client.post(
+        f"/api/v1/organizations/{org_a.id}/members",
+        json={"user_id": str(another_user.id), "role_id": str(auditor_role.id)},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_assign_sys.status_code == 400
+    assert "trusted platform authority" in res_assign_sys.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_ordinary_tenant_user_cannot_obtain_system_role_through_team_invitations_or_onboarding(
+    client: AsyncClient, two_studies_setup: dict
+):
+    """
+    Scenario 2 (Alternate Assignment Paths):
+    An ordinary tenant user cannot obtain a system role through alternate assignment/approval paths:
+    - POST /api/v1/platform/team-invitations rejecting reserved or system roles
+    - POST /api/v1/platform/onboarding-requests rejecting reserved system roles
+    """
+    token_caller = two_studies_setup["tokens"]["user_a"]
+    org_a = two_studies_setup["org_a"]
+
+    # 1. Attempt to invite a team member with "System Administrator" role -> 400
+    res_invite_sys = await client.post(
+        "/api/v1/platform/team-invitations",
+        json={
+            "full_name": "Injected System Admin",
+            "email": "injected.sysadmin@example.org",
+            "requested_role": "System Administrator",
+            "organization_id": str(org_a.id),
+        },
+        headers={"Authorization": f"Bearer {token_caller}"},
+    )
+    assert res_invite_sys.status_code == 400
+    assert "platform or system-level roles" in res_invite_sys.json()["detail"]
+
+    # 2. Attempt to invite a team member with "Global System Auditor" role -> 400
+    res_invite_aud = await client.post(
+        "/api/v1/platform/team-invitations",
+        json={
+            "full_name": "Injected Auditor",
+            "email": "injected.auditor@example.org",
+            "requested_role": "Global System Auditor",
+            "organization_id": str(org_a.id),
+        },
+        headers={"Authorization": f"Bearer {token_caller}"},
+    )
+    assert res_invite_aud.status_code == 400
+    assert "platform or system-level roles" in res_invite_aud.json()["detail"]
+
+    # 3. Attempt to submit onboarding request requesting "System Administrator" role -> 400
+    res_onboard = await client.post(
+        "/api/v1/platform/onboarding-requests",
+        json={
+            "applicant_name": "Malicious Applicant",
+            "organization_name": "Rogue Entity",
+            "organization_type": "cro",
+            "email": "rogue@entity.org",
+            "requested_role": "System Administrator",
+        },
+    )
+    assert res_onboard.status_code == 400
+    assert "platform or system-level roles" in res_onboard.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_config_based_trusted_platform_organization_identifier_supported(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """
+    Scenario 5:
+    Configuration-based trusted platform authority identifier (settings.PLATFORM_ORGANIZATION_ID)
+    is recognized, and when not configured, fails closed.
+    """
+    from app.core.config import get_settings
+
+    # Create an organization that does NOT have is_platform_authority=True in DB
+    config_org = Organization(
+        name="Platform Authority Configured via Env",
+        organization_type=OrganizationType.institution,
+        status=OrganizationStatus.active,
+        registration_number="REG-CONFIG-001",
+        is_platform_authority=False,  # Not marked in DB!
+    )
+    config_user = User(
+        email="env.admin@ayuctms.gov.in",
+        full_name="Env Bootstrapped Admin",
+        status=UserStatus.active,
+        hashed_password=hash_password("Pass123!"),
+    )
+    sys_role = Role(
+        name="Config Platform Admin",
+        scope_level=ScopeLevel.system,
+        is_system_role=True,
+    )
+    db_session.add_all([config_org, config_user, sys_role])
+    await db_session.flush()
+
+    audit_perm = (
+        await db_session.execute(
+            select(Permission).where(Permission.codename == "audit:read")
+        )
+    ).scalars().first()
+    if not audit_perm:
+        audit_perm = Permission(codename="audit:read", resource="audit", action="read", description="Audit read")
+        db_session.add(audit_perm)
+        await db_session.flush()
+    rp = RolePermission(role_id=sys_role.id, permission_id=audit_perm.id)
+    mem = OrganizationMember(
+        organization_id=config_org.id,
+        user_id=config_user.id,
+        role_id=sys_role.id,
+        status=AssignmentStatus.active,
+    )
+    db_session.add_all([rp, mem])
+    await db_session.commit()
+
+    token = create_access_token({"sub": str(config_user.id), "email": config_user.email})
+
+    # Without PLATFORM_ORGANIZATION_ID configured -> FAILS CLOSED (403)
+    res_before = await client.get("/api/v1/audit/logs", headers={"Authorization": f"Bearer {token}"})
+    assert res_before.status_code == 403
+
+    # Now configure PLATFORM_ORGANIZATION_ID to match config_org.id
+    current_settings = get_settings()
+    monkeypatch.setattr(current_settings, "PLATFORM_ORGANIZATION_ID", str(config_org.id))
+
+    # With PLATFORM_ORGANIZATION_ID configured to correct org -> SUCCEEDS (200)
+    res_after = await client.get("/api/v1/audit/logs", headers={"Authorization": f"Bearer {token}"})
+    assert res_after.status_code == 200
+
+    # With mismatched PLATFORM_ORGANIZATION_ID configured -> FAILS CLOSED (403)
+    monkeypatch.setattr(current_settings, "PLATFORM_ORGANIZATION_ID", str(uuid.uuid4()))
+    res_mismatched = await client.get("/api/v1/audit/logs", headers={"Authorization": f"Bearer {token}"})
+    assert res_mismatched.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_tenant_api_cannot_set_or_update_is_platform_authority(
+    client: AsyncClient, db_session: AsyncSession, admin_token: str
+):
+    """
+    Ensure ordinary signup, onboarding, organization creation/update, invitations,
+    and tenant administration cannot create or modify the trusted platform identity.
+    """
+    # 1. Attempt to create organization with is_platform_authority=True in payload
+    res_create = await client.post(
+        "/api/v1/organizations",
+        json={
+            "name": "Sneaky Platform Org",
+            "organization_type": "institution",
+            "is_platform_authority": True,  # Attacker attempt
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_create.status_code == 201
+    created_id = res_create.json()["id"]
+
+    created_org = await db_session.get(Organization, uuid.UUID(created_id))
+    assert created_org is not None
+    assert created_org.is_platform_authority is False  # Must remain False!
+
+    # 2. Attempt to update organization with is_platform_authority=True in PATCH payload
+    res_patch = await client.patch(
+        f"/api/v1/organizations/{created_id}",
+        json={"is_platform_authority": True},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_patch.status_code == 200
+
+    await db_session.refresh(created_org)
+    assert created_org.is_platform_authority is False  # Must still remain False!
 

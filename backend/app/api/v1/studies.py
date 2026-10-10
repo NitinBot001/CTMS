@@ -7,13 +7,24 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user, require_study_access
+from app.core.auth import (
+    RESERVED_SYSTEM_ROLE_NAMES,
+    get_current_user,
+    is_technical_system_admin,
+    require_study_access,
+)
 from app.core.database import get_db
-from app.models.enums import AssignmentStatus, StudyPhase, StudySiteActivationStatus, StudyStatus
+from app.models.enums import (
+    AssignmentStatus,
+    ScopeLevel,
+    StudyPhase,
+    StudySiteActivationStatus,
+    StudyStatus,
+)
 from app.models.progress import StudyMilestone
 from app.models.site import StudySite
 from app.models.study import Study, StudyTeamMember
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.common import StatusTransitionRequest
 from app.schemas.site import EligibleSiteItem, StudySiteCreate, StudySiteRead
 from app.schemas.study import (
@@ -174,6 +185,23 @@ async def add_study_team_member(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role = await db.get(Role, member_in.role_id)
+    if not role:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role not found")
+
+    is_sys_admin = is_technical_system_admin(current_user)
+    is_target_system_role = (
+        role.scope_level == ScopeLevel.system
+        or role.is_system_role
+        or (role.name and role.name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES)
+    )
+
+    if is_target_system_role and not is_sys_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: study team members cannot be assigned platform or system-level roles",
+        )
+
     member = StudyTeamMember(
         study_id=study_id,
         user_id=member_in.user_id,

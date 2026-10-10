@@ -21,7 +21,7 @@ from app.models.enums import AssignmentStatus
 from app.models.participant import Participant
 from app.models.site import Site, StudySite
 from app.models.study import Study, StudyTeamMember
-from app.models.user import User
+from app.models.user import Permission, Role, RolePermission, User
 from app.services.audit import AuditService
 
 router = APIRouter(prefix="/audit", tags=["Audit Trail"])
@@ -62,25 +62,48 @@ def extract_study_id_from_audit_changes(changes: Any) -> uuid.UUID | None:
 
 async def get_user_study_scope_ids(user: User, db: AsyncSession) -> set[uuid.UUID]:
     """
-    Returns set of Study IDs accessible to the user based on active organization membership
-    (Sponsor/CRO) and active study team member assignments.
+    Returns set of Study IDs for which the caller is explicitly authorized to view audit logs.
+    Enforces that the user must have both:
+    1. Study association (via sponsor/CRO organization membership or study team assignment).
+    2. Explicit 'audit:read' permission within that same scope.
+    Ordinary assigned users (e.g. site nurses, coordinators, investigators) without 'audit:read'
+    permission gain NO audit access.
     """
-    user_org_ids = [
-        m.organization_id
-        for m in user.memberships
-        if m.status == AssignmentStatus.active
-    ]
     accessible: set[uuid.UUID] = set()
-    if user_org_ids:
+
+    # 1. Organization-scoped audit:read:
+    # Active organization membership whose role explicitly grants 'audit:read' (or '*')
+    # Grants access strictly to studies where that organization is sponsor or CRO.
+    authorized_org_ids: list[uuid.UUID] = []
+    for m in user.memberships:
+        if m.status == AssignmentStatus.active and m.role:
+            has_audit = any(
+                rp.permission and rp.permission.codename in ("audit:read", "*")
+                for rp in m.role.permissions
+            )
+            if has_audit:
+                authorized_org_ids.append(m.organization_id)
+
+    if authorized_org_ids:
         stmt = select(Study.id).where(
-            (Study.sponsor_org_id.in_(user_org_ids)) | (Study.cro_org_id.in_(user_org_ids))
+            (Study.sponsor_org_id.in_(authorized_org_ids)) | (Study.cro_org_id.in_(authorized_org_ids))
         )
         for sid in (await db.execute(stmt)).scalars().all():
             accessible.add(sid)
 
-    team_stmt = select(StudyTeamMember.study_id).where(
-        StudyTeamMember.user_id == user.id,
-        StudyTeamMember.assignment_status == AssignmentStatus.active,
+    # 2. Study-scoped audit:read:
+    # Active study team assignment whose assigned role explicitly grants 'audit:read' (or '*')
+    # Grants access strictly to that assigned study.
+    team_stmt = (
+        select(StudyTeamMember.study_id)
+        .join(StudyTeamMember.role)
+        .join(Role.permissions)
+        .join(RolePermission.permission)
+        .where(
+            StudyTeamMember.user_id == user.id,
+            StudyTeamMember.assignment_status == AssignmentStatus.active,
+            Permission.codename.in_(["audit:read", "*"]),
+        )
     )
     for sid in (await db.execute(team_stmt)).scalars().all():
         accessible.add(sid)

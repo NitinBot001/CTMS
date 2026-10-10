@@ -103,7 +103,18 @@ async def seed_data():
         db.add_all([role_admin, role_pi, role_cro])
         await db.flush()
 
-        # 3. Organizations (Sponsor + CRO)
+        # 3. Organizations (Platform Authority + Sponsor + CRO)
+        platform_org = Organization(
+            name="Ministry of Ayush Central CTMS Platform Authority",
+            organization_type=OrganizationType.institution,
+            status=OrganizationStatus.active,
+            registration_number="AYUSH-CTMS-PLATFORM-01",
+            is_platform_authority=True,
+            email="admin@ayuctms.gov.in",
+            city="New Delhi",
+            state="Delhi",
+            country="India",
+        )
         sponsor = Organization(
             name="All India Institute of Ayurveda (AIIA)",
             organization_type=OrganizationType.sponsor,
@@ -124,11 +135,11 @@ async def seed_data():
             state="Karnataka",
             country="India",
         )
-        db.add_all([sponsor, cro])
+        db.add_all([platform_org, sponsor, cro])
         await db.flush()
 
         admin_member = OrganizationMember(
-            organization_id=sponsor.id,
+            organization_id=platform_org.id,
             user_id=admin_user.id,
             role_id=role_admin.id,
             status=AssignmentStatus.active,

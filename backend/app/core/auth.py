@@ -5,21 +5,92 @@ from collections.abc import Callable
 from typing import Any
 
 import jwt
+import sqlalchemy as sa
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.base import NO_VALUE
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.enums import AssignmentStatus, ScopeLevel, UserStatus
-from app.models.organization import OrganizationMember
+from app.models.organization import Organization, OrganizationMember
 from app.models.study import Study, StudyTeamMember
 from app.models.user import Role, RolePermission, User
 
 # Security scheme: Bearer token
 security_bearer = HTTPBearer(auto_error=False)
+
+RESERVED_SYSTEM_ROLE_NAMES: set[str] = {
+    "system administrator",
+    "system admin",
+    "super admin",
+    "superadmin",
+    "global administrator",
+    "platform administrator",
+    "platform super admin",
+    "government super admin",
+    "government verification super admin",
+    "global system auditor",
+    "global auditor",
+}
+
+
+def _get_membership_organization(membership: OrganizationMember) -> Organization | None:
+    """Safely retrieves loaded organization from membership without triggering lazy loads."""
+    try:
+        insp = sa.inspect(membership)
+        val = insp.attrs.organization.loaded_value
+        if val is not NO_VALUE and isinstance(val, Organization):
+            return val
+    except Exception:
+        pass
+    try:
+        val = getattr(membership, "organization", None)
+        if isinstance(val, Organization):
+            return val
+    except Exception:
+        pass
+    return None
+
+
+def is_trusted_platform_organization(org: Organization | None) -> bool:
+    """
+    Determines whether an organization is the genuine, explicitly trusted platform authority.
+
+    Security rules:
+    - Never infers authority from organization name, email domain, or applicant-supplied registration numbers.
+    - Requires an explicit trusted platform identifier (settings.PLATFORM_ORGANIZATION_ID)
+      or a protected database attribute (org.is_platform_authority is True) established
+      by platform-controlled bootstrap or migration.
+    - If neither is configured or established, fails closed (returns False).
+    """
+    if not org:
+        return False
+
+    # Check 1: Protected database attribute established by platform-controlled bootstrap/migration
+    if getattr(org, "is_platform_authority", False) is True:
+        return True
+
+    # Check 2: Explicitly configured trusted platform identifier in application settings
+    settings = get_settings()
+    if settings.PLATFORM_ORGANIZATION_ID:
+        try:
+            if str(org.id) == str(uuid.UUID(settings.PLATFORM_ORGANIZATION_ID)):
+                return True
+        except (ValueError, TypeError):
+            if str(org.id) == settings.PLATFORM_ORGANIZATION_ID:
+                return True
+
+    # Fail closed: ordinary institutions, hospitals, sponsors, and CROs receive no platform authority
+    return False
+
+
+# Backward compatibility alias
+_is_central_platform_organization = is_trusted_platform_organization
 
 
 def is_system_admin(user: User) -> bool:
@@ -33,6 +104,9 @@ def is_system_admin(user: User) -> bool:
             and membership.role
             and (membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator")
         ):
+            org = _get_membership_organization(membership)
+            if not is_trusted_platform_organization(org):
+                continue
             return True
     return False
 
@@ -42,13 +116,18 @@ def is_technical_system_admin(user: User) -> bool:
     Checks whether the user has an active technical System Administrator role
     (scope_level == ScopeLevel.system or name == 'System Administrator').
     Strictly excludes Government Verification SuperAdminProfile.
+    Tenant organization members must not inherit platform-level technical admin rights.
     """
     for membership in user.memberships:
         if (
             membership.status == AssignmentStatus.active
             and membership.role
             and (membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator")
+            and membership.role.is_system_role
         ):
+            org = _get_membership_organization(membership)
+            if not is_trusted_platform_organization(org):
+                continue
             return True
     return False
 
@@ -85,6 +164,7 @@ def has_global_audit_permission(user: User) -> bool:
     - Organization-scoped roles granting audit:read or wildcard * (must not leak cross-tenant).
     - Study-scoped roles granting audit:read or wildcard * (must not leak global logs).
     - Non-system roles with wildcard *.
+    - Tenant OrganizationMember records (must not inherit platform-level global audit access).
     """
     if is_technical_system_admin(user):
         return True
@@ -94,7 +174,14 @@ def has_global_audit_permission(user: User) -> bool:
             membership.status == AssignmentStatus.active
             and membership.role
             and membership.role.scope_level == ScopeLevel.system
+            and membership.role.is_system_role
         ):
+            # Tenant OrganizationMember records must not be treated as a platform-level grant.
+            # Platform-level roles must belong to an explicitly authorized central platform authority.
+            org = _get_membership_organization(membership)
+            if not is_trusted_platform_organization(org):
+                continue
+
             for rp in membership.role.permissions:
                 if rp.permission and rp.permission.codename == "audit:read":
                     return True
@@ -111,8 +198,19 @@ def get_user_permissions(user: User) -> set[str]:
 
     for membership in user.memberships:
         if membership.status == AssignmentStatus.active and membership.role:
-            if membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator":
-                permissions.add("*")
+            is_sys = (
+                membership.role.scope_level == ScopeLevel.system
+                or membership.role.is_system_role
+                or membership.role.name == "System Administrator"
+            )
+            if is_sys:
+                org = _get_membership_organization(membership)
+                if not is_trusted_platform_organization(org):
+                    # Tenant members with improperly attached system roles cannot claim system permissions
+                    continue
+                if membership.role.scope_level == ScopeLevel.system or membership.role.name == "System Administrator":
+                    permissions.add("*")
+
             for rp in membership.role.permissions:
                 if rp.permission and rp.permission.codename:
                     permissions.add(rp.permission.codename)
@@ -177,11 +275,15 @@ async def get_current_user(
     stmt = (
         select(User)
         .options(
+            selectinload(User.memberships).selectinload(OrganizationMember.organization),
             selectinload(User.memberships)
             .selectinload(OrganizationMember.role)
             .selectinload(Role.permissions)
             .selectinload(RolePermission.permission),
-            selectinload(User.study_team_assignments),
+            selectinload(User.study_team_assignments)
+            .selectinload(StudyTeamMember.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission),
             selectinload(User.super_admin_profile),
         )
         .where(User.id == user_id)

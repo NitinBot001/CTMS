@@ -46,6 +46,7 @@ def test_alembic_migration_reproducibility():
         db_url = f"sqlite:///{db_path}"
         cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "alembic.ini")
         alembic_cfg = Config(cfg_path)
+        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(cfg_path), "alembic"))
         alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{db_path}")
 
         # 1. Upgrade to head on empty database
@@ -56,6 +57,8 @@ def test_alembic_migration_reproducibility():
         tables = set(inspector.get_table_names())
 
         assert EXPECTED_CANONICAL_TABLES.issubset(tables), f"Missing tables: {EXPECTED_CANONICAL_TABLES - tables}"
+        org_cols = {c["name"] for c in inspector.get_columns("organizations")}
+        assert "is_platform_authority" in org_cols, "is_platform_authority column missing from organizations"
 
         # 2. Downgrade to base
         command.downgrade(alembic_cfg, "base")

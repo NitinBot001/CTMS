@@ -34,6 +34,10 @@ class Organization(BaseModel):
         sa.Enum(OrganizationStatus, name="organization_status", create_constraint=True)
     )
 
+    is_platform_authority: Mapped[bool] = mapped_column(
+        sa.Boolean, default=False, server_default=sa.false()
+    )
+
     registration_number: Mapped[str | None] = mapped_column(sa.String(100))
     website: Mapped[str | None] = mapped_column(sa.String(500))
     phone: Mapped[str | None] = mapped_column(sa.String(50))

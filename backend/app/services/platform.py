@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import RESERVED_SYSTEM_ROLE_NAMES
 from app.core.config import Settings
 from app.core.security import hash_password, verify_password
 from app.models.enums import (
@@ -217,6 +218,12 @@ class PlatformService:
             if request.request_type in (AccessRequestType.research_pi, AccessRequestType.site_pi)
             else "Organization Admin"
         )
+        if role_name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+            role_name = (
+                "Principal Investigator"
+                if request.request_type in (AccessRequestType.research_pi, AccessRequestType.site_pi)
+                else "Organization Admin"
+            )
         role_stmt = select(Role).where(
             Role.name == role_name, Role.scope_level == ScopeLevel.organization
         )
@@ -579,6 +586,21 @@ class PlatformService:
 
         raw_token: str | None = None
         if status == OnboardingRequestStatus.approved:
+            role_norm = req.requested_role.strip().lower()
+            if role_norm in RESERVED_SYSTEM_ROLE_NAMES:
+                raise ValueError("Team members cannot be provisioned with platform or system-level roles")
+
+            existing_sys_role = (
+                await db.execute(
+                    select(Role).where(
+                        Role.name.ilike(req.requested_role.strip()),
+                        (Role.scope_level == ScopeLevel.system) | (Role.is_system_role.is_(True)),
+                    )
+                )
+            ).scalars().first()
+            if existing_sys_role:
+                raise ValueError("Team members cannot be provisioned with platform or system-level roles")
+
             # Provision or find user
             u_stmt = select(User).where(User.email == req.email)
             u = (await db.execute(u_stmt)).scalars().first()
@@ -597,14 +619,19 @@ class PlatformService:
 
             req.provisioned_user_id = u.id
 
-            # Role
-            role_stmt = select(Role).where(Role.name == req.requested_role)
+            # Role (strictly non-system)
+            role_stmt = select(Role).where(
+                Role.name == req.requested_role,
+                Role.scope_level != ScopeLevel.system,
+                Role.is_system_role.is_(False),
+            )
             role = (await db.execute(role_stmt)).scalars().first()
             if not role:
                 role = Role(
                     name=req.requested_role,
                     description=f"Auto-created role {req.requested_role}",
                     scope_level=ScopeLevel.study if req.study_id else ScopeLevel.organization,
+                    is_system_role=False,
                 )
                 db.add(role)
                 await db.flush()

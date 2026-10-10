@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import (
+    RESERVED_SYSTEM_ROLE_NAMES,
     get_current_user,
     has_user_manage_permission,
     is_technical_system_admin,
@@ -138,16 +139,7 @@ async def create_role(
     is_system_scope = (role_in.scope_level == ScopeLevel.system)
     is_system_flag = (raw_body.get("is_system_role") is True) or getattr(role_in, "is_system_role", False) is True
     name_norm = role_in.name.strip().lower()
-    reserved_role_names = {
-        "system administrator",
-        "system admin",
-        "super admin",
-        "superadmin",
-        "platform super admin",
-        "government verification super admin",
-        "government super admin",
-    }
-    is_reserved_name = name_norm in reserved_role_names
+    is_reserved_name = name_norm in RESERVED_SYSTEM_ROLE_NAMES
 
     # Prevent privilege escalation and payload bypasses: only technical System Administrators can create system-level roles
     if (is_system_scope or is_system_flag or is_reserved_name) and not is_tech_admin:

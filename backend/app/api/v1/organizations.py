@@ -6,11 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import get_current_user
+from app.core.auth import (
+    RESERVED_SYSTEM_ROLE_NAMES,
+    get_current_user,
+    is_technical_system_admin,
+    is_trusted_platform_organization,
+)
 from app.core.database import get_db
-from app.models.enums import OnboardingStatus, OrganizationStatus, OrganizationType
+from app.models.enums import (
+    AssignmentStatus,
+    OnboardingStatus,
+    OrganizationStatus,
+    OrganizationType,
+    ScopeLevel,
+)
 from app.models.organization import OnboardingApplication, Organization, OrganizationMember
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.common import StatusTransitionRequest
 from app.schemas.organization import (
     OnboardingApplicationRead,
@@ -80,6 +91,7 @@ async def update_organization(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     update_data = org_in.model_dump(exclude_unset=True)
+    update_data.pop("is_platform_authority", None)
     for field, value in update_data.items():
         setattr(org, field, value)
 
@@ -192,10 +204,64 @@ async def add_organization_member(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    org = await db.get(Organization, org_id)
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+
+    role = await db.get(Role, member_in.role_id)
+    if not role:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Role not found")
+
+    is_sys_admin = is_technical_system_admin(current_user)
+
+    # System-level role boundary: ordinary organization administrators cannot assign platform/system roles
+    is_target_system_role = (
+        role.scope_level == ScopeLevel.system
+        or role.is_system_role
+        or (role.name and role.name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES)
+    )
+
+    if is_target_system_role:
+        if not is_sys_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: ordinary organization administrators cannot assign platform or system-level roles",
+            )
+        if not is_trusted_platform_organization(org):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="System-level roles can only be assigned to members of the trusted platform authority",
+            )
+
+    # Authorization check: caller must be a technical system admin or an active member of this organization
+    if not is_sys_admin:
+        is_member = any(
+            m.organization_id == org_id and m.status == AssignmentStatus.active
+            for m in current_user.memberships
+        )
+        if not is_member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: user is not an active member of this organization",
+            )
+
+    # Check for existing membership
+    existing_stmt = select(OrganizationMember).where(
+        OrganizationMember.organization_id == org_id,
+        OrganizationMember.user_id == member_in.user_id,
+    )
+    existing_res = await db.execute(existing_stmt)
+    if existing_res.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already a member of this organization",
+        )
+
     member = OrganizationMember(
         organization_id=org_id,
         user_id=member_in.user_id,
         role_id=member_in.role_id,
+        status=AssignmentStatus.active,
     )
     db.add(member)
     await db.flush()
@@ -206,7 +272,11 @@ async def add_organization_member(
         action="organization.member_add",
         resource_type="organization_member",
         resource_id=member.id,
-        changes={"organization_id": str(org_id), "user_id": str(member_in.user_id)},
+        changes={
+            "organization_id": str(org_id),
+            "user_id": str(member_in.user_id),
+            "role_id": str(member_in.role_id),
+        },
     )
     await db.commit()
     await db.refresh(member)

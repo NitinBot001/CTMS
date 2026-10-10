@@ -113,6 +113,7 @@ async def admin_user(db_session: AsyncSession) -> User:
         name="Central System Org",
         organization_type=OrganizationType.institution,
         status=OrganizationStatus.active,
+        is_platform_authority=True,
     )
     db_session.add(org)
     await db_session.flush()

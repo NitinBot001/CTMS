@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     SUPER_ADMIN_EMAIL: str = ""
     SUPER_ADMIN_BOOTSTRAP_PASSWORD: str = ""
     SUPER_ADMIN_ACTIVATION_MODE: str = "bootstrap_password"
+    # Platform Authority Configuration
+    PLATFORM_ORGANIZATION_ID: str = ""
     # Email & Resend
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "onboarding@resend.dev"

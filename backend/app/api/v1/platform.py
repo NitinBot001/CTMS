@@ -8,13 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.auth import get_current_user
+from app.core.auth import RESERVED_SYSTEM_ROLE_NAMES, get_current_user
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password
 from app.models.enums import (
     AccessRequestType,
     OnboardingRequestStatus,
+    ScopeLevel,
     UserStatus,
 )
 from app.models.platform import (
@@ -22,7 +23,7 @@ from app.models.platform import (
     SiteParticipationRequest,
     TeamMemberVerificationRequest,
 )
-from app.models.user import SuperAdminProfile, User
+from app.models.user import Role, SuperAdminProfile, User
 from app.schemas.dashboard import SuperAdminOverviewResponse
 from app.schemas.participant import ParticipantRead
 from app.schemas.platform import (
@@ -75,6 +76,11 @@ async def require_super_admin(
 async def submit_onboarding_request(
     request_data: OnboardingRequestCreate, db: AsyncSession = Depends(get_db)
 ) -> OnboardingRequestRead:
+    if request_data.requested_role and request_data.requested_role.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot request platform or system-level roles in onboarding requests",
+        )
     new_request = OnboardingRequest(**request_data.model_dump())
     db.add(new_request)
     await db.commit()
@@ -90,6 +96,11 @@ async def submit_onboarding_request(
 async def submit_research_pi_request(
     data: ResearchPIRequestCreate, db: AsyncSession = Depends(get_db)
 ) -> OnboardingRequestRead:
+    if data.requested_role and data.requested_role.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot request platform or system-level roles in onboarding requests",
+        )
     dump = data.model_dump()
     dump["request_type"] = AccessRequestType.research_pi
     new_req = OnboardingRequest(**dump)
@@ -107,6 +118,11 @@ async def submit_research_pi_request(
 async def submit_cro_staff_request(
     data: CROStaffRequestCreate, db: AsyncSession = Depends(get_db)
 ) -> OnboardingRequestRead:
+    if data.requested_role and data.requested_role.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot request platform or system-level roles in onboarding requests",
+        )
     dump = data.model_dump()
     dump["request_type"] = AccessRequestType.cro_staff
     new_req = OnboardingRequest(**dump)
@@ -124,6 +140,11 @@ async def submit_cro_staff_request(
 async def submit_site_pi_request(
     data: SitePIRequestCreate, db: AsyncSession = Depends(get_db)
 ) -> OnboardingRequestRead:
+    if data.requested_role and data.requested_role.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot request platform or system-level roles in onboarding requests",
+        )
     dump = data.model_dump()
     dump["request_type"] = AccessRequestType.site_pi
     new_req = OnboardingRequest(**dump)
@@ -503,6 +524,26 @@ async def create_team_invitation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TeamMemberVerificationRequestRead:
+    role_norm = data.requested_role.strip().lower()
+    if role_norm in RESERVED_SYSTEM_ROLE_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot invite team members with platform or system-level roles",
+        )
+    existing_sys_role = (
+        await db.execute(
+            select(Role).where(
+                Role.name.ilike(data.requested_role.strip()),
+                (Role.scope_level == ScopeLevel.system) | (Role.is_system_role.is_(True)),
+            )
+        )
+    ).scalars().first()
+    if existing_sys_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Permission denied: cannot invite team members with platform or system-level roles",
+        )
+
     inv = await PlatformService.create_team_invitation(
         invited_by=current_user,
         full_name=data.full_name,
