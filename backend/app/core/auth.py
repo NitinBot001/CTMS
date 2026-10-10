@@ -450,3 +450,211 @@ def require_study_access(permission: str | None = None) -> Callable[..., Any]:
         )
 
     return _study_access_dependency
+
+
+def has_document_permission(user: User, permission: str) -> bool:
+    """
+    Checks whether the user has the specified document permission (e.g. 'documents:read', 'documents:upload').
+    Technical System Administrator holds wildcard '*'.
+    Strictly excludes:
+    - Government Verification SuperAdminProfile wildcard bypass (Rule 5).
+    - Unassigned or inactive users (Rule 6).
+    """
+    if is_technical_system_admin(user):
+        return True
+
+    # Check active organization memberships
+    for membership in user.memberships:
+        if membership.status == AssignmentStatus.active and membership.role:
+            for rp in membership.role.permissions:
+                if rp.permission and rp.permission.codename in (permission, "*"):
+                    if rp.permission.codename == "*":
+                        org = _get_membership_organization(membership)
+                        if not is_trusted_platform_organization(org):
+                            continue
+                    return True
+
+    # Check active study team assignments
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename in (permission, "*"):
+                        return True
+
+    return False
+
+
+async def is_user_authorized_for_document(
+    user: User,
+    doc: Any,
+    db: AsyncSession,
+    permission: str = "documents:read",
+) -> bool:
+    """
+    Verifies whether the authenticated user is authorized to perform the requested operation
+    (read or upload/mutate) on the specific Document record based on study, site, and organization scopes.
+    """
+    from app.models.site import Site
+
+    if is_technical_system_admin(user):
+        return True
+
+    if not has_document_permission(user, permission):
+        return False
+
+    # 1. Study-scoped document
+    if doc.study_id is not None:
+        study = await db.get(Study, doc.study_id)
+        if not study:
+            return False
+
+        # Check Sponsor / CRO organization memberships
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id in (study.sponsor_org_id, study.cro_org_id):
+                has_perm = any(
+                    rp.permission and rp.permission.codename in (permission, "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    # Sponsor/CRO members can access study-level and site-level documents
+                    return True
+
+        # Check Study Team assignments
+        if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+            for a in user.study_team_assignments:
+                if a.study_id == doc.study_id and a.assignment_status == AssignmentStatus.active and a.role:
+                    has_perm = any(
+                        rp.permission and rp.permission.codename in (permission, "*")
+                        for rp in a.role.permissions
+                    )
+                    if has_perm:
+                        if a.site_id is None:
+                            # Study-level team member (e.g. Study PI)
+                            return True
+                        if doc.site_id is None:
+                            # Site staff can read study-level documents (e.g. Protocol, IB)
+                            # But cannot mutate study-wide documents
+                            return permission == "documents:read"
+                        return bool(doc.site_id == a.site_id)
+        return False
+
+    # 2. Site-scoped document not associated with a study
+    if doc.site_id is not None:
+        site = await db.get(Site, doc.site_id)
+        if not site:
+            return False
+
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id == site.organization_id:
+                has_perm = any(
+                    rp.permission and rp.permission.codename in (permission, "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+
+        if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+            for a in user.study_team_assignments:
+                if a.site_id == doc.site_id and a.assignment_status == AssignmentStatus.active and a.role:
+                    has_perm = any(
+                        rp.permission and rp.permission.codename in (permission, "*")
+                        for rp in a.role.permissions
+                    )
+                    if has_perm:
+                        return True
+        return False
+
+    # 3. Organization-scoped document not associated with a study or site
+    if doc.organization_id is not None:
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id == doc.organization_id:
+                has_perm = any(
+                    rp.permission and rp.permission.codename in (permission, "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+        return False
+
+    # 4. Unscoped document
+    return False
+
+
+async def can_user_approve_document(
+    user: User,
+    doc: Any,
+    db: AsyncSession,
+) -> bool:
+    """
+    Checks whether the user has authority to approve the given document.
+    Enforces that site staff cannot approve study-wide documents, and only
+    authorized Sponsor/CRO monitors or study-level PIs can approve global trial documents.
+    """
+    from app.models.site import Site
+
+    if is_technical_system_admin(user):
+        return True
+
+    if not has_document_permission(user, "documents:upload"):
+        return False
+
+    if doc.study_id is not None:
+        study = await db.get(Study, doc.study_id)
+        if not study:
+            return False
+
+        # Sponsor or CRO members with documents:upload can approve
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id in (study.sponsor_org_id, study.cro_org_id):
+                has_perm = any(
+                    rp.permission and rp.permission.codename in ("documents:upload", "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+
+        # Study team members
+        if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+            for a in user.study_team_assignments:
+                if a.study_id == doc.study_id and a.assignment_status == AssignmentStatus.active and a.role:
+                    has_perm = any(
+                        rp.permission and rp.permission.codename in ("documents:upload", "*")
+                        for rp in a.role.permissions
+                    )
+                    if has_perm:
+                        if a.site_id is None:
+                            # Study-level Principal Investigator
+                            return True
+                        # Site staff can only approve documents for their own site
+                        if doc.site_id is not None and doc.site_id == a.site_id:
+                            return True
+        return False
+
+    if doc.site_id is not None:
+        site = await db.get(Site, doc.site_id)
+        if not site:
+            return False
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id == site.organization_id:
+                has_perm = any(
+                    rp.permission and rp.permission.codename in ("documents:upload", "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+        return False
+
+    if doc.organization_id is not None:
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id == doc.organization_id:
+                has_perm = any(
+                    rp.permission and rp.permission.codename in ("documents:upload", "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+        return False
+
+    return False
+

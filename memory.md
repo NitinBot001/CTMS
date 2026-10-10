@@ -12,17 +12,24 @@
 - **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation + `f1b2c3d4e5f6` add is_platform_authority to organizations) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
-  - Git & GitHub Sync: Local commit `ff3580e` committed locally (ahead of `origin/master` by 1 commit). Remote `origin/master` at `7f9e63d`.
-  - Backend: 100% GREEN (159/159 pytest async tests passing across all test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
+  - Git & GitHub Sync: Local commits committed locally (ahead of `origin/master`). Remote `origin/master` at `7f9e63d`.
+  - Backend: 100% GREEN (171/171 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 9.6s with optimized assets).
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 15.1s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C: Fully remediated and verified with 67 dedicated RBAC and adversarial audit regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03: Fully remediated and verified with 79 dedicated RBAC and adversarial regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Document & TMF Multi-Tiered Authorization and Scoping (F03)**:
+  - Enforced strict canonical permissions (`documents:read` for read/list and `documents:upload` for create/mutate/transition).
+  - Strictly excluded Government Verification Super Admin from document wildcard bypass; technical System Administrator retains platform-wide access.
+  - Multi-tier resource scoping: Sponsor/CRO members access all documents within their studies (study-level and active site-level); study-level team members (e.g. Study PI) access study-level and site-level documents; site-level staff (Site PI, Site Coordinator) can read study protocols and their own site's documents, but CANNOT access other sites' documents or other studies.
+  - Site staff are strictly prohibited from approving study-wide documents (`site_id=None`). Only Sponsor/CRO monitors or study-level PIs can approve global trial documents.
+  - Path traversal sequences (`../`, `..\`, null bytes) in `storage_key` or `file_name` are rejected with `HTTP 400 Bad Request`.
+  - Document audit records include `study_id` in changes to maintain strict synchronization with F02/F02B/F02C study-scoped audit logging and cryptographic hash-chain integrity.
 - **Explicit Trusted Platform Identity vs Insecure Keyword Heuristics**: Replaced all keyword/name/registration-based heuristics (`_is_central_platform_organization`) with explicit trusted platform authority identification (`is_trusted_platform_organization`). An organization is recognized as the platform authority only via: (1) protected database column `is_platform_authority: bool` established via platform bootstrap/migration, or (2) explicit configuration setting `PLATFORM_ORGANIZATION_ID` in `Settings`. If neither is configured/present, authorization fails closed (`False`). Public tenant APIs (`POST /organizations`, `PATCH /organizations/{id}`, onboarding requests, team invitations) cannot create or modify `is_platform_authority`.
 - **System Role Assignment Isolation to Platform Authority**: In `POST /organizations/{org_id}/members`, system-level roles (`ScopeLevel.system` / `is_system_role=True` / reserved names) can ONLY be assigned if the organization is the trusted platform authority (`is_trusted_platform_organization(org)` is True). Attempts to assign system roles to tenant organizations are rejected with `HTTP 400 Bad Request` for admins, and `HTTP 403 Forbidden` for non-admins. In `get_user_permissions` and `is_system_admin`, system-level roles attached to non-platform organizations are ignored, preventing privilege escalation.
 - **Real Application Context & Role Discovery**: Generated authoritative markdown context documentation and sanitized rendered HTML snapshots for downstream AI discussion without modifying application source code or permissions.
@@ -35,7 +42,29 @@
 
 ## 3. Task Log
 
-### 2026-10-10 18:15 — F02C Final Fix: Replace Heuristic Platform Identity & Deployment Safety Gate
+### 2026-10-10 19:25 — F03: Document/TMF Authorization and Scoping
+
+- **What**: Implemented and verified comprehensive role-based, tenant-aware, study-aware, and site-aware authorization and scoping for all document/TMF REST API endpoints (`POST /documents`, `GET /documents`, `GET /documents/{id}`, `POST /documents/{id}/transition`). Added 12 adversarial regression tests in `backend/tests/test_documents_rbac.py`.
+- **Why**: Prevent cross-tenant data leaks, unauthorized document creation or mutations, cross-site document disclosure, unprivileged document approvals by site staff or coordinators, and bypasses via path traversal or manipulated IDs. Maintain full hash-chain auditability and F02/F02B/F02C boundary integrity.
+- **How**:
+  1. In `backend/app/core/auth.py`: Added `has_document_permission(user, permission)` strictly excluding Government Verification SuperAdminProfile from document wildcard bypass; added `is_user_authorized_for_document(user, doc, db, permission)` enforcing multi-tier tenant, study, site, and assignment boundaries; added `can_user_approve_document(user, doc, db)` ensuring site-level staff cannot approve study-wide documents.
+  2. In `backend/app/api/v1/documents.py`:
+     - `create_document`: Enforces `documents:upload` permission, path traversal sanitation on `storage_key` and `file_name`, and strict resource scope validation (study, org, site).
+     - `list_documents`: Enforces `documents:read`, validates filter params against caller's accessible studies/sites/orgs, and dynamically applies multi-tier SQL filter conditions (`sa.or_`) isolating tenant, study, and site documents.
+     - `get_document`: Enforces `documents:read` and verifies caller is authorized for the specific document record.
+     - `transition_document`: Enforces `documents:upload`, verifies scope authorization, validates state transition machine, validates approval authority when transitioning to `approved`, and records audit log with `study_id`.
+  3. In `backend/tests/test_documents_rbac.py`: Added 12 comprehensive adversarial regression tests covering: Sponsor A vs Sponsor B isolation, CRO access and isolation, Site PI vs other sites, Site Coordinator read-only enforcement, user without permissions denial, pending/revoked users denial, Government Super Admin isolation, path traversal and unscoped metadata rejection, full authorized lifecycle, and audit trail hash-chain cryptographic verification.
+- **Result**: Complete document authorization boundary integrity achieved. API contract completely frozen and intact. All 171 backend tests passing (100% green across all 16 suites). Frontend verification passing clean.
+- **Verified by**:
+  - Full backend test suite (`cd backend && .venv/bin/pytest tests/ -q`): 171/171 passed in 507s (100% green).
+  - Focused document RBAC tests (`pytest tests/test_documents_rbac.py -v`): 12/12 passed in 31s.
+  - Contract & endpoint regression tests (`pytest tests/test_api_endpoints.py tests/test_api_contract.py -q`): 13/13 passed in 42s.
+  - Static analysis: `ruff check` (0 errors), `mypy` (0 errors across 3 source files).
+  - Frontend verification (`npm run verify`): passed in 15.1s (tsc, oxlint, and Vite build clean).
+  - Secret scan on git diff: clean (0 leaks).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to checkpoint F03 changes in git.
 
 - **What**: Replaced heuristic organization identification with explicit trusted platform authority mechanisms (`is_platform_authority: bool` protected DB column and `PLATFORM_ORGANIZATION_ID` configuration setting). Updated boolean server default to portable `sa.false()` for PostgreSQL and SQLite. Hardened system-role assignment across organization members and onboarding request endpoints.
 - **Why**: An organization named "Central Ayurveda Hospital" or with registration number containing "PLATFORM"/"AYUCTMS" could previously trigger keyword heuristics and masquerade as the platform authority. Authorization credentials must never be inferred from user-supplied names or registration strings. Boolean column defaults must be portable across both SQLite and PostgreSQL.
