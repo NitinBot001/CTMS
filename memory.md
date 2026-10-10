@@ -17,12 +17,16 @@
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 10.4s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C: Fully remediated and verified with 87 dedicated RBAC and adversarial regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C, F03D: Fully remediated and verified with 87 dedicated RBAC and adversarial regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Document Approval Role-and-Scope Matrix & Governance Verification (F03D)**:
+  - Formally verified canonical 4-tier authorization matrix for document approval: Global (System Administrator), Sponsor/CRO (`CRO Lead Monitor`, `Clinical Research Associate`, `Principal Investigator`, `Director`), Study Team (`Principal Investigator`, `Clinical Director`), and Site (`Site Principal Investigator`, `Investigator`).
+  - Canonical roles `CRO Lead Monitor` and `Clinical Research Associate` are defined at `ScopeLevel.organization` in `rbac.py` and exercise document approval authority through active membership in `study.cro_org_id` / `study.sponsor_org_id`.
+  - Confined study-level team approval (`StudyTeamMember` with `site_id is None`) strictly to `Principal Investigator` and clinical directors; flagged the unresolved policy question regarding whether un-affiliated study-level monitors outside Sponsor/CRO organization scope should be granted document sign-off.
 - **Role Token Matching vs Insecure Substring Matching (F03C)**:
   - Eliminated unsafe substring matching (`"pi" in role_name`) in `can_user_approve_document`. Replaced with exact word-boundary token matching (`_get_role_tokens`) and explicit non-approver exclusion (`coordinator`, `administrator`, `nurse`, `assistant`, `clerk`, etc.).
   - Roles containing the string "hospital" (such as "Hospital Site Coordinator" or "Hospital Administrator") can NEVER acquire approval privileges through the letters "pi" inside "hospital".
@@ -56,6 +60,24 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-10 22:05 — F03D: Final Document Approval Role-Matrix Verification
+
+- **What**: Conducted exhaustive role-matrix and policy verification of `can_user_approve_document()` in `backend/app/core/auth.py`, cross-referencing canonical role definitions, permission fixtures, data dictionary, OpenAPI contracts, and scoping architecture. Formally resolved the reported inconsistency between F03B prototype policy and F03C token governance.
+- **Why**: Determine whether study-level team assignments (`StudyTeamMember` with `site_id is None`) are permitted to approve study-level documents if assigned monitor/lead roles, and verify that site-level, study-level, Sponsor/CRO, and global approval boundaries are explicitly and consistently enforced by server-side checks without regression of the "Hospital Site Coordinator" fix.
+- **How**:
+  1. Traced canonical role definitions in `backend/app/core/rbac.py`: confirmed that `CRO Lead Monitor` and `Clinical Research Associate` are defined at `ScopeLevel.organization` (not `ScopeLevel.study`), and `Principal Investigator` is the sole canonical role defined at `ScopeLevel.study`.
+  2. Verified scoping hierarchy in `artifacts/ayuctms-context-audit/network/scoping-rules.md`: confirmed that CRO monitoring oversight operates through organization membership in `study.cro_org_id` (Path A in `can_user_approve_document`), while study team scope (`StudyTeamMember`) represents clinical study staff.
+  3. Evaluated policy consistency: confirmed that no explicit business rule exists anywhere in `docs/` or `artifacts/` permitting study-level monitors outside the Sponsor/CRO organization scope to approve study documents. Reported the ambiguity explicitly rather than guessing or hardcoding unverified rules.
+  4. Verified server-side checks for the complete 4-tier matrix: Global (Technical System Admin), Sponsor/CRO (`CRO Lead Monitor`, `Clinical Research Associate`, `Principal Investigator`, `Director`), Study Team (`Principal Investigator`, `Clinical Director`), and Site (`Site Principal Investigator`, `Investigator`). Confirmed that upload permission alone never grants approval.
+- **Result**: Formal role-and-scope matrix verified and intact. Zero contract or schema changes. All 179 backend tests passing (100% green across all 16 suites). Targeted RBAC suite passing (21/21 in 104.78s). Static analysis clean.
+- **Verified by**:
+  - Targeted document RBAC suite (`pytest tests/test_documents_rbac.py tests/test_audit_chain.py -q`): 21/21 passed in 104.78s.
+  - Full backend test suite (`pytest tests/ -q`): 179/179 passed in 561.96s (100% green across all 16 suites).
+  - Working tree and git diff status: clean.
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready for user review and product stakeholder guidance on the study-level monitor policy question.
 
 ### 2026-10-10 21:15 — F03C: Fix Role-Name Matching Vulnerability in Document Approval
 
