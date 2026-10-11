@@ -213,59 +213,97 @@ class PlatformService:
             await db.flush()
 
         # 4. Role & Membership Provisioning
-        default_role = (
-            "Site Principal Investigator"
-            if request.request_type == AccessRequestType.site_pi
-            else (
-                "Principal Investigator"
-                if request.request_type == AccessRequestType.research_pi
-                else "Organization Admin"
-            )
-        )
-        role_name = request.requested_role or default_role
-        if role_name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
-            role_name = default_role
+        # Establish explicit request-type-to-role/scope policy
+        if request.request_type == AccessRequestType.site_pi:
+            expected_scope = ScopeLevel.site
+            default_role = "Site Principal Investigator"
+            allowed_roles = {"Site Principal Investigator"}
+        elif request.request_type == AccessRequestType.research_pi:
+            expected_scope = ScopeLevel.study
+            default_role = "Principal Investigator"
+            allowed_roles = {"Principal Investigator"}
+        elif request.request_type == AccessRequestType.cro_staff:
+            expected_scope = ScopeLevel.organization
+            default_role = "Clinical Research Associate"
+            allowed_roles = {"Clinical Research Associate", "CRO Lead Monitor"}
+        else:
+            expected_scope = ScopeLevel.organization
+            default_role = "Organization Admin"
+            allowed_roles = {"Organization Admin"}
 
-        role_stmt = select(Role).where(Role.name == role_name)
-        role = (await db.execute(role_stmt)).scalars().first()
+        requested_name = (request.requested_role or "").strip()
+        is_fallback_needed = False
+        target_role: Role | None = None
 
-        # Scope compatibility and system role boundary:
-        # 1. System-level and reserved roles can never be assigned to tenant users
-        # 2. Site PI requests cannot be assigned study- or system-scoped roles (prevents permission widening)
-        is_scope_incompatible = bool(
-            role
-            and (
-                role.scope_level == ScopeLevel.system
-                or role.name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES
-                or (
-                    request.request_type == AccessRequestType.site_pi
-                    and role.scope_level in (ScopeLevel.study, ScopeLevel.system)
+        if not requested_name or requested_name == default_role:
+            target_role_name = default_role
+        else:
+            # 1. Reserved system role escalation check (case-insensitive)
+            if requested_name.lower() in RESERVED_SYSTEM_ROLE_NAMES:
+                is_fallback_needed = True
+            elif requested_name not in allowed_roles:
+                # Requested role does not match documented policy for this request type
+                is_fallback_needed = True
+            else:
+                existing_role = (
+                    await db.execute(select(Role).where(Role.name == requested_name))
+                ).scalars().first()
+                if (
+                    not existing_role
+                    or existing_role.scope_level == ScopeLevel.system
+                    or existing_role.scope_level != expected_scope
+                ):
+                    is_fallback_needed = True
+                else:
+                    target_role = existing_role
+                    target_role_name = target_role.name
+
+        if is_fallback_needed:
+            target_role_name = default_role
+            fallback_role = (
+                await db.execute(select(Role).where(Role.name == target_role_name))
+            ).scalars().first()
+
+            # Validate fallback role itself: must exist and have compatible scope
+            if not fallback_role:
+                raise ValueError(
+                    f"Role configuration error: fallback role '{target_role_name}' is missing from database"
                 )
-            )
-        )
-
-        if is_scope_incompatible:
-            role_name = default_role
-            role = (await db.execute(select(Role).where(Role.name == role_name))).scalars().first()
-
-        if not role:
-            scope = (
-                ScopeLevel.site
-                if request.request_type == AccessRequestType.site_pi
-                else (
-                    ScopeLevel.study
-                    if request.request_type == AccessRequestType.research_pi
-                    else ScopeLevel.organization
+            if (
+                fallback_role.scope_level != expected_scope
+                or fallback_role.scope_level == ScopeLevel.system
+            ):
+                raise ValueError(
+                    f"Role configuration error: fallback role '{target_role_name}' has incompatible scope "
+                    f"'{fallback_role.scope_level}' (expected {expected_scope})"
                 )
-            )
-            role = Role(
-                name=role_name,
-                description=f"Standard role for {role_name}",
-                scope_level=scope,
-                is_system_role=False,
-            )
-            db.add(role)
-            await db.flush()
+            target_role = fallback_role
+        elif target_role is None:
+            resolved_role = (
+                await db.execute(select(Role).where(Role.name == target_role_name))
+            ).scalars().first()
+            if resolved_role:
+                if (
+                    resolved_role.scope_level != expected_scope
+                    or resolved_role.scope_level == ScopeLevel.system
+                ):
+                    raise ValueError(
+                        f"Role configuration error: role '{target_role_name}' has incompatible scope "
+                        f"'{resolved_role.scope_level}' (expected {expected_scope})"
+                    )
+                target_role = resolved_role
+            else:
+                new_role = Role(
+                    name=target_role_name,
+                    description=f"Standard role for {target_role_name}",
+                    scope_level=expected_scope,
+                    is_system_role=False,
+                )
+                db.add(new_role)
+                await db.flush()
+                target_role = new_role
+
+        role = target_role
 
         # Membership Check
         member_stmt = select(OrganizationMember).where(

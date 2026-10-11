@@ -33,7 +33,7 @@ from app.models.platform import (
     TeamMemberVerificationRequest,
 )
 from app.models.site import Site, StudySite
-from app.models.study import Study
+from app.models.study import Study, StudyTeamMember
 from app.models.user import InvitationToken, Role, SuperAdminProfile, User
 from app.services.platform import PlatformService
 
@@ -948,14 +948,20 @@ async def test_site_pi_incompatible_study_scope_falls_back_to_site_pi(
     Ensures that when a site_pi applicant requests a study-scoped role ('Principal Investigator'),
     the system rejects the scope widening and falls back to 'Site Principal Investigator' (ScopeLevel.site).
     """
-    # Pre-seed Principal Investigator at study scope
+    # Pre-seed Principal Investigator at study scope and Site PI at site scope
     role_pi = Role(
         name="Principal Investigator",
         description="Standard role for Study PI",
         scope_level=ScopeLevel.study,
         is_system_role=True,
     )
-    db_session.add(role_pi)
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard role for Site PI",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add_all([role_pi, role_site_pi])
     await db_session.commit()
 
     req = OnboardingRequest(
@@ -1038,3 +1044,541 @@ async def test_team_invitation_with_site_id_auto_creates_site_scoped_role(
     created_role = (await db_session.execute(role_stmt)).scalars().first()
     assert created_role is not None
     assert created_role.scope_level == ScopeLevel.site
+
+
+# =============================================================================
+# ADVERSARIAL REGRESSION SUITE: ONBOARDING ROLE-SCOPE COMPATIBILITY & SAFETY
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_adversarial_site_pi_asking_org_admin_falls_back_to_site_pi_scope(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 1:
+    A 'site_pi' request explicitly asking for an existing organization-scoped
+    'Organization Admin' role must NOT obtain organization-wide privileges.
+    It must safely fall back to the site-scoped 'Site Principal Investigator' role.
+    """
+    role_org_admin = Role(
+        name="Organization Admin",
+        description="Standard Organization Admin role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard Site PI role",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add_all([role_org_admin, role_site_pi])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Vikram Patel",
+        organization_name="Civil Hospital Ahmedabad",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Organization Admin",  # Adversarial attempt to acquire org-wide role
+        proposed_site_name="Civil Hospital Trial Center",
+        email="vikram.patel@civilhospital.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    user = (await db_session.execute(select(User).where(User.email == "vikram.patel@civilhospital.org"))).scalars().first()
+    assert user is not None
+
+    member = (await db_session.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+        )
+    )).scalars().first()
+    assert member is not None
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == member.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.id == role_site_pi.id
+    assert assigned_role.name == "Site Principal Investigator"
+    assert assigned_role.scope_level == ScopeLevel.site
+
+
+@pytest.mark.asyncio
+async def test_adversarial_research_pi_asking_org_admin_falls_back_to_study_scope(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 2:
+    A 'research_pi' request asking for the organization-scoped 'Organization Admin' role
+    must NOT obtain organization-admin authority. It must safely fall back to the
+    study-scoped 'Principal Investigator' role.
+    """
+    role_org_admin = Role(
+        name="Organization Admin",
+        description="Standard Organization Admin role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    role_pi = Role(
+        name="Principal Investigator",
+        description="Standard Principal Investigator role",
+        scope_level=ScopeLevel.study,
+        is_system_role=True,
+    )
+    db_session.add_all([role_org_admin, role_pi])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Shweta Rao",
+        organization_name="AyurVeda Labs Ltd",
+        organization_type=OrganizationType.sponsor,
+        request_type=AccessRequestType.research_pi,
+        requested_role="Organization Admin",  # Adversarial attempt to acquire org-wide admin
+        email="shweta.rao@ayurvedalabs.com",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    user = (await db_session.execute(select(User).where(User.email == "shweta.rao@ayurvedalabs.com"))).scalars().first()
+    assert user is not None
+
+    member = (await db_session.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+        )
+    )).scalars().first()
+    assert member is not None
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == member.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.id == role_pi.id
+    assert assigned_role.name == "Principal Investigator"
+    assert assigned_role.scope_level == ScopeLevel.study
+
+
+@pytest.mark.asyncio
+async def test_adversarial_research_pi_asking_site_pi_falls_back_to_study_scope(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 3:
+    A 'research_pi' request asking for the site-scoped 'Site Principal Investigator' role
+    must NOT obtain site-scoped authority. It must safely fall back to the
+    study-scoped 'Principal Investigator' role.
+    """
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard Site PI role",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    role_pi = Role(
+        name="Principal Investigator",
+        description="Standard Principal Investigator role",
+        scope_level=ScopeLevel.study,
+        is_system_role=True,
+    )
+    db_session.add_all([role_site_pi, role_pi])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Raghav Menon",
+        organization_name="Kerala Herbal Clinical Research",
+        organization_type=OrganizationType.sponsor,
+        request_type=AccessRequestType.research_pi,
+        requested_role="Site Principal Investigator",  # Incompatible site scope for research_pi
+        email="raghav.menon@keralaherbal.com",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    user = (await db_session.execute(select(User).where(User.email == "raghav.menon@keralaherbal.com"))).scalars().first()
+    assert user is not None
+
+    member = (await db_session.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+        )
+    )).scalars().first()
+    assert member is not None
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == member.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.id == role_pi.id
+    assert assigned_role.name == "Principal Investigator"
+    assert assigned_role.scope_level == ScopeLevel.study
+
+
+@pytest.mark.asyncio
+async def test_adversarial_cro_staff_asking_org_admin_falls_back_to_cra_scope(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test for cro_staff:
+    A 'cro_staff' request asking for the organization-admin role must NOT obtain
+    organization-admin authority. It must safely fall back to the CRA role.
+    """
+    role_org_admin = Role(
+        name="Organization Admin",
+        description="Standard Organization Admin role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    role_cra = Role(
+        name="Clinical Research Associate",
+        description="Standard CRA role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=True,
+    )
+    db_session.add_all([role_org_admin, role_cra])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Deepak Sharma",
+        organization_name="Global CRO Services",
+        organization_type=OrganizationType.cro,
+        request_type=AccessRequestType.cro_staff,
+        requested_role="Organization Admin",  # CRO staff cannot claim Org Admin
+        email="deepak.sharma@globalcro.com",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    user = (await db_session.execute(select(User).where(User.email == "deepak.sharma@globalcro.com"))).scalars().first()
+    assert user is not None
+
+    member = (await db_session.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+        )
+    )).scalars().first()
+    assert member is not None
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == member.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.id == role_cra.id
+    assert assigned_role.name == "Clinical Research Associate"
+    assert assigned_role.scope_level == ScopeLevel.organization
+
+
+@pytest.mark.asyncio
+async def test_adversarial_onboarding_fails_safely_when_fallback_role_missing(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 4A:
+    When an onboarding request triggers fallback (e.g. site_pi requests Organization Admin),
+    and the fallback role ('Site Principal Investigator') is missing from the database,
+    the system must fail safely with HTTP 400 rather than creating a duplicate or unprivileged role.
+    """
+    role_org_admin = Role(
+        name="Organization Admin",
+        description="Standard Organization Admin role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    db_session.add(role_org_admin)
+    await db_session.commit()
+    # Note: 'Site Principal Investigator' is NOT seeded in DB!
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Manoj Mishra",
+        organization_name="Varanasi Ayurvedic Hospital",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Organization Admin",  # Triggers fallback to missing Site Principal Investigator
+        proposed_site_name="Varanasi Site 1",
+        email="manoj.mishra@varanasihospital.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 400, res.text
+    assert "fallback role 'Site Principal Investigator' is missing from database" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_adversarial_onboarding_fails_safely_when_fallback_role_misconfigured(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 4B:
+    When an onboarding request triggers fallback, and the fallback role exists in the database
+    with an incompatible scope (e.g. ScopeLevel.system), the system must fail safely with HTTP 400.
+    """
+    role_org_admin = Role(
+        name="Organization Admin",
+        description="Standard Organization Admin role",
+        scope_level=ScopeLevel.organization,
+        is_system_role=False,
+    )
+    role_site_pi_corrupt = Role(
+        name="Site Principal Investigator",
+        description="Corrupt system-level role",
+        scope_level=ScopeLevel.system,
+        is_system_role=True,
+    )
+    db_session.add_all([role_org_admin, role_site_pi_corrupt])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Alok Verma",
+        organization_name="Lucknow Medical Institute",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Organization Admin",  # Triggers fallback to corrupt Site Principal Investigator
+        proposed_site_name="Lucknow Clinical Unit",
+        email="alok.verma@lucknowmed.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 400, res.text
+    assert "has incompatible scope" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_adversarial_seeded_roles_reused_without_duplicate_insert(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 5:
+    Confirms pre-seeded valid roles are reused without duplicate INSERT attempts
+    and without IntegrityError on global Role.name uniqueness constraint.
+    """
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard Site PI role",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    role_pi = Role(
+        name="Principal Investigator",
+        description="Standard Study PI role",
+        scope_level=ScopeLevel.study,
+        is_system_role=True,
+    )
+    db_session.add_all([role_site_pi, role_pi])
+    await db_session.commit()
+
+    req_site = OnboardingRequest(
+        applicant_name="Dr. K. S. Murthy",
+        organization_name="Mysore Ayurvedic Research Center",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Site Principal Investigator",
+        proposed_site_name="Mysore Clinical Site",
+        email="murthy@mysoreayur.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    req_study = OnboardingRequest(
+        applicant_name="Dr. Ananya Sen",
+        organization_name="Kolkata Clinical Trials",
+        organization_type=OrganizationType.sponsor,
+        request_type=AccessRequestType.research_pi,
+        requested_role="Principal Investigator",
+        email="ananya.sen@kolkatatrials.com",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add_all([req_site, req_study])
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res_site = await client.post(f"/api/v1/platform/onboarding-requests/{req_site.id}/approve", headers=headers)
+    assert res_site.status_code == 200, res_site.text
+
+    res_study = await client.post(f"/api/v1/platform/onboarding-requests/{req_study.id}/approve", headers=headers)
+    assert res_study.status_code == 200, res_study.text
+
+    # Assert roles were reused, not duplicated
+    site_roles = (await db_session.execute(select(Role).where(Role.name == "Site Principal Investigator"))).scalars().all()
+    assert len(site_roles) == 1
+    assert site_roles[0].id == role_site_pi.id
+
+    study_roles = (await db_session.execute(select(Role).where(Role.name == "Principal Investigator"))).scalars().all()
+    assert len(study_roles) == 1
+    assert study_roles[0].id == role_pi.id
+
+
+@pytest.mark.asyncio
+async def test_adversarial_reserved_system_role_escalation_blocked(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Adversarial Regression Test 6:
+    When a request attempts privilege escalation by requesting a reserved system role
+    ('Global System Auditor'), approving the request must never assign the system role
+    and must fall back to the appropriate scoped role.
+    """
+    role_auditor = Role(
+        name="Global System Auditor",
+        description="Reserved platform auditor role",
+        scope_level=ScopeLevel.system,
+        is_system_role=True,
+    )
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard Site PI role",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add_all([role_auditor, role_site_pi])
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Sneha Kulkarni",
+        organization_name="Pune Clinical Center",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Global System Auditor",  # Reserved system role escalation attempt
+        proposed_site_name="Pune Trial Site",
+        email="sneha.kulkarni@puneclinic.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    user = (await db_session.execute(select(User).where(User.email == "sneha.kulkarni@puneclinic.org"))).scalars().first()
+    assert user is not None
+
+    member = (await db_session.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+        )
+    )).scalars().first()
+    assert member is not None
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == member.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.id == role_site_pi.id
+    assert assigned_role.name == "Site Principal Investigator"
+    assert assigned_role.scope_level == ScopeLevel.site
+
+
+@pytest.mark.asyncio
+async def test_adversarial_clinical_team_site_coordinator_provisionable(
+    client: AsyncClient,
+    gov_admin_token: str,
+    db_session: AsyncSession,
+    sample_study_and_sites: tuple[Study, Site, Site, User],
+):
+    """
+    Adversarial Regression Test 7:
+    Confirms legitimate clinical team roles such as 'Site Coordinator' remain provisionable
+    without error, creating valid study team assignments with ScopeLevel.site.
+    """
+    study, site_a, _, pi_user = sample_study_and_sites
+    pi_token = create_access_token({"sub": str(pi_user.id), "email": pi_user.email})
+
+    role_coord = Role(
+        name="Site Coordinator",
+        description="Standard Site Coordinator role",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add(role_coord)
+    await db_session.commit()
+
+    invite_res = await client.post(
+        "/api/v1/platform/team-invitations",
+        json={
+            "full_name": "Kavita Reddy",
+            "email": "kavita.reddy@sitecoord.example",
+            "requested_role": "Site Coordinator",
+            "study_id": str(study.id),
+            "site_id": str(site_a.id),
+        },
+        headers={"Authorization": f"Bearer {pi_token}"},
+    )
+    assert invite_res.status_code == 201, invite_res.text
+    inv_data = invite_res.json()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    appr_res = await client.post(
+        f"/api/v1/platform/team-verifications/{inv_data['id']}/review",
+        json={"status": "approved"},
+        headers=headers,
+    )
+    assert appr_res.status_code == 200, appr_res.text
+
+    # Verify user and study team member assignment
+    user_stmt = select(User).where(User.email == "kavita.reddy@sitecoord.example")
+    user = (await db_session.execute(user_stmt)).scalars().first()
+    assert user is not None
+
+    assignment_stmt = select(StudyTeamMember).where(
+        StudyTeamMember.user_id == user.id,
+        StudyTeamMember.study_id == study.id,
+    )
+    assignment = (await db_session.execute(assignment_stmt)).scalars().first()
+    assert assignment is not None
+    assert assignment.site_id == site_a.id
+    assert assignment.role_id == role_coord.id
+
+    assigned_role = (await db_session.execute(select(Role).where(Role.id == assignment.role_id))).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.name == "Site Coordinator"
+    assert assigned_role.scope_level == ScopeLevel.site

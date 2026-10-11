@@ -12,17 +12,25 @@
 - **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation + `f1b2c3d4e5f6` add is_platform_authority to organizations) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
-  - Git & GitHub Sync: Local master at `e68527f`. Ready for stage/commit.
-  - Backend: 100% GREEN (197/197 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
+  - Git & GitHub Sync: Local master at `a6ce7e2`. Ready for follow-up stage/commit.
+  - Backend: 100% GREEN (206/206 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
-  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 1.1s with optimized assets).
+  - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 838ms with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C, F03D, F03E, F04: Fully remediated and verified with 105 dedicated RBAC, adversarial, and integrity regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C, F03D, F03E, F04: Fully remediated and verified with 114 dedicated RBAC, adversarial, and integrity regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Strict Onboarding Request Role-Scope Compatibility & Safe Fallback Validation**:
+  - In `PlatformService.provision_organization_from_request`, an explicit request-type-to-role/scope policy is strictly enforced:
+    - `site_pi`: strictly mapped to `ScopeLevel.site` (canonical role: `Site Principal Investigator`). Must never receive organization-wide (`Organization Admin`) or study-wide (`Principal Investigator`) roles.
+    - `research_pi`: strictly mapped to `ScopeLevel.study` (canonical role: `Principal Investigator`). Must never receive organization-admin or site-scoped roles.
+    - `cro_staff`: strictly mapped to `ScopeLevel.organization` (canonical role: `Clinical Research Associate`, allowed: `Clinical Research Associate`, `CRO Lead Monitor`). Cannot obtain `Organization Admin`.
+    - Reserved system roles (`RESERVED_SYSTEM_ROLE_NAMES`) and `ScopeLevel.system` roles are strictly prohibited from tenant onboarding.
+  - Fallback role validation: When a requested role is invalid, reserved, or has an incompatible scope, fallback to the canonical role is triggered. The fallback role is strictly validated: it must exist in the database and have the expected scope and non-system level. If missing or misconfigured, provisioning fails safely with HTTP 400 (`ValueError`) instead of silently creating arbitrary unprivileged roles or granting broader permissions.
+  - Existing seeded roles are reused without duplicate insertion, strictly respecting global `Role.name` uniqueness constraint.
 - **Role Provisioning Scope Resilience & Unique Constraint Protection**:
   - In `PlatformService.provision_organization_from_request`, roles are queried by `Role.name == role_name` without filtering on `scope_level == ScopeLevel.organization`.
   - When approving onboarding requests for roles seeded with site or study scope (such as `Site Principal Investigator` with `scope_level=ScopeLevel.site` or `Principal Investigator` with `scope_level=ScopeLevel.study`), the existing role is reused directly. This prevents duplicate `INSERT INTO roles` statements that previously triggered `(sqlite3.IntegrityError) UNIQUE constraint failed: roles.name`.
@@ -77,6 +85,43 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-11 13:30 — F04 Follow-up: Strict Onboarding Role-Scope Compatibility & Safe Fallback Validation
+
+- **What**: Audited and strictly enforced onboarding request-type-to-role/scope policy in `PlatformService.provision_organization_from_request`. Added 9 adversarial regression tests in `backend/tests/test_government_onboarding.py` bringing the backend suite from 197 to 206 tests across 17 test suites (100% passing).
+- **Why**: Prevent privilege escalation during tenant onboarding where applicants (e.g. `site_pi`, `research_pi`, `cro_staff`) could request wider roles (such as `Organization Admin` or reserved system roles). Validate that fallback roles exist and possess expected scopes, failing safely rather than creating duplicate roles or assigning incompatible permissions.
+- **How**:
+  1. In `backend/app/services/platform.py`:
+     - Defined explicit mapping of request types to expected scope and allowed canonical roles:
+       - `site_pi` -> `ScopeLevel.site`, canonical: `Site Principal Investigator`.
+       - `research_pi` -> `ScopeLevel.study`, canonical: `Principal Investigator`.
+       - `cro_staff` -> `ScopeLevel.organization`, canonical: `Clinical Research Associate` (allowed: `Clinical Research Associate`, `CRO Lead Monitor`).
+       - General -> `ScopeLevel.organization`, canonical: `Organization Admin`.
+     - Validated requested roles against `RESERVED_SYSTEM_ROLE_NAMES`, `allowed_roles`, and `expected_scope`. Incompatible requests trigger safe fallback to the default role.
+     - Validated fallback roles: verified that the fallback role exists in the database and has `scope_level == expected_scope` and `scope_level != ScopeLevel.system`. If missing or misconfigured, safely raises `ValueError` (handled by endpoint as HTTP 400 Bad Request).
+     - Standardized role reuse without duplicate `INSERT` statements to respect `Role.name` unique constraint.
+  2. In `backend/tests/test_government_onboarding.py`:
+     - Added 9 adversarial regression tests covering:
+       1. `site_pi` requesting existing `Organization Admin` falling back safely to `Site Principal Investigator` (`ScopeLevel.site`).
+       2. `research_pi` requesting existing `Organization Admin` falling back safely to `Principal Investigator` (`ScopeLevel.study`).
+       3. `research_pi` requesting existing `Site Principal Investigator` falling back safely to `Principal Investigator` (`ScopeLevel.study`).
+       4. `cro_staff` requesting existing `Organization Admin` falling back safely to `Clinical Research Associate` (`ScopeLevel.organization`).
+       5. Missing fallback role failing safely with HTTP 400.
+       6. Misconfigured fallback role (e.g. system-scoped) failing safely with HTTP 400.
+       7. Seeded roles reused without duplicate insert or IntegrityError.
+       8. Reserved system role escalation (`Global System Auditor`) blocked and falling back safely.
+       9. Clinical team role (`Site Coordinator`) remaining provisionable.
+- **Result**: Complete enforcement of least-privilege role boundaries during onboarding. Zero permission widening. Full backend suite 100% green (206/206 tests passed in 29.6s). Static analysis clean (`ruff` 0 errors, `mypy` 0 errors). Frontend verification 100% green (`npm run verify`).
+- **Verified by**:
+  - Full backend test suite (`pytest tests/ -q`): 206/206 passed in 29.63s.
+  - Onboarding test suite (`pytest tests/test_government_onboarding.py`): 34/34 passed in 4.27s.
+  - Contract & audit tests (`pytest tests/test_api_contract.py tests/test_audit_chain.py tests/test_audit_rbac.py`): 50/50 passed in 8.01s.
+  - Static analysis: `ruff check` (0 errors), `mypy` (0 errors).
+  - Frontend verification (`npm run verify`): passed clean (0 errors, Vite build in 838ms).
+  - `git diff --check` and secret scan clean.
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready for local Git checkpoint commit.
 
 ### 2026-10-11 09:30 — Bug Fix: Resilient Role Provisioning on Onboarding Approval (IntegrityError Fix)
 
