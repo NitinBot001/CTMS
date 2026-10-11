@@ -13,16 +13,21 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Local commits committed locally (ahead of `origin/master`). Remote `origin/master` at `7f9e63d`.
-  - Backend: 100% GREEN (179/179 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
+  - Backend: 100% GREEN (180/180 pytest async tests passing across all 16 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean in 10.4s with optimized assets).
   - Role-Specific Dashboards & Scoped Permissions: Fully implemented across all roles. Dedicated dashboards for Super Admin, Research PI, CRO Operations, Site PI, and safe Access-Pending state.
-  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C, F03D: Fully remediated and verified with 87 dedicated RBAC and adversarial regression tests.
+  - Security Findings F01, F01B, F02, F02B, F02C, F03, F03B, F03C, F03D, F03E: Fully remediated and verified with 88 dedicated RBAC and adversarial regression tests.
 - **System Changes**: Symlinked `/usr/local/bin/python -> /usr/bin/python3` (Undo: `rm /usr/local/bin/python`) so `python` uses system Python 3.14 with OpenSSL 3.5.5 support instead of Termux binary without `_ssl`.
 
 ---
 
 ## 2. Decisions
+- **Final Monitor/CRA Document Approval Policy (F03E)**:
+  - Adopted authoritative policy: A Monitor, Clinical Research Associate (CRA), or CRO Lead Monitor may approve study-wide documents ONLY through an active OrganizationMember relationship in the study's registered Sponsor or CRO organization (`study.sponsor_org_id` or `study.cro_org_id`).
+  - Directly assigned `StudyTeamMember` roles alone (even with titles like `CRO Lead Monitor`, `Clinical Research Associate`, `CRA`, `Lead Monitor`, `Study Monitor`) CANNOT grant document approval authority without qualifying Sponsor/CRO organization membership. Excluded `monitor`, `cra`, `associate` tokens from `_is_study_approver_role` and `_is_site_approver_role`.
+  - Confirmed that Monitor/CRA titles never infer site-level approval authority. Site PI/investigator approval remains strictly limited to assigned site documents (`doc.site_id == a.site_id`).
+  - Study-level team approval remains strictly reserved for Study Principal Investigators and Clinical Directors.
 - **Document Approval Role-and-Scope Matrix & Governance Verification (F03D)**:
   - Formally verified canonical 4-tier authorization matrix for document approval: Global (System Administrator), Sponsor/CRO (`CRO Lead Monitor`, `Clinical Research Associate`, `Principal Investigator`, `Director`), Study Team (`Principal Investigator`, `Clinical Director`), and Site (`Site Principal Investigator`, `Investigator`).
   - Canonical roles `CRO Lead Monitor` and `Clinical Research Associate` are defined at `ScopeLevel.organization` in `rbac.py` and exercise document approval authority through active membership in `study.cro_org_id` / `study.sponsor_org_id`.
@@ -60,6 +65,27 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-11 08:35 — F03E: Final Monitor/CRA Document Approval Policy
+
+- **What**: Finalized and verified the authoritative Monitor/CRA document approval policy across `backend/app/core/auth.py` and added exhaustive adversarial regression test `test_monitor_cra_document_approval_policy_and_scoping_rules` in `backend/tests/test_documents_rbac.py` bringing the suite to 21 document RBAC tests and the full backend to 180 tests.
+- **Why**: Enforce that a Monitor, CRA, or CRO Lead Monitor may approve study-wide documents ONLY through an active OrganizationMember relationship in the study's registered Sponsor or CRO organization (`study.sponsor_org_id` or `study.cro_org_id`); verify that direct `StudyTeamMember` assignments alone (even with titles containing `monitor`, `CRA`, or `lead`) are strictly denied approval authority; confirm that Monitor/CRA titles never infer site-level approval; and ensure Study PI / Clinical Director study-team paths retain intended scoped access.
+- **How**:
+  1. In `backend/app/core/auth.py`:
+     - Tightened `non_approver_tokens` in `_is_site_approver_role` and `_is_study_approver_role` to include `monitor`, `cra`, `associate`, `admin`, `manager`, and `auditor`.
+     - Added `auditor` to `non_approver_tokens` in `_is_sponsor_cro_approver_role`.
+     - Confirmed that direct `StudyTeamMember` assignments rejecting `monitor`, `cra`, and `associate` tokens prevents un-affiliated monitors from approving study documents without qualifying Sponsor/CRO organization membership.
+  2. In `backend/tests/test_documents_rbac.py`:
+     - Added `test_monitor_cra_document_approval_policy_and_scoping_rules` testing: (1) active CRA in study CRO approves study-wide document -> 200 OK; (2) active CRO Lead Monitor in study CRO supersedes approved document -> 200 OK; (3) direct StudyTeamMember Monitor, CRA, and Lead Monitor without qualifying org membership are denied approval, rejection, and archival -> 403 Forbidden; (4) monitor in unrelated CRO denied -> 403 Forbidden; (5) inactive and revoked CRO members denied -> 403 Forbidden; (6) direct Study PI and Clinical Director on study team (site_id=None) approve study documents -> 200 OK.
+- **Result**: Watertight, fully enforced Monitor/CRA document approval policy. Zero contract drift (`docs/API_CONTRACT.md` and `docs/openapi.json` frozen). Zero schema migrations. Full backend suite 100% green (180/180 passed in 542s). Targeted RBAC suite 100% green (22/22 passed in 91.5s). Ruff and Mypy clean.
+- **Verified by**:
+  - Full backend test suite (`pytest tests/ -q`): 180/180 passed in 542.30s (100% green across all 16 suites).
+  - Targeted document RBAC suite (`pytest tests/test_documents_rbac.py tests/test_audit_chain.py -q`): 22/22 passed in 91.47s.
+  - Static analysis: `ruff check` (0 errors), `mypy` (0 errors across 56 source files).
+  - Secret scan on git diff: clean (0 leaks).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to checkpoint F03E changes in git.
 
 ### 2026-10-10 22:05 — F03D: Final Document Approval Role-Matrix Verification
 

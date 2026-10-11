@@ -1610,3 +1610,289 @@ async def test_site_investigator_approval_scoping_and_isolation(
         json={"new_status": "approved", "reason": "Investigator attempting cross-study approval"},
     )
     assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_monitor_cra_document_approval_policy_and_scoping_rules(
+    client: AsyncClient,
+    document_rbac_setup: dict,
+    db_session: AsyncSession,
+):
+    """
+    Exhaustively verifies F03E Monitor / CRA document approval policy:
+    1. Sponsor/CRO Monitor or CRA with valid active organization membership CAN approve
+       an eligible study-wide document within scope.
+    2. Direct StudyTeamMember Monitor/CRA without qualifying Sponsor/CRO membership CANNOT approve it
+       (even if active and role name contains 'monitor', 'CRA', or 'lead').
+    3. Sponsor/CRO membership in an unrelated organization does NOT grant approval.
+    4. Inactive or revoked organization membership does NOT grant approval.
+    5. Authorized Study PI and approved Clinical Director assigned via StudyTeamMember (site_id=None)
+       CAN approve study-wide documents.
+    """
+    study_a = document_rbac_setup["study_a"]
+    org_a = document_rbac_setup["org_a"]
+    org_cro = document_rbac_setup["org_cro"]
+    tokens = document_rbac_setup["tokens"]
+    role_cro_monitor = (await db_session.execute(
+        select(Role).where(Role.name == "CRO Lead Monitor")
+    )).scalars().first()
+    role_sponsor_pi = (await db_session.execute(
+        select(Role).where(Role.name == "Principal Investigator")
+    )).scalars().first()
+
+    perm_doc_read = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:read")
+    )).scalars().first()
+    perm_doc_upload = (await db_session.execute(
+        select(Permission).where(Permission.codename == "documents:upload")
+    )).scalars().first()
+
+    # 1. Create canonical role 'Clinical Research Associate' (organization scope)
+    role_cra = Role(name="Clinical Research Associate", scope_level=ScopeLevel.organization, is_system_role=True)
+    role_clinical_director = Role(name="Clinical Director", scope_level=ScopeLevel.study, is_system_role=False)
+    role_study_monitor = Role(name="Study Team Lead Monitor", scope_level=ScopeLevel.study, is_system_role=False)
+    role_study_cra = Role(name="Direct Study CRA", scope_level=ScopeLevel.study, is_system_role=False)
+
+    db_session.add_all([role_cra, role_clinical_director, role_study_monitor, role_study_cra])
+    await db_session.flush()
+
+    for r in [role_cra, role_clinical_director, role_study_monitor, role_study_cra]:
+        db_session.add_all([
+            RolePermission(role_id=r.id, permission_id=perm_doc_read.id),
+            RolePermission(role_id=r.id, permission_id=perm_doc_upload.id),
+        ])
+    await db_session.flush()
+
+    # Create users:
+    # A. CRA with active OrganizationMember in study_a's CRO (org_cro)
+    user_cra = User(email="cra_member@cro-solutions.com", full_name="Active CRA Member", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # B. Direct StudyTeamMember with role CRO Lead Monitor (no org membership in study_a's sponsor or CRO)
+    user_direct_monitor = User(email="direct_monitor@external.com", full_name="Direct Study Monitor", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # C. Direct StudyTeamMember with role CRA (no org membership in study_a's sponsor or CRO)
+    user_direct_cra = User(email="direct_cra@external.com", full_name="Direct Study CRA", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # D. Direct StudyTeamMember with role 'Study Team Lead Monitor'
+    user_direct_lead_mon = User(email="lead_mon@external.com", full_name="Direct Lead Monitor", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # E. Inactive OrganizationMember in org_cro with role CRO Lead Monitor
+    user_inactive_cro = User(email="inactive_cro@cro-solutions.com", full_name="Inactive CRO Monitor", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # F. Revoked OrganizationMember in org_cro with role CRO Lead Monitor
+    user_revoked_cro = User(email="revoked_cro@cro-solutions.com", full_name="Revoked CRO Monitor", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # G. Monitor in unrelated CRO organization (org_unrelated_cro)
+    org_unrelated_cro = Organization(name="Unrelated Global CRO", organization_type=OrganizationType.cro, status=OrganizationStatus.active)
+    db_session.add(org_unrelated_cro)
+    await db_session.flush()
+    user_unrelated_cro = User(email="unrelated_cro@othercro.com", full_name="Unrelated CRO Monitor", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+
+    # H. Direct StudyTeamMember with role Principal Investigator (site_id=None, study-wide)
+    user_direct_study_pi = User(email="direct_study_pi@external.com", full_name="Direct Study PI", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+    # I. Direct StudyTeamMember with role Clinical Director (site_id=None, study-wide)
+    user_direct_clinical_dir = User(email="clinical_dir@external.com", full_name="Direct Clinical Director", status=UserStatus.active, hashed_password=hash_password("Pass123!"))
+
+    db_session.add_all([
+        user_cra, user_direct_monitor, user_direct_cra, user_direct_lead_mon,
+        user_inactive_cro, user_revoked_cro, user_unrelated_cro,
+        user_direct_study_pi, user_direct_clinical_dir,
+    ])
+    await db_session.flush()
+
+    # Memberships & Assignments
+    db_session.add_all([
+        # User A: active CRA member in study_a's CRO
+        OrganizationMember(organization_id=org_cro.id, user_id=user_cra.id, role_id=role_cra.id, status=AssignmentStatus.active),
+        # User B: direct StudyTeamMember with CRO Lead Monitor (study-level, site_id=None)
+        StudyTeamMember(study_id=study_a.id, site_id=None, user_id=user_direct_monitor.id, role_id=role_cro_monitor.id, assignment_status=AssignmentStatus.active),
+        # User C: direct StudyTeamMember with Clinical Research Associate (study-level, site_id=None)
+        StudyTeamMember(study_id=study_a.id, site_id=None, user_id=user_direct_cra.id, role_id=role_cra.id, assignment_status=AssignmentStatus.active),
+        # User D: direct StudyTeamMember with Study Team Lead Monitor (study-level, site_id=None)
+        StudyTeamMember(study_id=study_a.id, site_id=None, user_id=user_direct_lead_mon.id, role_id=role_study_monitor.id, assignment_status=AssignmentStatus.active),
+        # User E: inactive member in org_cro
+        OrganizationMember(organization_id=org_cro.id, user_id=user_inactive_cro.id, role_id=role_cro_monitor.id, status=AssignmentStatus.inactive),
+        # User F: removed member in org_cro
+        OrganizationMember(organization_id=org_cro.id, user_id=user_revoked_cro.id, role_id=role_cro_monitor.id, status=AssignmentStatus.removed),
+        # User G: active member in unrelated CRO
+        OrganizationMember(organization_id=org_unrelated_cro.id, user_id=user_unrelated_cro.id, role_id=role_cro_monitor.id, status=AssignmentStatus.active),
+        # User H: direct StudyTeamMember with Principal Investigator (study-level, site_id=None)
+        StudyTeamMember(study_id=study_a.id, site_id=None, user_id=user_direct_study_pi.id, role_id=role_sponsor_pi.id, assignment_status=AssignmentStatus.active),
+        # User I: direct StudyTeamMember with Clinical Director (study-level, site_id=None)
+        StudyTeamMember(study_id=study_a.id, site_id=None, user_id=user_direct_clinical_dir.id, role_id=role_clinical_director.id, assignment_status=AssignmentStatus.active),
+    ])
+    await db_session.commit()
+
+    token_cra = create_access_token({"sub": str(user_cra.id), "email": user_cra.email})
+    token_direct_monitor = create_access_token({"sub": str(user_direct_monitor.id), "email": user_direct_monitor.email})
+    token_direct_cra = create_access_token({"sub": str(user_direct_cra.id), "email": user_direct_cra.email})
+    token_direct_lead_mon = create_access_token({"sub": str(user_direct_lead_mon.id), "email": user_direct_lead_mon.email})
+    token_inactive_cro = create_access_token({"sub": str(user_inactive_cro.id), "email": user_inactive_cro.email})
+    token_revoked_cro = create_access_token({"sub": str(user_revoked_cro.id), "email": user_revoked_cro.email})
+    token_unrelated_cro = create_access_token({"sub": str(user_unrelated_cro.id), "email": user_unrelated_cro.email})
+    token_direct_study_pi = create_access_token({"sub": str(user_direct_study_pi.id), "email": user_direct_study_pi.email})
+    token_direct_clinical_dir = create_access_token({"sub": str(user_direct_clinical_dir.id), "email": user_direct_clinical_dir.email})
+
+    # Test Document 1: Fresh study-wide document created by Sponsor PI
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "protocol",
+            "title": "Study A Core Protocol Amendment",
+            "version": "2.0",
+            "storage_key": "s3://ctms-docs/studies/A/protocol_amendment.pdf",
+            "file_name": "protocol_amendment.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id1 = res.json()["id"]
+
+    # Submit to under_review
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {tokens['sponsor_a']}"},
+        json={"new_status": "under_review", "reason": "Ready for regulatory and monitoring sign-off"},
+    )
+    assert res.status_code == 200
+
+    # 1. Direct StudyTeamMember Monitor/CRA attempts approval, rejection, archival -> all 403 Forbidden
+    # A) Direct Monitor trying to approve
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_direct_monitor}"},
+        json={"new_status": "approved", "reason": "Direct StudyTeamMember monitor attempting approval"},
+    )
+    assert res.status_code == 403
+    assert "approve" in res.json()["detail"].lower()
+
+    # B) Direct Monitor trying to reject
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_direct_monitor}"},
+        json={"new_status": "draft", "reason": "Direct StudyTeamMember monitor attempting rejection"},
+    )
+    assert res.status_code == 403
+
+    # C) Direct Monitor trying to archive
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_direct_monitor}"},
+        json={"new_status": "archived", "reason": "Direct StudyTeamMember monitor attempting archival"},
+    )
+    assert res.status_code == 403
+
+    # D) Direct CRA trying to approve
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_direct_cra}"},
+        json={"new_status": "approved", "reason": "Direct CRA attempting approval"},
+    )
+    assert res.status_code == 403
+
+    # E) Direct Lead Monitor trying to approve
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_direct_lead_mon}"},
+        json={"new_status": "approved", "reason": "Direct Lead Monitor attempting approval"},
+    )
+    assert res.status_code == 403
+
+    # 2. Monitor in unrelated CRO organization trying to approve -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_unrelated_cro}"},
+        json={"new_status": "approved", "reason": "Unrelated CRO monitor attempting approval"},
+    )
+    assert res.status_code == 403
+
+    # 3. Inactive and revoked CRO members trying to approve -> 403 Forbidden
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_inactive_cro}"},
+        json={"new_status": "approved", "reason": "Inactive CRO member attempting approval"},
+    )
+    assert res.status_code == 403
+
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_revoked_cro}"},
+        json={"new_status": "approved", "reason": "Revoked CRO member attempting approval"},
+    )
+    assert res.status_code == 403
+
+    # 4. Valid Active CRA in study_a's designated CRO approves study-wide document -> 200 OK
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {token_cra}"},
+        json={"new_status": "approved", "reason": "Valid CRO CRA approval"},
+    )
+    assert res.status_code == 200
+    doc_approved = res.json()
+    assert doc_approved["status"] == "approved"
+    assert doc_approved["approved_by"] == str(user_cra.id)
+    assert doc_approved["approved_at"] is not None
+
+    # 5. CRO Lead Monitor in study_a's designated CRO can retire (supersede) approved document -> 200 OK
+    res = await client.post(
+        f"/api/v1/documents/{doc_id1}/transition",
+        headers={"Authorization": f"Bearer {tokens['cro_a']}"},
+        json={"new_status": "superseded", "reason": "CRO Lead Monitor supersedes with protocol amendment v3.0"},
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "superseded"
+
+    # 6. Test Document 2: Direct Study PI assigned via StudyTeamMember (site_id=None) can approve
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token_direct_study_pi}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "investigator_brochure",
+            "title": "Study A Investigator Brochure",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/ib_v1.pdf",
+            "file_name": "ib_v1.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id2 = res.json()["id"]
+
+    await client.post(
+        f"/api/v1/documents/{doc_id2}/transition",
+        headers={"Authorization": f"Bearer {token_direct_study_pi}"},
+        json={"new_status": "under_review", "reason": "Submit IB for review"},
+    )
+    res_app_pi = await client.post(
+        f"/api/v1/documents/{doc_id2}/transition",
+        headers={"Authorization": f"Bearer {token_direct_study_pi}"},
+        json={"new_status": "approved", "reason": "Direct Study PI formal sign-off"},
+    )
+    assert res_app_pi.status_code == 200
+    assert res_app_pi.json()["status"] == "approved"
+    assert res_app_pi.json()["approved_by"] == str(user_direct_study_pi.id)
+
+    # 7. Test Document 3: Clinical Director assigned via StudyTeamMember (site_id=None) can approve
+    res = await client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token_direct_clinical_dir}"},
+        json={
+            "study_id": str(study_a.id),
+            "document_type": "regulatory",
+            "title": "Study A Regulatory Filing Dossier",
+            "version": "1.0",
+            "storage_key": "s3://ctms-docs/studies/A/reg_filing.pdf",
+            "file_name": "reg_filing.pdf",
+        },
+    )
+    assert res.status_code == 201
+    doc_id3 = res.json()["id"]
+
+    await client.post(
+        f"/api/v1/documents/{doc_id3}/transition",
+        headers={"Authorization": f"Bearer {token_direct_clinical_dir}"},
+        json={"new_status": "under_review", "reason": "Submit dossier for review"},
+    )
+    res_app_dir = await client.post(
+        f"/api/v1/documents/{doc_id3}/transition",
+        headers={"Authorization": f"Bearer {token_direct_clinical_dir}"},
+        json={"new_status": "approved", "reason": "Clinical Director sign-off"},
+    )
+    assert res_app_dir.status_code == 200
+    assert res_app_dir.json()["status"] == "approved"
+    assert res_app_dir.json()["approved_by"] == str(user_direct_clinical_dir.id)

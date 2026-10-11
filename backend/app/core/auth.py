@@ -594,21 +594,27 @@ def _is_site_approver_role(role_name: str | None) -> bool:
     Checks whether the role represents a Site Principal Investigator or approved equivalent
     (e.g. Site PI, Investigator, Director).
     Strictly excludes roles such as Hospital Site Coordinator, Hospital Administrator,
-    Site Coordinator, Site Nurse, or assistants/clerks.
+    Site Coordinator, Site Nurse, assistants, clerks, monitors, or CRAs.
     """
     if not role_name:
         return False
     tokens = _get_role_tokens(role_name)
 
-    # Exclude non-approver roles (coordinator, administrator, nurse, assistant, clerk, etc.)
+    # Exclude non-approver roles (coordinator, administrator, nurse, assistant, clerk, monitor, cra, etc.)
     non_approver_tokens = {
         "coordinator",
         "administrator",
+        "admin",
+        "manager",
         "nurse",
         "assistant",
         "clerk",
         "technician",
         "specialist",
+        "monitor",
+        "cra",
+        "associate",
+        "auditor",
     }
     if tokens & non_approver_tokens:
         return False
@@ -621,8 +627,8 @@ def _is_study_approver_role(role_name: str | None) -> bool:
     """
     Checks whether a study-level team assignment role represents a Study Principal Investigator
     or equivalent clinical director.
-    Strictly excludes coordinators, administrators, nurses, assistants, and monitors
-    (monitors belong to CRO/Sponsor organization scope, not study team scope).
+    Strictly excludes coordinators, administrators, nurses, assistants, monitors, CRAs, and associates
+    (monitors and CRAs belong to CRO/Sponsor organization scope, not study team scope).
     """
     if not role_name:
         return False
@@ -631,12 +637,17 @@ def _is_study_approver_role(role_name: str | None) -> bool:
     non_approver_tokens = {
         "coordinator",
         "administrator",
+        "admin",
+        "manager",
         "nurse",
         "assistant",
         "clerk",
         "technician",
         "specialist",
         "monitor",
+        "cra",
+        "associate",
+        "auditor",
     }
     if tokens & non_approver_tokens:
         return False
@@ -677,6 +688,7 @@ def _is_sponsor_cro_approver_role(role_name: str | None, is_system_role: bool = 
         "nurse",
         "technician",
         "specialist",
+        "auditor",
     }
     if tokens & non_approver_tokens:
         return False
