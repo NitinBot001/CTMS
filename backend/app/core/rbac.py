@@ -116,6 +116,30 @@ CANONICAL_PERMISSIONS: list[dict[str, str]] = [
         "action": "read",
         "description": "Inspect cryptographic audit trail",
     },
+    {
+        "codename": "compliance:read",
+        "resource": "compliance",
+        "action": "read",
+        "description": "View ethics approvals, regulatory submissions, protocol deviations, and CAPA records",
+    },
+    {
+        "codename": "compliance:write",
+        "resource": "compliance",
+        "action": "write",
+        "description": "Create and transition ethics, regulatory, deviation, and CAPA compliance records",
+    },
+    {
+        "codename": "safety:read",
+        "resource": "safety",
+        "action": "read",
+        "description": "View pharmacovigilance adverse event reports",
+    },
+    {
+        "codename": "safety:write",
+        "resource": "safety",
+        "action": "write",
+        "description": "Report and transition adverse events and safety cases",
+    },
 ]
 
 ROLE_PERMISSION_MAPPING: dict[str, list[str]] = {
@@ -130,6 +154,10 @@ ROLE_PERMISSION_MAPPING: dict[str, list[str]] = {
         "study_teams:manage",
         "documents:read",
         "documents:upload",
+        "compliance:read",
+        "compliance:write",
+        "safety:read",
+        "safety:write",
     ],
     "CRO Lead Monitor": [
         "organizations:read",
@@ -141,6 +169,10 @@ ROLE_PERMISSION_MAPPING: dict[str, list[str]] = {
         "study_sites:request",
         "documents:read",
         "documents:upload",
+        "compliance:read",
+        "compliance:write",
+        "safety:read",
+        "safety:write",
     ],
     "Clinical Research Associate": [
         "studies:read",
@@ -151,6 +183,10 @@ ROLE_PERMISSION_MAPPING: dict[str, list[str]] = {
         "study_sites:request",
         "documents:read",
         "documents:upload",
+        "compliance:read",
+        "compliance:write",
+        "safety:read",
+        "safety:write",
     ],
     "Site Principal Investigator": [
         "studies:read",
@@ -159,12 +195,20 @@ ROLE_PERMISSION_MAPPING: dict[str, list[str]] = {
         "study_sites:approve",
         "documents:read",
         "documents:upload",
+        "compliance:read",
+        "compliance:write",
+        "safety:read",
+        "safety:write",
     ],
     "Site Coordinator": [
         "studies:read",
         "participants:read",
         "participants:assign",
         "documents:read",
+        "compliance:read",
+        "compliance:write",
+        "safety:read",
+        "safety:write",
     ],
 }
 

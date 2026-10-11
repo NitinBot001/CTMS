@@ -582,6 +582,233 @@ async def is_user_authorized_for_document(
     return False
 
 
+def has_compliance_permission(user: User, permission: str) -> bool:
+    """
+    Checks whether the user has the specified compliance permission (e.g. 'compliance:read', 'compliance:write').
+    Technical System Administrator holds wildcard '*'.
+    Strictly excludes:
+    - Government Verification SuperAdminProfile wildcard bypass.
+    - Unassigned or inactive users.
+    """
+    if is_technical_system_admin(user):
+        return True
+
+    # Check active organization memberships
+    for membership in user.memberships:
+        if membership.status == AssignmentStatus.active and membership.role:
+            for rp in membership.role.permissions:
+                if rp.permission and rp.permission.codename in (permission, "*"):
+                    if rp.permission.codename == "*":
+                        org = _get_membership_organization(membership)
+                        if not is_trusted_platform_organization(org):
+                            continue
+                    return True
+
+    # Check active study team assignments
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename in (permission, "*"):
+                        return True
+
+    return False
+
+
+def has_safety_permission(user: User, permission: str) -> bool:
+    """
+    Checks whether the user has the specified safety permission (e.g. 'safety:read', 'safety:write').
+    Technical System Administrator holds wildcard '*'.
+    Strictly excludes:
+    - Government Verification SuperAdminProfile wildcard bypass.
+    - Unassigned or inactive users.
+    """
+    if is_technical_system_admin(user):
+        return True
+
+    # Check active organization memberships
+    for membership in user.memberships:
+        if membership.status == AssignmentStatus.active and membership.role:
+            for rp in membership.role.permissions:
+                if rp.permission and rp.permission.codename in (permission, "*"):
+                    if rp.permission.codename == "*":
+                        org = _get_membership_organization(membership)
+                        if not is_trusted_platform_organization(org):
+                            continue
+                    return True
+
+    # Check active study team assignments
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for assignment in user.study_team_assignments:
+            if assignment.assignment_status == AssignmentStatus.active and assignment.role:
+                for rp in assignment.role.permissions:
+                    if rp.permission and rp.permission.codename in (permission, "*"):
+                        return True
+
+    return False
+
+
+async def is_user_authorized_for_adverse_event(
+    user: User,
+    ae: Any,
+    db: AsyncSession,
+    permission: str = "safety:read",
+) -> bool:
+    """
+    Verifies whether the authenticated user is authorized to perform the requested operation
+    (read or write/transition) on the specific AdverseEvent record based on study and site scopes.
+    """
+    from app.models.participant import Participant
+
+    if is_technical_system_admin(user):
+        return True
+
+    if not has_safety_permission(user, permission):
+        return False
+
+    if ae.study_id is None:
+        return False
+
+    study = await db.get(Study, ae.study_id)
+    if not study:
+        return False
+
+    # Check Sponsor / CRO organization memberships
+    for m in user.memberships:
+        if m.status == AssignmentStatus.active and m.role and m.organization_id in (study.sponsor_org_id, study.cro_org_id):
+            has_perm = any(
+                rp.permission and rp.permission.codename in (permission, "*")
+                for rp in m.role.permissions
+            )
+            if has_perm:
+                return True
+
+    # Check Study Team assignments
+    if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+        for a in user.study_team_assignments:
+            if a.study_id == ae.study_id and a.assignment_status == AssignmentStatus.active and a.role:
+                has_perm = any(
+                    rp.permission and rp.permission.codename in (permission, "*")
+                    for rp in a.role.permissions
+                )
+                if has_perm:
+                    if a.site_id is None:
+                        # Study-level team member (e.g. Study PI)
+                        return True
+                    # Site-level team member: strictly restricted to their assigned site
+                    if ae.site_id is not None:
+                        return bool(ae.site_id == a.site_id)
+                    if ae.participant_id is not None:
+                        p = await db.get(Participant, ae.participant_id)
+                        if p and p.site_id is not None:
+                            return bool(p.site_id == a.site_id)
+                    return False
+
+    return False
+
+
+async def is_user_authorized_for_compliance_record(
+    user: User,
+    record: Any,
+    db: AsyncSession,
+    permission: str = "compliance:read",
+) -> bool:
+    """
+    Verifies whether the authenticated user is authorized to perform the requested operation
+    (read or write/transition) on a compliance record (EthicsApproval, RegulatorySubmission,
+    ProtocolDeviation, or CAPARecord).
+    """
+    from app.models.compliance import (
+        CAPARecord,
+        EthicsApproval,
+        ProtocolDeviation,
+        RegulatorySubmission,
+    )
+    from app.models.participant import Participant
+
+    if is_technical_system_admin(user):
+        return True
+
+    if not has_compliance_permission(user, permission):
+        return False
+
+    # 1. Study-scoped compliance record
+    record_study_id = getattr(record, "study_id", None)
+    if record_study_id is not None:
+        study = await db.get(Study, record_study_id)
+        if not study:
+            return False
+
+        # Sponsor / CRO org members have study-wide oversight
+        for m in user.memberships:
+            if m.status == AssignmentStatus.active and m.role and m.organization_id in (study.sponsor_org_id, study.cro_org_id):
+                has_perm = any(
+                    rp.permission and rp.permission.codename in (permission, "*")
+                    for rp in m.role.permissions
+                )
+                if has_perm:
+                    return True
+
+        # Study team members
+        if hasattr(user, "study_team_assignments") and user.study_team_assignments:
+            for a in user.study_team_assignments:
+                if a.study_id == record_study_id and a.assignment_status == AssignmentStatus.active and a.role:
+                    has_perm = any(
+                        rp.permission and rp.permission.codename in (permission, "*")
+                        for rp in a.role.permissions
+                    )
+                    if has_perm:
+                        if a.site_id is None:
+                            # Study-level team member (e.g. Study PI)
+                            return True
+
+                        # Site-level team member
+                        if isinstance(record, EthicsApproval):
+                            if record.site_id is None:
+                                # Central/study-wide ethics approval: site staff may read, but not transition
+                                return permission == "compliance:read"
+                            return bool(record.site_id == a.site_id)
+
+                        elif isinstance(record, RegulatorySubmission):
+                            # Regulatory submissions are study-wide: site staff may read, but not transition
+                            return permission == "compliance:read"
+
+                        elif isinstance(record, ProtocolDeviation):
+                            if record.site_id is not None:
+                                return bool(record.site_id == a.site_id)
+                            if record.participant_id is not None:
+                                p = await db.get(Participant, record.participant_id)
+                                if p and p.site_id is not None:
+                                    return bool(p.site_id == a.site_id)
+                            # Study-wide deviation: read only for site staff
+                            return permission == "compliance:read"
+
+                        elif isinstance(record, CAPARecord):
+                            # Site staff can read study CAPAs
+                            return permission == "compliance:read"
+
+                        return False
+        return False
+
+    # 2. CAPA without direct study_id (e.g. organization-level CAPA or deviation-linked)
+    if isinstance(record, CAPARecord):
+        if record.organization_id is not None:
+            for m in user.memberships:
+                if m.status == AssignmentStatus.active and m.role and m.organization_id == record.organization_id:
+                    has_perm = any(
+                        rp.permission and rp.permission.codename in (permission, "*")
+                        for rp in m.role.permissions
+                    )
+                    if has_perm:
+                        return True
+        if record.deviation_id is not None:
+            dev = await db.get(ProtocolDeviation, record.deviation_id)
+            if dev:
+                return await is_user_authorized_for_compliance_record(user, dev, db, permission=permission)
+
+    return False
+
+
 def _get_role_tokens(role_name: str | None) -> set[str]:
     """Extracts lower-cased alphanumeric word tokens from a role name."""
     if not role_name:

@@ -534,7 +534,7 @@ async def create_team_invitation(
         await db.execute(
             select(Role).where(
                 Role.name.ilike(data.requested_role.strip()),
-                (Role.scope_level == ScopeLevel.system) | (Role.is_system_role.is_(True)),
+                Role.scope_level == ScopeLevel.system,
             )
         )
     ).scalars().first()

@@ -213,26 +213,56 @@ class PlatformService:
             await db.flush()
 
         # 4. Role & Membership Provisioning
-        role_name = request.requested_role or (
-            "Principal Investigator"
-            if request.request_type in (AccessRequestType.research_pi, AccessRequestType.site_pi)
-            else "Organization Admin"
-        )
-        if role_name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
-            role_name = (
+        default_role = (
+            "Site Principal Investigator"
+            if request.request_type == AccessRequestType.site_pi
+            else (
                 "Principal Investigator"
-                if request.request_type in (AccessRequestType.research_pi, AccessRequestType.site_pi)
+                if request.request_type == AccessRequestType.research_pi
                 else "Organization Admin"
             )
-        role_stmt = select(Role).where(
-            Role.name == role_name, Role.scope_level == ScopeLevel.organization
         )
+        role_name = request.requested_role or default_role
+        if role_name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES:
+            role_name = default_role
+
+        role_stmt = select(Role).where(Role.name == role_name)
         role = (await db.execute(role_stmt)).scalars().first()
+
+        # Scope compatibility and system role boundary:
+        # 1. System-level and reserved roles can never be assigned to tenant users
+        # 2. Site PI requests cannot be assigned study- or system-scoped roles (prevents permission widening)
+        is_scope_incompatible = bool(
+            role
+            and (
+                role.scope_level == ScopeLevel.system
+                or role.name.strip().lower() in RESERVED_SYSTEM_ROLE_NAMES
+                or (
+                    request.request_type == AccessRequestType.site_pi
+                    and role.scope_level in (ScopeLevel.study, ScopeLevel.system)
+                )
+            )
+        )
+
+        if is_scope_incompatible:
+            role_name = default_role
+            role = (await db.execute(select(Role).where(Role.name == role_name))).scalars().first()
+
         if not role:
+            scope = (
+                ScopeLevel.site
+                if request.request_type == AccessRequestType.site_pi
+                else (
+                    ScopeLevel.study
+                    if request.request_type == AccessRequestType.research_pi
+                    else ScopeLevel.organization
+                )
+            )
             role = Role(
                 name=role_name,
                 description=f"Standard role for {role_name}",
-                scope_level=ScopeLevel.organization,
+                scope_level=scope,
+                is_system_role=False,
             )
             db.add(role)
             await db.flush()
@@ -594,7 +624,7 @@ class PlatformService:
                 await db.execute(
                     select(Role).where(
                         Role.name.ilike(req.requested_role.strip()),
-                        (Role.scope_level == ScopeLevel.system) | (Role.is_system_role.is_(True)),
+                        Role.scope_level == ScopeLevel.system,
                     )
                 )
             ).scalars().first()
@@ -623,14 +653,22 @@ class PlatformService:
             role_stmt = select(Role).where(
                 Role.name == req.requested_role,
                 Role.scope_level != ScopeLevel.system,
-                Role.is_system_role.is_(False),
             )
             role = (await db.execute(role_stmt)).scalars().first()
             if not role:
+                existing_any_role = (
+                    await db.execute(select(Role).where(Role.name == req.requested_role))
+                ).scalars().first()
+                if existing_any_role:
+                    raise ValueError("Team members cannot be provisioned with platform or system-level roles")
                 role = Role(
                     name=req.requested_role,
                     description=f"Auto-created role {req.requested_role}",
-                    scope_level=ScopeLevel.study if req.study_id else ScopeLevel.organization,
+                    scope_level=(
+                        ScopeLevel.site
+                        if req.site_id
+                        else (ScopeLevel.study if req.study_id else ScopeLevel.organization)
+                    ),
                     is_system_role=False,
                 )
                 db.add(role)

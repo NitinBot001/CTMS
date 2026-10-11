@@ -777,3 +777,264 @@ async def test_transitions_generate_expected_audit_records(
     stmt = select(AuditLog).order_by(AuditLog.created_at.desc())
     logs = (await db_session.execute(stmt)).scalars().all()
     assert isinstance(logs, list)
+
+
+# =============================================================================
+# REGRESSION TESTS: ROLE PROVISIONING UNIQUE CONSTRAINT RESILIENCE
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_site_pi_onboarding_approval_with_existing_seeded_site_pi_role(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Regression Test:
+    Ensures that when 'Site Principal Investigator' role already exists in database
+    with scope_level=ScopeLevel.site (e.g. from seed data), approving an onboarding
+    request with requested_role='Site Principal Investigator' reuses the existing role
+    rather than attempting duplicate INSERT which previously caused:
+    (sqlite3.IntegrityError) UNIQUE constraint failed: roles.name
+    """
+    # 1. Seed the Site Principal Investigator role with ScopeLevel.site
+    role_site_pi = Role(
+        name="Site Principal Investigator",
+        description="Standard role for Site Principal Investigator",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add(role_site_pi)
+    await db_session.commit()
+
+    # 2. Create an onboarding request requesting "Site Principal Investigator"
+    req = OnboardingRequest(
+        applicant_name="Dr. Rajesh Vaidya",
+        organization_name="Charak Ayurveda Research Hospital",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Site Principal Investigator",
+        proposed_site_name="Charak Clinical Trial Site",
+        email="rajesh.vaidya@charakhospital.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    # 3. Approve the request via government admin endpoint
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["user_email"] == "rajesh.vaidya@charakhospital.org"
+    assert data["organization_id"] is not None
+
+    # 4. Verify organization membership points to the existing seeded role
+    user_stmt = select(User).where(User.email == "rajesh.vaidya@charakhospital.org")
+    provisioned_user = (await db_session.execute(user_stmt)).scalars().first()
+    assert provisioned_user is not None
+
+    mem_stmt = select(OrganizationMember).where(
+        OrganizationMember.user_id == provisioned_user.id,
+        OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+    )
+    member = (await db_session.execute(mem_stmt)).scalars().first()
+    assert member is not None
+    assert member.role_id == role_site_pi.id
+
+
+@pytest.mark.asyncio
+async def test_research_pi_onboarding_approval_with_existing_seeded_study_pi_role(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Regression Test:
+    Ensures that when 'Principal Investigator' role exists with scope_level=ScopeLevel.study,
+    approving a research_pi onboarding request reuses it without IntegrityError.
+    """
+    role_pi = Role(
+        name="Principal Investigator",
+        description="Standard role for Principal Investigator",
+        scope_level=ScopeLevel.study,
+        is_system_role=True,
+    )
+    db_session.add(role_pi)
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Meera Nambiar",
+        organization_name="Kerala Ayurvedic Pharma",
+        organization_type=OrganizationType.sponsor,
+        request_type=AccessRequestType.research_pi,
+        requested_role="Principal Investigator",
+        email="meera.nambiar@keralapharma.example",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+
+    user_stmt = select(User).where(User.email == "meera.nambiar@keralapharma.example")
+    provisioned_user = (await db_session.execute(user_stmt)).scalars().first()
+    assert provisioned_user is not None
+
+    mem_stmt = select(OrganizationMember).where(OrganizationMember.user_id == provisioned_user.id)
+    member = (await db_session.execute(mem_stmt)).scalars().first()
+    assert member is not None
+    assert member.role_id == role_pi.id
+
+
+@pytest.mark.asyncio
+async def test_team_member_invitation_with_existing_seeded_clinical_role(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession, org_admin_user: tuple[User, Organization]
+):
+    """
+    Regression Test:
+    Ensures that inviting and approving a team member with a seeded role like 'Site Coordinator'
+    (scope_level=ScopeLevel.site) succeeds and does not fail either system role rejection
+    or unique constraint duplicate creation.
+    """
+    inviter, org = org_admin_user
+    role_coord = Role(
+        name="Site Coordinator",
+        description="Standard role for Site Coordinator",
+        scope_level=ScopeLevel.site,
+        is_system_role=True,
+    )
+    db_session.add(role_coord)
+    await db_session.commit()
+
+    inviter_token = create_access_token({"sub": str(inviter.id), "email": inviter.email})
+    invite_res = await client.post(
+        "/api/v1/platform/team-invitations",
+        json={
+            "full_name": "Kavita Rao",
+            "email": "kavita.rao@clinicalsite.org",
+            "requested_role": "Site Coordinator",
+            "organization_id": str(org.id),
+        },
+        headers={"Authorization": f"Bearer {inviter_token}"},
+    )
+    assert invite_res.status_code == 201, invite_res.text
+    inv_data = invite_res.json()
+    req_id = inv_data["id"]
+
+    # Gov verifier approves
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    appr_res = await client.post(
+        f"/api/v1/platform/team-verifications/{req_id}/review",
+        json={"status": "approved"},
+        headers=headers,
+    )
+    assert appr_res.status_code == 200, appr_res.text
+    assert appr_res.json()["status"] == "approved"
+    assert appr_res.json()["provisioned_user_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_site_pi_incompatible_study_scope_falls_back_to_site_pi(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession
+):
+    """
+    Regression Test:
+    Ensures that when a site_pi applicant requests a study-scoped role ('Principal Investigator'),
+    the system rejects the scope widening and falls back to 'Site Principal Investigator' (ScopeLevel.site).
+    """
+    # Pre-seed Principal Investigator at study scope
+    role_pi = Role(
+        name="Principal Investigator",
+        description="Standard role for Study PI",
+        scope_level=ScopeLevel.study,
+        is_system_role=True,
+    )
+    db_session.add(role_pi)
+    await db_session.commit()
+
+    req = OnboardingRequest(
+        applicant_name="Dr. Harish Joshi",
+        organization_name="Apex Site Hospital",
+        organization_type=OrganizationType.institution,
+        request_type=AccessRequestType.site_pi,
+        requested_role="Principal Investigator",  # Incompatible study scope!
+        proposed_site_name="Apex Clinical Site",
+        email="harish.joshi@apexhospital.org",
+        status=OnboardingRequestStatus.under_review,
+    )
+    db_session.add(req)
+    await db_session.commit()
+
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    res = await client.post(
+        f"/api/v1/platform/onboarding-requests/{req.id}/approve",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+
+    # User must have Site Principal Investigator (ScopeLevel.site), NOT Study Principal Investigator
+    user_stmt = select(User).where(User.email == "harish.joshi@apexhospital.org")
+    user = (await db_session.execute(user_stmt)).scalars().first()
+    assert user is not None
+
+    mem_stmt = select(OrganizationMember).where(
+        OrganizationMember.user_id == user.id,
+        OrganizationMember.organization_id == uuid.UUID(data["organization_id"]),
+    )
+    member = (await db_session.execute(mem_stmt)).scalars().first()
+    assert member is not None
+
+    role_stmt = select(Role).where(Role.id == member.role_id)
+    assigned_role = (await db_session.execute(role_stmt)).scalars().first()
+    assert assigned_role is not None
+    assert assigned_role.name == "Site Principal Investigator"
+    assert assigned_role.scope_level == ScopeLevel.site
+
+
+@pytest.mark.asyncio
+async def test_team_invitation_with_site_id_auto_creates_site_scoped_role(
+    client: AsyncClient, gov_admin_token: str, db_session: AsyncSession, sample_study_and_sites: tuple[Study, Site, Site, User]
+):
+    """
+    Regression Test:
+    Ensures that when a team invitation provides both study_id and site_id with a custom role,
+    the auto-created role receives ScopeLevel.site rather than ScopeLevel.study.
+    """
+    study, site_a, _, pi_user = sample_study_and_sites
+
+    pi_token = create_access_token({"sub": str(pi_user.id), "email": pi_user.email})
+    invite_res = await client.post(
+        "/api/v1/platform/team-invitations",
+        json={
+            "full_name": "Arun Kumar",
+            "email": "arun.kumar@pharmacy.example",
+            "requested_role": "Site Trial Pharmacist",
+            "study_id": str(study.id),
+            "site_id": str(site_a.id),
+        },
+        headers={"Authorization": f"Bearer {pi_token}"},
+    )
+    assert invite_res.status_code == 201, invite_res.text
+    inv_data = invite_res.json()
+
+    # Gov verifier approves
+    headers = {"Authorization": f"Bearer {gov_admin_token}"}
+    appr_res = await client.post(
+        f"/api/v1/platform/team-verifications/{inv_data['id']}/review",
+        json={"status": "approved"},
+        headers=headers,
+    )
+    assert appr_res.status_code == 200, appr_res.text
+
+    # Verify auto-created role received ScopeLevel.site
+    role_stmt = select(Role).where(Role.name == "Site Trial Pharmacist")
+    created_role = (await db_session.execute(role_stmt)).scalars().first()
+    assert created_role is not None
+    assert created_role.scope_level == ScopeLevel.site
