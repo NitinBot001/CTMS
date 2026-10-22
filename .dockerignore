@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python environment & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & quality caches
+.cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node & Frontend build artifacts
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.oxlintrc.json
+
+# Local Databases, state, and logs
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/ctms.db
+ctms.db
+*.log
+
+# Sensitive credentials & environment files (A2.3)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Documentation & Audit Artifacts (keeps image lean)
+artifacts/
+docs/

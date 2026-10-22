@@ -1,0 +1,91 @@
+# ==============================================================================
+# AyuCTMS — Fullstack Production Runtime Server Environment (Docker Compose)
+# ==============================================================================
+# Starts Backend (FastAPI / Uvicorn), Frontend (React / Nginx), and PostgreSQL.
+#
+# Quick Start:
+#   docker compose up -d --build
+#
+# Stop:
+#   docker compose down
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Backend Server API (FastAPI + Async SQLAlchemy + Alembic)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ayuctms-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - WORKERS=2
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/ayuctms
+      - SECRET_KEY=ayu-ctms-production-grade-jwt-secret-key-32bytes-secure
+      - APP_BASE_URL=http://localhost
+      - SEED_ON_STARTUP=false
+    volumes:
+      - ctms_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # 2. Frontend Web Application (React 19 SPA served via Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ayuctms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ----------------------------------------------------------------------------
+  # 3. PostgreSQL Database (Relational Data & 21 CFR Part 11 Audit Trail)
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: ayuctms-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ayuctms
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ayuctms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  ctms_data:
+    name: ayuctms_data
+  pg_data:
+    name: ayuctms_pgdata
