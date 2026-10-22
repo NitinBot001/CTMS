@@ -13,7 +13,7 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Fully synchronized on branch `main` with GitHub `origin/main` at `9a5556d` (reflecting remote rename of `master` to `main` and `main` to `main1`). Working tree clean.
-  - Production Docker Server Runtime: Added production-grade root `Dockerfile`, `docker-entrypoint.sh`, `.dockerignore`, `frontend/Dockerfile`, `frontend/nginx.conf`, and `docker-compose.yml`. Multi-stage Python 3.12 + Node 22 / Nginx alpine architecture, unprivileged non-root user (`ctms:10001`), persistent data volume, automated Alembic migrations, and health checks.
+  - Production Docker Server Runtime: Refactored container architecture to strictly expose ONLY the frontend (Port 80 via Nginx) while keeping the FastAPI backend and PostgreSQL database completely private/internal. In `docker-compose.yml`, backend has no host ports and is reached solely via Nginx reverse proxy over Docker's internal network (`http://backend:8000`). In the root unified `Dockerfile`, Nginx exposes Port 80 while Uvicorn runs bound to internal loopback (`127.0.0.1:8000`).
   - Backend: 100% GREEN (206/206 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean with optimized assets).
@@ -24,6 +24,11 @@
 ---
 
 ## 2. Decisions
+- **Frontend-Only Exposed Container Architecture (Private Backend & DB)**:
+  - Enforced strict ingress perimeter: ONLY the frontend Nginx web application publishes Port 80 to the host network.
+  - Backend isolation in Compose (`docker-compose.yml`): Host port mapping (`8000:8000`) removed from `backend` service; port 8000 is exposed purely on the internal Docker network. Host port mapping (`5432:5432`) removed from `db` service.
+  - Nginx reverse-proxy: Nginx in the frontend container handles all client traffic and securely proxies `/api` and `/docs` requests internally to `http://backend:8000`.
+  - Unified all-in-one container (`Dockerfile`): Exposes ONLY Port 80. Runs Uvicorn internally bound to loopback `127.0.0.1:8000` (inaccessible from external network interfaces) with Nginx proxying traffic internally.
 - **Production Docker Server Runtime Architecture**:
   - Adopted multi-stage Dockerfile architecture with `python:3.12-slim-bookworm` for backend and `node:22-alpine` + `nginx:1.27-alpine` for frontend.
   - Enforced unprivileged container execution via dedicated system user `ctms:ctms` (UID 10001) for strict runtime security.
@@ -93,6 +98,24 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-22 11:45 — Refactor Docker Architecture: Expose Only Frontend, Keep Backend & DB Internal
+
+- **What**: Reconfigured Docker and Compose architectures so that ONLY the frontend web server (Port 80) is exposed to the outside world, while the FastAPI backend (Port 8000) and PostgreSQL database (Port 5432) remain completely private and unexposed on the host network.
+- **Why**: User instructed that only the frontend should be exposed, and the frontend must consume the backend internally without exposing backend ports externally.
+- **How**:
+  1. In `docker-compose.yml`: Removed host port mapping `8000:8000` from `backend` service (replaced with `expose: - "8000"` for internal Docker bridge network visibility only) and removed host port mapping `5432:5432` from `db` service. `frontend` service remains the sole ingress publishing port `80:80`.
+  2. In `backend/Dockerfile` & `backend/docker-entrypoint.sh`: Created dedicated internal backend container for Docker Compose.
+  3. In `frontend/nginx.conf`: Refined `location /api` reverse proxy to pass traffic internally to `http://backend:8000`.
+  4. In root `Dockerfile` & `docker-entrypoint.sh` & `nginx-unified.conf`: Unified all-in-one container exposes ONLY Port 80. Starts Uvicorn bound strictly to internal loopback (`127.0.0.1:8000`) and serves React SPA via Nginx reverse proxy on Port 80.
+- **Result**: Zero backend or database port exposure on the host network. All external communication flows strictly through the frontend Nginx reverse proxy.
+- **Verified by**:
+  - Configuration inspection: `docker-compose.yml` has only `80:80` under `frontend:ports`. `backend` and `db` have zero host port mappings.
+  - Root `Dockerfile` has only `EXPOSE 80`.
+  - Secret scan: Clean (0 leaks).
+- **Not verified**: Live container networking execution in PRoot (daemon not running in Termux PRoot environment).
+- **Dead ends**: None.
+- **Follow-ups**: Ready to commit and push to `origin/main` if desired.
 
 ### 2026-10-22 11:30 — Git Branch Alignment & Production Server Dockerfile Implementation
 

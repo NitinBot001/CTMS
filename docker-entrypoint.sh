@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# AyuCTMS Container Runtime Entrypoint
+# AyuCTMS Unified Container Runtime Entrypoint
+# Starts Backend internally on 127.0.0.1:8000 and Nginx on Port 80 (Exposed).
 # ==============================================================================
 set -e
 
-# Ensure data directory exists
 if [ -n "$DATA_DIR" ] && [ ! -d "$DATA_DIR" ]; then
     mkdir -p "$DATA_DIR" 2>/dev/null || true
 fi
 
-# Run database schema migrations if alembic.ini is present
+# Run database schema migrations
 if [ -f "alembic.ini" ]; then
     echo "▶ Running database migrations (alembic upgrade head)..."
     alembic upgrade head || {
@@ -17,27 +17,48 @@ if [ -f "alembic.ini" ]; then
     }
 fi
 
-# Optional: Seed initial benchmark data if requested
+# Optional seed
 if [ "${SEED_ON_STARTUP:-false}" = "true" ]; then
     echo "▶ Seeding database with benchmark data..."
     python scripts/seed.py || echo "⚠️ Seeding skipped or data already exists."
 fi
 
-# Start uvicorn server in production mode
+# Start unified production server (Frontend exposed on port 80, Backend internal on 127.0.0.1:8000)
 if [ "$1" = "server" ]; then
     echo "=================================================="
-    echo "  🏥 Starting AyuCTMS Backend Server"
-    echo "  Port:    ${PORT:-8000}"
-    echo "  Workers: ${WORKERS:-2}"
-    echo "  Docs:    http://${HOST:-0.0.0.0}:${PORT:-8000}/docs"
+    echo "  🏥 Starting AyuCTMS Production Server"
+    echo "  Frontend Port: 80 (Exposed to outside)"
+    echo "  Backend Port:  8000 (Internal loopback 127.0.0.1)"
     echo "=================================================="
-    exec uvicorn app.main:app \
-        --host "${HOST:-0.0.0.0}" \
-        --port "${PORT:-8000}" \
+
+    # Start FastAPI backend internally on 127.0.0.1:8000 (NOT accessible from outside)
+    uvicorn app.main:app \
+        --host 127.0.0.1 \
+        --port 8000 \
         --workers "${WORKERS:-2}" \
         --proxy-headers \
-        --forwarded-allow-ips "*"
+        --forwarded-allow-ips "*" &
+    BACKEND_PID=$!
+
+    # Wait for backend to report healthy on internal port
+    for i in $(seq 1 30); do
+        if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
+            echo "✅ Backend initialized on internal loopback (127.0.0.1:8000)."
+            break
+        fi
+        sleep 0.5
+    done
+
+    # Trap termination signals to stop both processes gracefully
+    trap "echo 'Shutting down server...'; kill -TERM $BACKEND_PID 2>/dev/null || true; nginx -s quit 2>/dev/null || true; exit 0" SIGINT SIGTERM
+
+    # Start Nginx in foreground on port 80 (the only exposed port)
+    nginx -g "daemon off;" &
+    NGINX_PID=$!
+
+    # Wait for either process to terminate
+    wait -n $BACKEND_PID $NGINX_PID 2>/dev/null || wait $BACKEND_PID $NGINX_PID 2>/dev/null
+    exit 0
 fi
 
-# If a custom command was passed (e.g. bash, pytest, etc.), execute it
 exec "$@"

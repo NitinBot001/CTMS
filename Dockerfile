@@ -1,93 +1,106 @@
 # ==============================================================================
-# AyuCTMS Backend Server — Production Runtime Dockerfile
+# AyuCTMS Unified Server — Production Runtime Dockerfile
 # ==============================================================================
-# Multi-stage, secure, unprivileged non-root container optimized for cloud
-# runtimes, Kubernetes, AWS ECS, GCP Cloud Run, VPS, and Docker Compose.
+# Architecture:
+#   - Exposes ONLY Frontend (Port 80 via Nginx).
+#   - Backend runs INTERNALLY on private loopback (127.0.0.1:8000) and is NOT exposed.
+#   - Nginx reverse-proxies /api and /docs internally to the FastAPI backend.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Stage 1: Dependency Builder
+# Stage 1: Build Frontend Assets
 # ------------------------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS builder
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
+
+# ------------------------------------------------------------------------------
+# Stage 2: Build Backend Dependencies
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim-bookworm AS backend-builder
 
 WORKDIR /build
 
-# Install build dependencies for compiling Python packages (e.g. asyncpg, bcrypt)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy backend requirements and install dependencies
 COPY backend/requirements.txt /build/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 
 # ------------------------------------------------------------------------------
-# Stage 2: Production Server Runtime Environment
+# Stage 3: Production Server Runtime (Frontend Exposed, Backend Internal)
 # ------------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS runtime
 
 LABEL maintainer="AyuCTMS Engineering Team"
-LABEL description="AyuCTMS Clinical Trial Management System — Backend Server Runtime"
+LABEL description="AyuCTMS Production Server — Frontend Exposed, Backend Internal"
 
-# Runtime Environment Variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/backend \
-    PORT=8000 \
-    HOST=0.0.0.0 \
+    PORT=80 \
+    BACKEND_PORT=8000 \
     WORKERS=2 \
     DATA_DIR=/app/data \
     DATABASE_URL=sqlite+aiosqlite:////app/data/ctms.db \
     PATH="/opt/venv/bin:$PATH"
 
-# Install minimal runtime libraries (curl for healthcheck, libpq5 for PostgreSQL)
+# Install Nginx and runtime libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
     curl \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pre-built virtual environment from builder stage
-COPY --from=builder /opt/venv /opt/venv
+# Copy pre-built virtualenv
+COPY --from=backend-builder /opt/venv /opt/venv
 
-# Create unprivileged system user and runtime directories
-RUN groupadd -g 10001 ctms && \
-    useradd -u 10001 -g ctms -s /bin/bash -m ctms && \
-    mkdir -p /app/backend /app/data && \
-    chown -R ctms:ctms /app
+# Configure Nginx
+RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
+COPY nginx-unified.conf /etc/nginx/conf.d/default.conf
+
+# Copy frontend static build to Nginx html directory
+COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
+
+# Create runtime directories
+RUN mkdir -p /app/backend /app/data /var/log/ctms
 
 WORKDIR /app/backend
 
-# Copy application code, migrations, and scripts
-COPY --chown=ctms:ctms backend/alembic.ini /app/backend/alembic.ini
-COPY --chown=ctms:ctms backend/alembic/ /app/backend/alembic/
-COPY --chown=ctms:ctms backend/app/ /app/backend/app/
-COPY --chown=ctms:ctms backend/scripts/ /app/backend/scripts/
-COPY --chown=ctms:ctms .env.example /app/.env.example
-COPY --chown=ctms:ctms docker-entrypoint.sh /app/docker-entrypoint.sh
+# Copy backend application code
+COPY backend/alembic.ini /app/backend/alembic.ini
+COPY backend/alembic/ /app/backend/alembic/
+COPY backend/app/ /app/backend/app/
+COPY backend/scripts/ /app/backend/scripts/
+COPY .env.example /app/.env.example
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
-# Ensure entrypoint script is executable
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Mount volume for SQLite database persistence / documents
+# Persistent volume for database / documents
 VOLUME ["/app/data"]
 
-# Switch to unprivileged non-root user
-USER ctms
+# ONLY Port 80 (Frontend) is exposed to the outside world
+EXPOSE 80
 
-# Expose backend API port
-EXPOSE 8000
-
-# Container healthcheck
+# Health check tests Nginx proxy to backend /health
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://127.0.0.1:${PORT}/health || exit 1
+    CMD curl -f http://127.0.0.1/health || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["server"]

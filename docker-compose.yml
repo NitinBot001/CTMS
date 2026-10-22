@@ -1,27 +1,52 @@
 # ==============================================================================
-# AyuCTMS — Fullstack Production Runtime Server Environment (Docker Compose)
+# AyuCTMS — Production Server Environment (Docker Compose)
 # ==============================================================================
-# Starts Backend (FastAPI / Uvicorn), Frontend (React / Nginx), and PostgreSQL.
+# Architecture:
+#   - Frontend (React SPA / Nginx): EXPOSED to Host (Port 80)
+#   - Backend (FastAPI / Uvicorn):  INTERNAL ONLY (Port 8000 on private network)
+#   - Database (PostgreSQL 16):     INTERNAL ONLY (Port 5432 on private network)
 #
-# Quick Start:
+# Only the Frontend is accessible from outside. The Frontend reverse-proxies
+# /api requests internally to the Backend over the secure Docker bridge network.
+#
+# Usage:
 #   docker compose up -d --build
-#
-# Stop:
-#   docker compose down
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. Backend Server API (FastAPI + Async SQLAlchemy + Alembic)
+  # 1. Frontend Web Application (Public Facing / Exposed)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ayuctms-frontend
+    restart: unless-stopped
+    # ONLY the frontend port is published to the host machine
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ----------------------------------------------------------------------------
+  # 2. Backend Server API (Internal Only — NOT exposed to Host/Internet)
   # ----------------------------------------------------------------------------
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: ayuctms-backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # No "ports" mapping! Port 8000 is accessible ONLY inside the Docker network.
+    expose:
+      - "8000"
     environment:
       - PORT=8000
       - HOST=0.0.0.0
@@ -43,38 +68,19 @@ services:
       start_period: 10s
 
   # ----------------------------------------------------------------------------
-  # 2. Frontend Web Application (React 19 SPA served via Nginx)
-  # ----------------------------------------------------------------------------
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: ayuctms-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
-  # ----------------------------------------------------------------------------
-  # 3. PostgreSQL Database (Relational Data & 21 CFR Part 11 Audit Trail)
+  # 3. PostgreSQL Database (Internal Only — NOT exposed to Host/Internet)
   # ----------------------------------------------------------------------------
   db:
     image: postgres:16-alpine
     container_name: ayuctms-db
     restart: unless-stopped
+    # No "ports" mapping! Database is strictly isolated within Docker network.
+    expose:
+      - "5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=ayuctms
-    ports:
-      - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
