@@ -13,7 +13,7 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Fully synchronized on branch `main` with GitHub `origin/main` at `9a5556d` (reflecting remote rename of `master` to `main` and `main` to `main1`). Working tree clean.
-  - Production Docker Server Runtime: Refactored container architecture to strictly expose ONLY the frontend (Port 80 via Nginx) while keeping the FastAPI backend and PostgreSQL database completely private/internal. In `docker-compose.yml`, backend has no host ports and is reached solely via Nginx reverse proxy over Docker's internal network (`http://backend:8000`). In the root unified `Dockerfile`, Nginx exposes Port 80 while Uvicorn runs bound to internal loopback (`127.0.0.1:8000`).
+  - Production Docker Server Runtime: Completely eliminated Nginx from the repository per user directive. Replaced with native Node / Vite preview runtime for frontend (port 5173 exposed) with internal API proxying to FastAPI backend (port 8000 internal, no host ports) and PostgreSQL (port 5432 internal). Pure Node.js + Python stack.
   - Backend: 100% GREEN (206/206 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean with optimized assets).
@@ -24,18 +24,11 @@
 ---
 
 ## 2. Decisions
-- **Frontend-Only Exposed Container Architecture (Private Backend & DB)**:
-  - Enforced strict ingress perimeter: ONLY the frontend Nginx web application publishes Port 80 to the host network.
-  - Backend isolation in Compose (`docker-compose.yml`): Host port mapping (`8000:8000`) removed from `backend` service; port 8000 is exposed purely on the internal Docker network. Host port mapping (`5432:5432`) removed from `db` service.
-  - Nginx reverse-proxy: Nginx in the frontend container handles all client traffic and securely proxies `/api` and `/docs` requests internally to `http://backend:8000`.
-  - Unified all-in-one container (`Dockerfile`): Exposes ONLY Port 80. Runs Uvicorn internally bound to loopback `127.0.0.1:8000` (inaccessible from external network interfaces) with Nginx proxying traffic internally.
-- **Production Docker Server Runtime Architecture**:
-  - Adopted multi-stage Dockerfile architecture with `python:3.12-slim-bookworm` for backend and `node:22-alpine` + `nginx:1.27-alpine` for frontend.
-  - Enforced unprivileged container execution via dedicated system user `ctms:ctms` (UID 10001) for strict runtime security.
-  - Implemented automated Alembic migrations (`alembic upgrade head`) and seed hook (`SEED_ON_STARTUP=true`) on startup via `docker-entrypoint.sh`.
-  - Configured persistent data storage via volume `/app/data` for SQLite DB / documents / audit logs.
-  - Configured Uvicorn production server with configurable workers, forwarded IP proxy headers (`--proxy-headers --forwarded-allow-ips "*"`), and container healthchecks against `/health`.
-  - Orchestrated complete fullstack stack (Backend, Frontend SPA, PostgreSQL 16) via `docker-compose.yml`.
+- **Zero-Nginx Native Node & Python Container Architecture**:
+  - Completely eliminated Nginx from the repository per user directive (`frontend/nginx.conf` and `nginx-unified.conf` deleted).
+  - Frontend is served natively by Node.js (`node:22-alpine`) using Vite's built-in preview server (`npm run preview -- --host 0.0.0.0 --port 5173`).
+  - Configured `preview.proxy` in `frontend/vite.config.ts` to transparently route `/api`, `/docs`, `/openapi.json`, and `/health` requests to `BACKEND_URL` (`http://backend:8000`).
+  - Strictly exposed ONLY the frontend port (5173) in `docker-compose.yml`. Backend (port 8000) and PostgreSQL (port 5432) have zero published host ports and operate strictly over the internal Docker network.
 - **Strict Onboarding Request Role-Scope Compatibility & Safe Fallback Validation**:
   - In `PlatformService.provision_organization_from_request`, an explicit request-type-to-role/scope policy is strictly enforced:
     - `site_pi`: strictly mapped to `ScopeLevel.site` (canonical role: `Site Principal Investigator`). Must never receive organization-wide (`Organization Admin`) or study-wide (`Principal Investigator`) roles.
@@ -98,6 +91,27 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-22 11:55 — Complete Elimination of Nginx in Favor of Native Node + Python Architecture
+
+- **What**: Removed Nginx entirely from the project (`frontend/nginx.conf` and `nginx-unified.conf` deleted). Switched frontend containerization to pure Node.js (`node:22-alpine`) utilizing Vite's built-in preview server (`npm run preview`) with dynamic internal API proxying (`preview.proxy`). Reconfigured Compose and Dockerfiles so ONLY frontend port (5173) is exposed, while backend and database operate internally.
+- **Why**: User specifically directed not to use Nginx ("nginx ka use nahi karna tha").
+- **How**:
+  1. Deleted all Nginx configurations: `rm -f frontend/nginx.conf nginx-unified.conf`.
+  2. In `frontend/vite.config.ts`: Configured `preview.proxy` and `server.proxy` to read `process.env.BACKEND_URL || 'http://localhost:8000'`, proxying `/api`, `/docs`, `/redoc`, `/openapi.json`, and `/health` natively.
+  3. In `frontend/Dockerfile`: Refactored to pure `node:22-alpine` running `npm run preview -- --host 0.0.0.0 --port 5173`.
+  4. In `backend/Dockerfile` & `Dockerfile`: Kept clean, pure Python 3.12 multi-stage images without Nginx packages.
+  5. In `docker-compose.yml`: Frontend exposed on port 5173 (`${FRONTEND_PORT:-5173}:5173`), with backend (8000) and database (5432) operating strictly on the internal private Docker bridge network.
+- **Result**: Zero Nginx dependencies. 100% native stack: React/Vite on Node.js + FastAPI on Python. Frontend is the sole entrypoint; backend is purely internal.
+- **Verified by**:
+  - Verification: `vite preview` verified running and returning HTTP 200 on port 5174.
+  - Lint: `oxlint` 0 errors on 129 files.
+  - Backend tests: 13/13 passed across contract and endpoint test suites.
+  - Search: Grep confirms zero Nginx runtime references remaining.
+  - Secret scan: Clean (0 leaks).
+- **Not verified**: Live container networking in PRoot.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to commit and push to `origin/main`.
 
 ### 2026-10-22 11:45 — Refactor Docker Architecture: Expose Only Frontend, Keep Backend & DB Internal
 

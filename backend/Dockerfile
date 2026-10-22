@@ -2,7 +2,7 @@
 # AyuCTMS Backend — Internal Server Runtime Dockerfile
 # ==============================================================================
 # Runs the FastAPI backend internally. Accessible ONLY via internal network
-# (e.g. from the Frontend Nginx reverse proxy). NOT exposed to the host.
+# (e.g. from the Frontend preview/proxy server). NOT exposed to the host.
 # ==============================================================================
 
 FROM python:3.12-slim-bookworm AS builder

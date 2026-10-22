@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# AyuCTMS Unified Container Runtime Entrypoint
-# Starts Backend internally on 127.0.0.1:8000 and Nginx on Port 80 (Exposed).
+# AyuCTMS Container Runtime Entrypoint (No Nginx)
 # ==============================================================================
 set -e
 
@@ -23,42 +22,19 @@ if [ "${SEED_ON_STARTUP:-false}" = "true" ]; then
     python scripts/seed.py || echo "⚠️ Seeding skipped or data already exists."
 fi
 
-# Start unified production server (Frontend exposed on port 80, Backend internal on 127.0.0.1:8000)
+# Start uvicorn server in production mode
 if [ "$1" = "server" ]; then
     echo "=================================================="
-    echo "  🏥 Starting AyuCTMS Production Server"
-    echo "  Frontend Port: 80 (Exposed to outside)"
-    echo "  Backend Port:  8000 (Internal loopback 127.0.0.1)"
+    echo "  🏥 Starting AyuCTMS Backend Server"
+    echo "  Port:    ${PORT:-8000}"
+    echo "  Workers: ${WORKERS:-2}"
     echo "=================================================="
-
-    # Start FastAPI backend internally on 127.0.0.1:8000 (NOT accessible from outside)
-    uvicorn app.main:app \
-        --host 127.0.0.1 \
-        --port 8000 \
+    exec uvicorn app.main:app \
+        --host "${HOST:-0.0.0.0}" \
+        --port "${PORT:-8000}" \
         --workers "${WORKERS:-2}" \
         --proxy-headers \
-        --forwarded-allow-ips "*" &
-    BACKEND_PID=$!
-
-    # Wait for backend to report healthy on internal port
-    for i in $(seq 1 30); do
-        if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
-            echo "✅ Backend initialized on internal loopback (127.0.0.1:8000)."
-            break
-        fi
-        sleep 0.5
-    done
-
-    # Trap termination signals to stop both processes gracefully
-    trap "echo 'Shutting down server...'; kill -TERM $BACKEND_PID 2>/dev/null || true; nginx -s quit 2>/dev/null || true; exit 0" SIGINT SIGTERM
-
-    # Start Nginx in foreground on port 80 (the only exposed port)
-    nginx -g "daemon off;" &
-    NGINX_PID=$!
-
-    # Wait for either process to terminate
-    wait -n $BACKEND_PID $NGINX_PID 2>/dev/null || wait $BACKEND_PID $NGINX_PID 2>/dev/null
-    exit 0
+        --forwarded-allow-ips "*"
 fi
 
 exec "$@"

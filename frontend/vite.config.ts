@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const backendTarget = process.env.BACKEND_URL || 'http://localhost:8000'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,7 +22,33 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: backendTarget,
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    port: 5173,
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
+      '/docs': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
+      '/redoc': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
+      '/openapi.json': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
+      '/health': {
+        target: backendTarget,
         changeOrigin: true,
       },
     },

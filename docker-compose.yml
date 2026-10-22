@@ -1,13 +1,13 @@
 # ==============================================================================
-# AyuCTMS — Production Server Environment (Docker Compose)
+# AyuCTMS — Container Runtime Server Environment (No Nginx)
 # ==============================================================================
 # Architecture:
-#   - Frontend (React SPA / Nginx): EXPOSED to Host (Port 80)
-#   - Backend (FastAPI / Uvicorn):  INTERNAL ONLY (Port 8000 on private network)
-#   - Database (PostgreSQL 16):     INTERNAL ONLY (Port 5432 on private network)
+#   - Frontend (React SPA / Vite Preview on Node): EXPOSED to Host (Port 5173)
+#   - Backend (FastAPI / Uvicorn):                 INTERNAL ONLY (Port 8000 on private network)
+#   - Database (PostgreSQL 16):                    INTERNAL ONLY (Port 5432 on private network)
 #
-# Only the Frontend is accessible from outside. The Frontend reverse-proxies
-# /api requests internally to the Backend over the secure Docker bridge network.
+# Frontend proxies /api requests internally to Backend over Docker's network.
+# No Nginx used — pure Node.js + Python stack.
 #
 # Usage:
 #   docker compose up -d --build
@@ -15,7 +15,7 @@
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. Frontend Web Application (Public Facing / Exposed)
+  # 1. Frontend Web Application (Exposed to Host / Outside)
   # ----------------------------------------------------------------------------
   frontend:
     build:
@@ -23,17 +23,19 @@ services:
       dockerfile: Dockerfile
     container_name: ayuctms-frontend
     restart: unless-stopped
-    # ONLY the frontend port is published to the host machine
+    # ONLY Frontend is exposed to the outside (defaults to 5173, configurable via FRONTEND_PORT)
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5173/"]
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 
   # ----------------------------------------------------------------------------
   # 2. Backend Server API (Internal Only — NOT exposed to Host/Internet)
@@ -53,7 +55,7 @@ services:
       - WORKERS=2
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/ayuctms
       - SECRET_KEY=ayu-ctms-production-grade-jwt-secret-key-32bytes-secure
-      - APP_BASE_URL=http://localhost
+      - APP_BASE_URL=http://localhost:5173
       - SEED_ON_STARTUP=false
     volumes:
       - ctms_data:/app/data

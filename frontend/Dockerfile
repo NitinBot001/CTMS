@@ -1,46 +1,34 @@
 # ==============================================================================
-# AyuCTMS Frontend — Production Runtime Dockerfile
+# AyuCTMS Frontend — Node Runtime Dockerfile (No Nginx)
 # ==============================================================================
-# Multi-stage build: compiles TypeScript/React SPA into optimized static files,
-# served via production Nginx with reverse proxy to FastAPI backend.
+# Serves the compiled React 19 SPA using Vite's built-in preview server and
+# proxies /api requests internally to the Backend service over Docker network.
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Stage 1: Build Frontend Assets
-# ------------------------------------------------------------------------------
-FROM node:22-alpine AS builder
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy dependency manifests
+# Copy dependency descriptors
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy frontend source files
+# Copy source code and configuration
 COPY . .
 
-# Run TypeScript check and production Vite build
+# Compile production bundle (TypeScript typecheck + Vite build)
 RUN npm run build
 
-# ------------------------------------------------------------------------------
-# Stage 2: Production Nginx Server
-# ------------------------------------------------------------------------------
-FROM nginx:1.27-alpine AS runner
+# Default backend URL on the internal Docker network
+ENV BACKEND_URL=http://backend:8000
+ENV PORT=5173
 
-# Remove default nginx configuration
-RUN rm /etc/nginx/conf.d/default.conf
+# Expose ONLY the frontend port to the host
+EXPOSE 5173
 
-# Copy custom Nginx configuration with API reverse proxy
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Container healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:5173/ || exit 1
 
-# Copy compiled static assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Expose HTTP port
-EXPOSE 80
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget -qO- http://127.0.0.1/ || exit 1
-
-CMD ["nginx", "-g", "daemon off;"]
+# Start Vite preview server bound to all interfaces
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
