@@ -92,6 +92,17 @@
 
 ## 3. Task Log
 
+### 2026-10-22 13:35 — Comprehensive Environment Variable Documentation (.env.example)
+
+- **What**: Updated `.env.example` and added `frontend/.env.example` with comprehensive documentation covering all runtime variables for single-Dockerfile multi-target deployment (`SERVICE`, `PORT`, `WORKERS`, `DATA_DIR`), frontend API proxy configuration (`BACKEND_URL`, `VITE_API_BASE_URL`), database connection strings (SQLite & PostgreSQL), and backend auth/email settings.
+- **Why**: User requested updating `.env.example` and pushing to git immediately so deployment parameters are clearly documented for Antideploy / cloud environments.
+- **How**: Structured `.env.example` into 5 clear sections: (1) Container Deployment Target, (2) Frontend Configuration, (3) Backend Database & Core Security, (4) Platform Authority & Super Admin Bootstrap, and (5) Email Delivery (Resend / SMTP).
+- **Result**: Complete, safe `.env.example` with dummy values matching all application configuration options.
+- **Verified by**: Secret scan on git diff (0 leaked credentials).
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to push to `origin/main`.
+
 ### 2026-10-22 13:22 — Single-Dockerfile Dual-Target Deployment (Frontend Default / Backend via ENV) with Dynamic Endpoint Loading
 
 - **What**: Enhanced single `Dockerfile` and `docker-entrypoint.sh` to support standalone deployments of frontend and backend separately based on environment variable `SERVICE`:
