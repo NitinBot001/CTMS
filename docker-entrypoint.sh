@@ -1,53 +1,96 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# AyuCTMS Unified Server Runtime Entrypoint (No Nginx)
+# AyuCTMS Single-Dockerfile Universal Deployment Entrypoint
 # ==============================================================================
-# Architecture:
-#   1. Sets up persistent SQLite data directory (/app/data).
-#   2. Runs Alembic migrations and database seed (demo users & compliance records).
-#   3. Starts FastAPI backend bound strictly to 127.0.0.1 (private loopback, unexposed).
-#   4. Awaits internal backend readiness via /health.
-#   5. Starts Node.js Vite preview server on 0.0.0.0:${PORT:-5173} to serve frontend
-#      and proxy /api requests internally to 127.0.0.1:8000.
+# Supports separated deployments or unified mode via ENV or arguments:
+#
+#   1. BACKEND Mode:
+#      - Triggered by: SERVICE=backend (or APP_MODE=backend, MODE=backend, DEPLOY_TARGET=backend)
+#      - Executes: Database migrations, seed data, and Uvicorn on 0.0.0.0:${PORT:-8000}
+#
+#   2. FRONTEND Mode (DEFAULT):
+#      - Triggered by: Default when no ENV is set, or SERVICE=frontend
+#      - Loads backend endpoint from environment (BACKEND_URL / VITE_API_URL / VITE_API_BASE_URL)
+#      - Injects runtime window.__ENV__ and starts Vite preview on 0.0.0.0:${PORT:-5173}
+#
+#   3. MONOLITH / BOTH Mode:
+#      - Triggered by: SERVICE=both or SERVICE=all
+#      - Starts internal FastAPI on 127.0.0.1:8000 and Vite preview on 0.0.0.0:${PORT:-5173}
 # ==============================================================================
 set -e
 
-cleanup() {
-    echo "⚠️ Shutting down AyuCTMS background processes..."
-    kill $(jobs -p) 2>/dev/null || true
-    wait 2>/dev/null || true
-}
-trap cleanup EXIT SIGINT SIGTERM
+# Detect target service from ENV (case-insensitive) or first argument
+RAW_SERVICE="${SERVICE:-${APP_MODE:-${MODE:-${DEPLOY_TARGET:-${1:-frontend}}}}}"
+TARGET_SERVICE=$(echo "$RAW_SERVICE" | tr '[:upper:]' '[:lower:]')
 
-DATA_DIR="${DATA_DIR:-/app/data}"
-mkdir -p "$DATA_DIR" 2>/dev/null || true
-
-cd /app/backend
-
-# Verify schema and apply any pending migrations
-if [ -f "alembic.ini" ]; then
-    echo "▶ Running database migrations (alembic upgrade head)..."
-    alembic upgrade head || {
-        echo "⚠️ Alembic migration notice: continuing startup..."
-    }
+# If $1 was a standard mode keyword or "server", shift it out so exec "$@" works for custom commands
+if [ "$1" = "server" ] || [ "$1" = "frontend" ] || [ "$1" = "backend" ] || [ "$1" = "both" ]; then
+    shift
 fi
 
-# Seed benchmark data and demo accounts
-echo "▶ Running database seed verification..."
-python scripts/seed.py || echo "⚠️ Seeding skipped or completed."
+# ==============================================================================
+# 1. BACKEND SERVICE MODE
+# ==============================================================================
+if [ "$TARGET_SERVICE" = "backend" ]; then
+    PORT="${PORT:-8000}"
+    WORKERS="${WORKERS:-2}"
+    DATA_DIR="${DATA_DIR:-/app/data}"
 
-if [ "$1" = "server" ]; then
+    echo "=================================================="
+    echo "  🏥 AyuCTMS BACKEND Service Mode"
+    echo "  Port:      0.0.0.0:${PORT}"
+    echo "  Workers:   ${WORKERS}"
+    echo "  Database:  ${DATABASE_URL:-SQLite (/app/data/ctms.db)}"
+    echo "=================================================="
+
+    mkdir -p "$DATA_DIR" 2>/dev/null || true
+    cd /app/backend
+
+    if [ -f "alembic.ini" ]; then
+        echo "▶ Running database migrations (alembic upgrade head)..."
+        alembic upgrade head || echo "⚠️ Alembic notice: continuing startup..."
+    fi
+
+    echo "▶ Verifying database benchmark seed data..."
+    python scripts/seed.py || echo "⚠️ Seeding skipped or completed."
+
+    echo "▶ Launching FastAPI Uvicorn server on port ${PORT}..."
+    exec uvicorn app.main:app \
+        --host 0.0.0.0 \
+        --port "$PORT" \
+        --workers "$WORKERS" \
+        --proxy-headers \
+        --forwarded-allow-ips "*"
+fi
+
+# ==============================================================================
+# 2. BOTH / MONOLITH MODE (Runs both internal backend + frontend preview)
+# ==============================================================================
+if [ "$TARGET_SERVICE" = "both" ] || [ "$TARGET_SERVICE" = "all" ] || [ "$TARGET_SERVICE" = "monolith" ]; then
     BACKEND_PORT="${BACKEND_PORT:-8000}"
     FRONTEND_PORT="${PORT:-5173}"
 
     echo "=================================================="
-    echo "  🏥 AyuCTMS Unified Server Startup"
+    echo "  🏥 AyuCTMS MONOLITH Service Mode (Both Services)"
     echo "  Internal Backend: http://127.0.0.1:${BACKEND_PORT}"
     echo "  Exposed Frontend: http://0.0.0.0:${FRONTEND_PORT}"
-    echo "  Workers:          ${WORKERS:-2}"
     echo "=================================================="
 
-    # Start FastAPI backend bound ONLY to private loopback 127.0.0.1
+    cleanup() {
+        echo "⚠️ Shutting down background processes..."
+        kill $(jobs -p) 2>/dev/null || true
+        wait 2>/dev/null || true
+    }
+    trap cleanup EXIT SIGINT SIGTERM
+
+    mkdir -p "${DATA_DIR:-/app/data}" 2>/dev/null || true
+    cd /app/backend
+
+    if [ -f "alembic.ini" ]; then
+        alembic upgrade head || true
+    fi
+    python scripts/seed.py || true
+
     uvicorn app.main:app \
         --host 127.0.0.1 \
         --port "$BACKEND_PORT" \
@@ -56,37 +99,59 @@ if [ "$1" = "server" ]; then
         --forwarded-allow-ips "*" &
     BACKEND_PID=$!
 
-    # Await internal backend readiness
-    echo "▶ Awaiting internal backend readiness on 127.0.0.1:${BACKEND_PORT}..."
-    READY=0
     for i in $(seq 1 30); do
         if curl -s -f "http://127.0.0.1:${BACKEND_PORT}/health" >/dev/null 2>&1; then
-            echo "✅ Internal FastAPI backend is ready and accepting requests!"
-            READY=1
             break
         fi
         sleep 1
     done
 
-    if [ "$READY" -ne 1 ]; then
-        echo "❌ Internal backend failed to report healthy within 30 seconds."
-        kill $BACKEND_PID 2>/dev/null || true
-        exit 1
-    fi
-
-    # Switch to frontend directory and run Vite Preview
     cd /app/frontend
     export BACKEND_URL="http://127.0.0.1:${BACKEND_PORT}"
-
-    echo "▶ Starting Vite preview proxy server on port ${FRONTEND_PORT}..."
     npm run preview -- --host 0.0.0.0 --port "${FRONTEND_PORT}" &
     FRONTEND_PID=$!
 
-    # Monitor processes: exit if either terminates
     wait -n $BACKEND_PID $FRONTEND_PID
     EXIT_CODE=$?
-    echo "⚠️ Process exited with code ${EXIT_CODE}. Shutting down container."
     exit $EXIT_CODE
 fi
 
+# ==============================================================================
+# 3. FRONTEND SERVICE MODE (DEFAULT when nothing or frontend is set)
+# ==============================================================================
+if [ "$TARGET_SERVICE" = "frontend" ] || [ -z "$TARGET_SERVICE" ]; then
+    PORT="${PORT:-5173}"
+    # Resolve backend URL from environment variables
+    BACKEND_URL="${BACKEND_URL:-${VITE_API_URL:-${API_URL:-${API_BASE_URL:-http://127.0.0.1:8000}}}}"
+    VITE_API_BASE_URL="${VITE_API_BASE_URL:-/api/v1}"
+
+    echo "=================================================="
+    echo "  🏥 AyuCTMS FRONTEND Service Mode (Default)"
+    echo "  Port:        0.0.0.0:${PORT}"
+    echo "  Backend URL: ${BACKEND_URL}"
+    echo "  API Base:    ${VITE_API_BASE_URL}"
+    echo "=================================================="
+
+    cd /app/frontend
+
+    # Inject runtime virtual env configuration into dist/env-config.js for client-side loading
+    if [ -d "dist" ]; then
+        echo "▶ Injecting runtime environment into dist/env-config.js..."
+        cat <<EOF > dist/env-config.js
+// Generated at container startup from deployment environment
+window.__ENV__ = {
+  VITE_API_BASE_URL: "${VITE_API_BASE_URL}",
+  BACKEND_URL: "${BACKEND_URL}"
+};
+EOF
+    fi
+
+    export BACKEND_URL
+    export VITE_API_BASE_URL
+
+    echo "▶ Launching Node.js Vite preview server on port ${PORT}..."
+    exec npm run preview -- --host 0.0.0.0 --port "$PORT"
+fi
+
+# Fallback: execute any custom command
 exec "$@"

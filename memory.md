@@ -13,7 +13,7 @@
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
   - Git & GitHub Sync: Fully synchronized on branch `main` with GitHub `origin/main`. Working tree ready for push.
-  - Production Docker Server Runtime: Unified dual-process single-container architecture (FastAPI backend on internal loopback 127.0.0.1:8000 + Node.js Vite preview on 0.0.0.0:$PORT). Zero Nginx dependencies. Resolves 502 Bad Gateway on Fly.io / Antideploy. Seeded demo credentials for `demo.pi.empty@aiia-ctms.local` (`PI@Empty123`).
+  - Production Docker Server Runtime: Universal single-Dockerfile dual-target architecture (defaults to Frontend Vite preview; switches to Backend FastAPI when SERVICE=backend). Dynamic API endpoint loading from runtime environment variables (BACKEND_URL / VITE_API_BASE_URL). Zero Nginx dependencies. Seeded demo credentials for `demo.pi.empty@aiia-ctms.local` (`PI@Empty123`).
   - Backend: 100% GREEN (206/206 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean with optimized assets).
@@ -91,6 +91,28 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-22 13:22 — Single-Dockerfile Dual-Target Deployment (Frontend Default / Backend via ENV) with Dynamic Endpoint Loading
+
+- **What**: Enhanced single `Dockerfile` and `docker-entrypoint.sh` to support standalone deployments of frontend and backend separately based on environment variable `SERVICE`:
+  - When `SERVICE=backend`: Only FastAPI backend runs on `0.0.0.0:${PORT:-8000}` with migrations and benchmark seed data.
+  - When `SERVICE=frontend` or no ENV is set (default): Only Node.js Vite preview runs on `0.0.0.0:${PORT:-5173}`.
+  - Dynamic API Endpoint Loading: Frontend loads backend URL at runtime from environment variables (`BACKEND_URL`, `VITE_API_URL`, `API_URL`, `VITE_API_BASE_URL`). Node preview server proxies `/api` requests to `BACKEND_URL`, and entrypoint injects `window.__ENV__` into `dist/env-config.js` for browser runtime access.
+- **Why**: User requested separating frontend and backend deployments using a single universal Dockerfile, where setting `SERVICE=backend` deploys only the backend, leaving it unset or `SERVICE=frontend` defaults to frontend, and the frontend dynamically resolves backend API endpoints from virtual environment / environment variables.
+- **How**:
+  - `docker-entrypoint.sh`: Inspects `SERVICE` (also supports `APP_MODE`, `MODE`, `DEPLOY_TARGET`, or CLI arg). Routes to Backend mode (`0.0.0.0:$PORT` via Uvicorn), Frontend mode (`0.0.0.0:$PORT` via Vite preview + dynamic `env-config.js` injection), or Monolith mode (`SERVICE=both`).
+  - `frontend/src/api/client.ts`: Updated to read `window.__ENV__?.VITE_API_BASE_URL` before falling back to `import.meta.env.VITE_API_BASE_URL` or `/api/v1`.
+  - `frontend/index.html` & `frontend/public/env-config.js`: Added `<script src="/env-config.js"></script>` to load runtime configuration before app hydration.
+  - `frontend/vite.config.ts`: Proxy target dynamically evaluates `process.env.BACKEND_URL || process.env.VITE_API_URL || process.env.API_URL || process.env.API_BASE_URL || 'http://127.0.0.1:8000'`.
+  - `Dockerfile`: Defaults `CMD ["frontend"]`, exposes ports 5173 and 8000.
+- **Result**: Single unified image deployable as independent frontend or backend services on Antideploy / Fly.io / Cloud Run without code duplication.
+- **Verified by**:
+  - Mode detection test: `SERVICE=backend` -> `backend`; unset -> `frontend`; `SERVICE=frontend` -> `frontend`; `APP_MODE=backend` -> `backend`.
+  - Frontend production build (`npx vite build`) -> passed in 16.68s, assets and `env-config.js` properly bundled.
+  - Secret scan on git diff -> 0 leaked credentials.
+- **Not verified**: Live multi-service Fly.io deployment (performed by user in Antideploy dashboard).
+- **Dead ends**: None.
+- **Follow-ups**: Commit and push to `origin/main`.
 
 ### 2026-10-22 13:10 — Unified Dual-Process Server (FastAPI + Vite Preview) to Resolve 502 Bad Gateway on Fly.io / Antideploy
 

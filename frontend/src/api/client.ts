@@ -10,7 +10,11 @@ class ApiClient {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+    const runtimeUrl =
+      typeof window !== 'undefined'
+        ? (window as unknown as { __ENV__?: { VITE_API_BASE_URL?: string } }).__ENV__?.VITE_API_BASE_URL
+        : undefined
+    this.baseUrl = runtimeUrl || import.meta.env.VITE_API_BASE_URL || '/api/v1'
   }
 
   public getToken(): string | null {

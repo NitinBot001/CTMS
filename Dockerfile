@@ -1,11 +1,11 @@
 # ==============================================================================
-# AyuCTMS Unified Server — Production Runtime Dockerfile (No Nginx)
+# AyuCTMS Universal Container Runtime Dockerfile
 # ==============================================================================
-# Architecture:
-#   - Exposes ONLY Frontend on $PORT (defaults to 5173 via Node.js Vite Preview)
-#   - Backend runs INTERNALLY on private loopback (127.0.0.1:8000) and is NOT exposed
-#   - Vite Preview proxies /api, /docs, /redoc, /health to internal FastAPI backend
-#   - Pure Node.js + Python 3.12 stack — Zero Nginx dependencies
+# Dual-target single Dockerfile:
+#   - Defaults to FRONTEND service (Node.js 22 Vite Preview)
+#   - Switch to BACKEND service by setting environment variable: SERVICE=backend
+#   - Loads backend API endpoint from environment: BACKEND_URL / VITE_API_BASE_URL
+#   - Pure Node.js + Python 3.12 stack — Zero Nginx
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -44,12 +44,12 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 
 # ------------------------------------------------------------------------------
-# Stage 3: Production Server Runtime (Frontend Exposed, Backend Internal — No Nginx)
+# Stage 3: Universal Production Server Runtime
 # ------------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS runtime
 
 LABEL maintainer="AyuCTMS Engineering Team"
-LABEL description="AyuCTMS Production Server — Frontend Exposed, Backend Internal (No Nginx)"
+LABEL description="AyuCTMS Universal Runtime — Frontend (Default) or Backend via SERVICE=backend (No Nginx)"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -92,7 +92,7 @@ COPY --from=frontend-builder --chown=ctms:ctms /app/frontend/vite.config.ts ./vi
 COPY --from=frontend-builder --chown=ctms:ctms /app/frontend/dist ./dist
 COPY --from=frontend-builder --chown=ctms:ctms /app/frontend/node_modules ./node_modules
 
-# Copy Backend application code, migrations, seed script, and database baseline
+# Copy Backend application code, migrations, and seed script
 WORKDIR /app/backend
 COPY --chown=ctms:ctms backend/alembic.ini /app/backend/alembic.ini
 COPY --chown=ctms:ctms backend/alembic/ /app/backend/alembic/
@@ -107,13 +107,12 @@ VOLUME ["/app/data"]
 
 USER ctms
 
-# ONLY Frontend port is exposed to the outside world!
-# Backend listens ONLY on 127.0.0.1:8000 internally.
-EXPOSE 5173
+# Default to frontend port 5173 and backend port 8000
+EXPOSE 5173 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://127.0.0.1:${PORT}/health || curl -f http://127.0.0.1:${PORT}/ || exit 1
 
 WORKDIR /app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["server"]
+CMD ["frontend"]
