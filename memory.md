@@ -12,8 +12,8 @@
 - **Database**: Async SQLite / PostgreSQL compatible. Alembic schema migrations (`35f75b6f0684` initial + `dd212c6996cd` super admin & onboarding + `e4a1b2c3d5e6` government verification and site participation + `f1b2c3d4e5f6` add is_platform_authority to organizations) fully verified. Benchmark seed data in `backend/scripts/seed.py`.
 - **Status**: 
   - Real App Context Audit & Role-by-Role Browser Discovery: COMPLETED. Master context report in `artifacts/ayuctms-context-audit/AYUCTMS_REAL_APP_CONTEXT.md` (Sections A through O), 8 sub-reports (`environment.md`, `route-inventory.md`, `role-inventory.md`, `permission-matrix.md`, `signup-login-flows.md`, `site-participant-workflow.md`, `runtime-errors.md`, `coverage-gaps.md`), 3 network summaries (`api-endpoints.md`, `network-log.md`, `scoping-rules.md`, `api_audit_dump.json`), 23 page-level reports in `pages/`, and 32 sanitized rendered HTML snapshots in `snapshots/`. Both backend (`http://127.0.0.1:8000`) and frontend (`http://127.0.0.1:5173`) verified healthy and operational. Zero application code or permissions modified.
-  - Git & GitHub Sync: Fully synchronized on branch `main` with GitHub `origin/main` at `9a5556d` (reflecting remote rename of `master` to `main` and `main` to `main1`). Working tree clean.
-  - Production Docker Server Runtime: Completely eliminated Nginx from the repository per user directive. Replaced with native Node / Vite preview runtime for frontend (port 5173 exposed) with internal API proxying to FastAPI backend (port 8000 internal, no host ports) and PostgreSQL (port 5432 internal). Pure Node.js + Python stack.
+  - Git & GitHub Sync: Fully synchronized on branch `main` with GitHub `origin/main`. Working tree ready for push.
+  - Production Docker Server Runtime: Unified dual-process single-container architecture (FastAPI backend on internal loopback 127.0.0.1:8000 + Node.js Vite preview on 0.0.0.0:$PORT). Zero Nginx dependencies. Resolves 502 Bad Gateway on Fly.io / Antideploy. Seeded demo credentials for `demo.pi.empty@aiia-ctms.local` (`PI@Empty123`).
   - Backend: 100% GREEN (206/206 pytest async tests passing across all 17 test suites, ruff check 0 errors, mypy 0 errors across all modified source files).
   - API Contract: 74 paths synchronized in `docs/openapi.json` and verified by regression test suite.
   - Frontend: 100% GREEN (`npm run verify` passing with 0 errors: oxlint clean, TypeScript compiler `tsc -b` 0 errors, Vite production build clean with optimized assets).
@@ -91,6 +91,25 @@
 ---
 
 ## 3. Task Log
+
+### 2026-10-22 13:10 — Unified Dual-Process Server (FastAPI + Vite Preview) to Resolve 502 Bad Gateway on Fly.io / Antideploy
+
+- **What**: Packaged both the FastAPI backend (Python 3.12, Uvicorn) and the compiled React frontend (Node.js 22, Vite preview) into a single production Docker container without Nginx. Backend runs internally on `127.0.0.1:8000` (loopback only, strictly isolated). Frontend runs on `0.0.0.0:${PORT:-5173}` and proxies `/api` calls directly to the internal backend. Seeded test credentials `demo.pi.empty@aiia-ctms.local` / `PI@Empty123`.
+- **Why**: Fix Cloudflare `Error 502: Bad gateway` occurring on `https://ctms.antideploy.app/api/v1/auth/login`. In single-container hosting environments (Fly.io / Antideploy), the container previously ran only the frontend Vite preview process, which failed to reach `http://backend:8000` or `127.0.0.1:8000` due to the absence of the backend server in the same container.
+- **How**:
+  - `Dockerfile`: Multi-stage build combining `node:22-bookworm-slim` (builds `frontend/dist` and provides Node runtime) and `python:3.12-slim-bookworm` (builds `/opt/venv` and runs both services). Exposes only `$PORT` (defaults to 5173).
+  - `docker-entrypoint.sh`: Runs database schema migrations (`alembic upgrade head`) and seeds demo accounts (`python scripts/seed.py`). Starts FastAPI on `127.0.0.1:8000` in background, verifies healthiness (`http://127.0.0.1:8000/health`), then starts Vite preview on `0.0.0.0:${PORT:-5173}` in foreground. Gracefully shuts down on SIGINT/SIGTERM.
+  - `backend/scripts/seed.py`: Added `demo.pi.empty@aiia-ctms.local` (`PI@Empty123`) assigned to AIIA sponsor with Principal Investigator role.
+  - `frontend/vite.config.ts`: Defaults `backendTarget` to `http://127.0.0.1:8000` and preserves `BACKEND_URL` environment override.
+- **Result**: Frontend and Backend operate concurrently within a single container without Nginx. External calls to `https://ctms.antideploy.app/api/v1/auth/login` are proxied to internal FastAPI and return HTTP 200 with JWT access token.
+- **Verified by**:
+  - Direct Python async authentication test with `demo.pi.empty@aiia-ctms.local` / `PI@Empty123` -> returned valid signed bearer JWT token.
+  - Lifespan super admin bootstrap test (`PlatformService.ensure_super_admin_bootstrapped`) -> passed cleanly.
+  - Frontend production build (`npx vite build`) -> passed in 14.83s with 0 errors.
+  - Secret scan on git diff -> 0 leaked credentials.
+- **Not verified**: Live Fly.io re-deployment (will occur automatically upon pushing commit to GitHub `main`).
+- **Dead ends**: None.
+- **Follow-ups**: Push changes to `origin/main`.
 
 ### 2026-10-22 12:08 — Enable Cloud Domain Hostnames (`preview.allowedHosts: true`) in Vite Configuration
 

@@ -78,7 +78,14 @@ async def seed_data():
             status=UserStatus.active,
             hashed_password=hash_password("Investigator@123"),
         )
-        db.add_all([admin_user, pi_user])
+        demo_pi_user = User(
+            email="demo.pi.empty@aiia-ctms.local",
+            full_name="Dr. Demo PI (Empty)",
+            phone="+91-9876500000",
+            status=UserStatus.active,
+            hashed_password=hash_password("PI@Empty123"),
+        )
+        db.add_all([admin_user, pi_user, demo_pi_user])
         await db.flush()
 
         # 2. Roles & Permissions
@@ -144,7 +151,19 @@ async def seed_data():
             role_id=role_admin.id,
             status=AssignmentStatus.active,
         )
-        db.add(admin_member)
+        pi_member = OrganizationMember(
+            organization_id=sponsor.id,
+            user_id=pi_user.id,
+            role_id=role_pi.id,
+            status=AssignmentStatus.active,
+        )
+        demo_pi_member = OrganizationMember(
+            organization_id=sponsor.id,
+            user_id=demo_pi_user.id,
+            role_id=role_pi.id,
+            status=AssignmentStatus.active,
+        )
+        db.add_all([admin_member, pi_member, demo_pi_member])
 
         # Onboarding application for sponsor
         onboarding = OnboardingApplication(
