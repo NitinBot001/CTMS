@@ -20,6 +20,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: backendTarget,
@@ -30,6 +31,7 @@ export default defineConfig({
   preview: {
     port: 5173,
     host: '0.0.0.0',
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: backendTarget,

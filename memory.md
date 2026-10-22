@@ -92,6 +92,19 @@
 
 ## 3. Task Log
 
+### 2026-10-22 12:08 — Enable Cloud Domain Hostnames (`preview.allowedHosts: true`) in Vite Configuration
+
+- **What**: Added `allowedHosts: true` to both `preview` and `server` configurations in `frontend/vite.config.ts`.
+- **Why**: Fix runtime error `Blocked request. This host ("ad-ctms-5a218a5a.fly.dev") is not allowed. To allow this host, add "ad-ctms-5a218a5a.fly.dev" to preview.allowedHosts in vite.config.js` when accessed via Fly.io deployment domain.
+- **How**: Set `allowedHosts: true` in `frontend/vite.config.ts` under both `server` and `preview` blocks, allowing `ad-ctms-5a218a5a.fly.dev` and any cloud or custom domains.
+- **Result**: Host validation passes seamlessly; cloud domain requests return HTTP 200 without blocking.
+- **Verified by**:
+  - Live test: Started `vite preview` and sent HTTP request with `Host: ad-ctms-5a218a5a.fly.dev` via `curl -i -H "Host: ad-ctms-5a218a5a.fly.dev" http://127.0.0.1:5175/` -> Returned `HTTP/1.1 200 OK` with complete HTML.
+  - Lint: `oxlint` 0 errors.
+- **Not verified**: None.
+- **Dead ends**: None.
+- **Follow-ups**: Ready to commit and push to `origin/main`.
+
 ### 2026-10-22 11:55 — Complete Elimination of Nginx in Favor of Native Node + Python Architecture
 
 - **What**: Removed Nginx entirely from the project (`frontend/nginx.conf` and `nginx-unified.conf` deleted). Switched frontend containerization to pure Node.js (`node:22-alpine`) utilizing Vite's built-in preview server (`npm run preview`) with dynamic internal API proxying (`preview.proxy`). Reconfigured Compose and Dockerfiles so ONLY frontend port (5173) is exposed, while backend and database operate internally.
